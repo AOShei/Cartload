@@ -3,12 +3,10 @@
   import { onMount, tick } from "svelte";
   import { inTauri } from "../api/tauri";
   import type { FlowKind } from "../api/types";
-  import DetailsList from "../components/DetailsList.svelte";
   import FailureCard from "../components/FailureCard.svelte";
   import FelIllustration from "../components/FelIllustration.svelte";
   import FlowLog from "../components/FlowLog.svelte";
   import Icon from "../components/Icon.svelte";
-  import StatusCard from "../components/StatusCard.svelte";
   import StepList from "../components/StepList.svelte";
   import {
     consoleStore,
@@ -164,15 +162,10 @@
     }
   });
 
-  const resultPrimary = $derived.by(() => {
-    if (snapshot.state !== "done") {
-      return null;
-    }
-    if (snapshot.kind?.kind === "install" && status?.state === "connected") {
-      return { label: "Open Library", run: () => navigation.go("library") };
-    }
-    return { label: "Open Console", run: () => navigation.go("console") };
-  });
+  /** After an install that left the console connected the Library is the next step. */
+  const libraryNext = $derived(
+    snapshot.state === "done" && snapshot.kind?.kind === "install" && status?.state === "connected",
+  );
 
   let menuOpen = $state(false);
   let menu: HTMLDetailsElement | undefined = $state();
@@ -316,7 +309,8 @@
     </details>
   </header>
 
-  <ol class="stages">
+  <div class="columns">
+  <ol class="stages left">
     <!-- Stage 1 -->
     <li class="stage" class:complete={watch.ready}>
       <span class="number" aria-hidden="true">{#if watch.ready}<Icon name="check" size={16} />{:else}1{/if}</span>
@@ -450,13 +444,21 @@
         {#if snapshot.cancel_pending}
           <p class="note">The current step writes to the console's flash, so it finishes first. Do not unplug the console.</p>
         {/if}
-        <StepList steps={flowStore.steps} now={flowStore.now} />
-        {#if snapshot.state !== "idle"}
-          <FlowLog since={snapshot.started_at} />
-        {/if}
       </div>
     </li>
+  </ol>
 
+  <div class="right">
+    <section class="card progress" aria-label="Steps and log of the run">
+      <div class="steps-scroll">
+        <StepList steps={flowStore.steps} now={flowStore.now} />
+      </div>
+      {#if snapshot.state !== "idle"}
+        <FlowLog since={snapshot.started_at} grow />
+      {/if}
+    </section>
+
+  <ol class="stages">
     <!-- Stage 4 -->
     <li class="stage" class:complete={snapshot.state === "done"} class:failed={snapshot.state === "failed"}>
       <span class="number" aria-hidden="true">
@@ -467,18 +469,16 @@
           <section class="card result">
             <h2>{outcome.heading}</h2>
             <p class="muted">{outcome.text}</p>
+            <p class="summary" role="status">
+              <span class="dot tone-{report?.tone ?? 'neutral'}" aria-hidden="true"></span>
+              <span class="summary-text">{report?.title ?? "Looking at the console…"}</span>
+              {#if flowElapsed}<span class="muted num">{flowElapsed}</span>{/if}
+            </p>
+            <div class="result-actions">
+              <button type="button" class="btn" class:btn-primary={!libraryNext} onclick={() => navigation.go("console")}>Open Console</button>
+              <button type="button" class="btn" class:btn-primary={libraryNext} onclick={() => navigation.go("library")}>Open Library</button>
+            </div>
           </section>
-          <StatusCard
-            {report}
-            refreshing={consoleStore.refreshing}
-            primary={resultPrimary}
-            onrefresh={() => void consoleStore.refresh()}
-          />
-          {#if report && report.details.length > 0}
-            <section class="card details" aria-label="Detected details">
-              <DetailsList details={report.details} />
-            </section>
-          {/if}
         {:else if snapshot.state === "failed" && snapshot.failure}
           <FailureCard
             failure={snapshot.failure}
@@ -510,6 +510,8 @@
       </div>
     </li>
   </ol>
+  </div>
+  </div>
 </div>
 
 <style>
@@ -519,14 +521,81 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    max-width: 1024px;
-    overflow: auto;
+    overflow: hidden;
   }
 
   .top {
+    flex: none;
     display: flex;
     align-items: flex-start;
     gap: var(--space-4);
+  }
+
+  /* Narrow: the stages and the progress stack in one scrolling column. Wide (1100 px and
+     up): two columns, the stage cards on the left and the step list, the run log and the
+     result on the right; the step list and the log scroll inside their column. */
+  .columns {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    overflow: auto;
+    max-width: 1024px;
+  }
+
+  .right {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .steps-scroll {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  @media (min-width: 1100px) {
+    .columns {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+      grid-template-rows: minmax(0, 1fr);
+      align-items: start;
+      gap: var(--space-5);
+      max-width: 1480px;
+      overflow: hidden;
+    }
+
+    .left {
+      max-height: 100%;
+      overflow: auto;
+    }
+
+    .right {
+      max-height: 100%;
+      min-height: 0;
+    }
+
+    .progress {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .steps-scroll {
+      flex: 0 1 auto;
+    }
+
+    .right > .stages {
+      flex: none;
+    }
   }
 
   .lede {
@@ -679,9 +748,31 @@
   }
 
   .body.card,
-  .result,
-  .details {
+  .result {
     padding: var(--space-4) var(--space-5);
+  }
+
+  .summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-s);
+    background: var(--surface-raised);
+    font-size: var(--text-md);
+  }
+
+  .summary-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .result-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-top: var(--space-3);
   }
 
   .row {
@@ -764,7 +855,9 @@
     border-top-color: var(--on-accent);
   }
 
-  @media (max-width: 1023px) {
+  /* The illustration sits beside the steps only when the stage card is wide enough for
+     both: a narrow window, or the left column of a two-column window under 1500 px. */
+  @media (max-width: 1023px), (min-width: 1100px) and (max-width: 1499px) {
     .fel {
       grid-template-columns: 1fr;
     }

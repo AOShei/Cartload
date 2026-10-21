@@ -5,9 +5,11 @@
   interface Props {
     /** Unix milliseconds: only lines from then on are shown. */
     since: number | null;
+    /** Fill the parent's remaining height instead of stopping at 192 px. */
+    grow?: boolean;
   }
 
-  let { since }: Props = $props();
+  let { since, grow = false }: Props = $props();
 
   // A little slack: the first lines of a flow can precede the snapshot's start time.
   const lines = $derived(
@@ -32,7 +34,7 @@
   }
 </script>
 
-<section class="flow-log" aria-label="Log of this run">
+<section class="flow-log" class:grow aria-label="Log of this run">
   <header>
     <h3 class="caps">Log</h3>
     <span class="spacer"></span>
@@ -82,10 +84,21 @@
     flex: 1;
   }
 
+  .grow {
+    flex: 1 1 160px;
+    min-height: 120px;
+  }
+
+  .grow ol {
+    flex: 1;
+    max-height: none;
+  }
+
   ol {
     margin: 0;
     padding: var(--space-1) 0;
     list-style: none;
+    min-height: 0;
     max-height: 192px;
     overflow: auto;
     font-family: var(--font-mono);
