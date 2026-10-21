@@ -514,10 +514,13 @@
 
 <style>
   .page {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
     max-width: 1024px;
+    overflow: auto;
   }
 
   .top {

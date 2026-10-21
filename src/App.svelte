@@ -99,13 +99,16 @@
     min-width: 0;
   }
 
+  /* The window is a fixed viewport: the sidebar, this header, the log panel and the status
+     bar never move, and the page content area is the only flexible region. It never scrolls
+     itself; each page declares which of its regions scroll. */
   main {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
     padding: var(--space-5) var(--space-6) var(--space-4);
-    overflow: auto;
+    overflow: hidden;
   }
 
   .page-header {
@@ -125,6 +128,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .shell > :global(footer) {

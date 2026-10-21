@@ -93,10 +93,14 @@
 </section>
 
 <style>
+  /* Fixed height: the panel shrinks the page content area, never pushes it off screen.
+     Short windows get a shorter log so the page keeps at least half of the height. */
   .panel {
+    flex: none;
     display: flex;
     flex-direction: column;
-    height: 224px;
+    height: clamp(144px, 28vh, 224px);
+    min-height: 0;
     border-top: 1px solid var(--border);
     background: var(--surface);
   }

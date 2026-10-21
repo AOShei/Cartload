@@ -53,9 +53,15 @@ class Preferences {
       // Unreadable storage: keep the defaults.
     }
     // `?theme=light|dark` forces a theme for previews and screenshots, without storing it.
-    const forced = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("theme");
+    const params = typeof location === "undefined" ? null : new URLSearchParams(location.search);
+    const forced = params?.get("theme") ?? null;
     if (isTheme(forced) && forced !== "system") {
       this.theme = forced;
+    }
+    // `?log=open|closed` forces the log panel for previews and screenshots, also unstored.
+    const log = params?.get("log");
+    if (log === "open" || log === "closed") {
+      this.logOpen = log === "open";
     }
     applyTheme(this.theme);
   }
