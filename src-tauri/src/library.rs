@@ -843,6 +843,12 @@ impl LibraryState {
                 .status(http::StatusCode::OK)
                 .header(http::header::CONTENT_TYPE, "image/png")
                 .header(http::header::CACHE_CONTROL, "max-age=31536000, immutable")
+                // WebKitGTK treats `cover://localhost` as a foreign origin and refuses to
+                // display it from the page's origin (`http://localhost:1420` in dev,
+                // `tauri://localhost` in a build) unless the load goes through CORS, so the
+                // `<img>` tags load with `crossorigin` and this header allows them, the same
+                // way Tauri's own asset protocol does.
+                .header(http::header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(bytes)
                 .unwrap_or_else(|_| http::Response::new(Vec::new())),
             None => http::Response::builder()

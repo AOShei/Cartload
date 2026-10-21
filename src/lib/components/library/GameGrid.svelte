@@ -382,7 +382,7 @@
             >
               <div class="art">
                 {#if tile.kind === "game"}
-                  <img src={tile.view.cover} alt="" loading="lazy" decoding="async" draggable="false" />
+                  <img src={tile.view.cover} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
                   {#if tile.view.game.placeholder_art}
                     <span class="noart">No art yet</span>
                   {/if}
@@ -436,7 +436,7 @@
             >
               <td class="name-cell">
                 {#if tile.kind === "game"}
-                  <img class="thumb" src={tile.view.thumbnail} alt="" loading="lazy" decoding="async" draggable="false" />
+                  <img class="thumb" src={tile.view.thumbnail} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
                 {:else}
                   <span class="thumb glyph"><Icon name={tile.kind === "folder" ? "folder" : "builtIn"} size={18} /></span>
                 {/if}

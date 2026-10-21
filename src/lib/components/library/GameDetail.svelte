@@ -125,7 +125,7 @@
   {#if game && form}
     <div class="scroll">
       <div class="cover">
-        <img src={game.cover} alt="Cover of {game.game.name}" decoding="async" />
+        <img src={game.cover} alt="Cover of {game.game.name}" decoding="async" crossorigin="anonymous" />
         {#if game.game.placeholder_art}
           <span class="noart">No art yet</span>
         {/if}
