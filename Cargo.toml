@@ -1,0 +1,41 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/fel",
+    "crates/console",
+    "crates/hmod",
+    "crates/library",
+    "src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/cartload/cartload"
+rust-version = "1.90"
+
+[workspace.dependencies]
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+cartload-fel = { path = "crates/fel" }
+cartload-console = { path = "crates/console" }
+cartload-hmod = { path = "crates/hmod" }
+cartload-library = { path = "crates/library" }
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true

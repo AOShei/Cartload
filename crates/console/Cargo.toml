@@ -1,0 +1,22 @@
+[package]
+name = "cartload-console"
+description = "Discovery, SSH and FTP sessions, and typed wrappers for the device hakchi script"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "cartload_console"
+
+[[bin]]
+name = "cartload-console"
+path = "src/main.rs"
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

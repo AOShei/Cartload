@@ -1,0 +1,22 @@
+[package]
+name = "cartload-fel"
+description = "Allwinner FEL USB boot protocol for the Classic Mini consoles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "cartload_fel"
+
+[[bin]]
+name = "cartload-fel"
+path = "src/main.rs"
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

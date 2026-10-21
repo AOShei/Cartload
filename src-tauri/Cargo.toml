@@ -1,0 +1,29 @@
+[package]
+name = "cartload-app"
+description = "Cartload desktop application (Tauri shell)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "cartload_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tauri = { version = "2.12", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+cartload-fel.workspace = true
+cartload-console.workspace = true
+cartload-hmod.workspace = true
+cartload-library.workspace = true
+
+[lints]
+workspace = true

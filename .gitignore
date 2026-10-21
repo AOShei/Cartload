@@ -8,3 +8,5 @@ __pycache__/
 *.log
 !docs/reference/*.log
 .env
+src-tauri/gen/schemas/
+src-tauri/icons/source.png
