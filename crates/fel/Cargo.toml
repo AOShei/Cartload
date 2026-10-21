@@ -21,7 +21,7 @@ default = ["cli"]
 cli = ["dep:anyhow", "dep:cartload-hmod", "dep:clap", "dep:tracing-subscriber"]
 
 [dependencies]
-nusb = "0.2"
+nusb = { version = "0.2", features = ["tokio"] }
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
