@@ -1,0 +1,198 @@
+Base directory: ~/Documents/Hakchi2-CE/hakchi_gui/bin/Release/net48 (portable mode)
+Loading configuration
+Loading spine templates
+Starting, version: 3.9.3-4fb3092c-dirty
+
+Gtk not found (missing LD_LIBRARY_PATH to libgtk-x11-2.0.so.0?), using built-in colorscheme
+There is no flag for "ko"
+Loading libretro core info files
+....Executing task: ModTasks.GetHmods
+Tasker completed all tasks, conclusion: Success
+Building libretro core cross index
+Done, 5 cores loaded
+Loading ~/Documents/Hakchi2-CE/hakchi_gui/bin/Release/net48/data/nescarts.xml
+Loading SNES Cartridge Cache
+SNES XML loading done, 786 roms total
+[Upgrade] No upgrade action needed
+......NES XML loading done, 2150 roms total
+.........................Executing task: LoadGamesTask.LoadGames
+Executing task: LoadGamesTask.CreateListViewGroups
+Executing task: LoadGamesTask.LoadGamesFromFiles
+Loading original games data
+Executing task: LoadGamesTask.AssignGroupsToGames
+Executing task: LoadGamesTask.AssignListViewGroups
+Executing task: LoadGamesTask.UpdateListView
+Tasker completed all tasks, conclusion: Success
+....Executing task: <>c__DisplayClass0_0.<DownloadFile>b__0
+Executing task: <>c__DisplayClass1_0.<MoveFile>b__0
+Executing task: <>c__DisplayClass70_0.<TaskTitle>b__0
+Executing task: <>c__DisplayClass0_0.<DownloadFile>b__0
+Executing task: <>c__DisplayClass1_0.<MoveFile>b__0
+Tasker completed all tasks, conclusion: Success
+Local hakchi.hmod version info: boot 1.0.3, kernel 3.4.113.29-madmonkey, script v1.0.4-126
+gpath.c:115: assertion 'filename != NULL' failed
+
+Downloading motd file, URL: https://teamshinkansen.github.io/motd.md
+USB link: console answering at 169.254.13.37:22
+Attempting to connect to 169.254.13.37...
+mDNS: watching interface enp8s0 (Up, 192.168.1.15, 2a01:cb08:5c7:7100:6c72:1e74:524a:1828, fe80::a4d0:d553:94b2:4e3a%3)
+mDNS: watching interface br-6e69d5cdad98 (Down, 172.19.0.1)
+mDNS: watching interface br-a7387cd97df0 (Down, 172.20.0.1)
+mDNS: watching interface br-c022b703781b (Down, 172.18.0.1)
+mDNS: watching interface docker0 (Down, 172.17.0.1)
+mDNS: watching interface hakchi0 (Unknown, 169.254.29.194, fe80::110a:b0a:3fcc:3e5e%17)
+Service added:
+    Instance: hakchi
+    Type: _ssh._tcp
+    IP: 169.254.13.37
+    Port: 22
+    Txt: hwid=0461872a 87280207 9d2818c7 6c118000, type=snes, region=eur
+Motd timestamp: 2022-11-09T12:59:00.0000000-05:00
+SSH shell connected
+IP Address: 169.254.13.37
+Encryption: aes256-ctr
+hakchi ismdPartitioning # exit code 1
+source /hakchi/config; [ "$cf_memboot" = "y" ] # exit code 2
+hakchi hwid # exit code 0
+Detected device unique ID: 0461872a872802079d2818c76c118000
+[ -f /var/version ] && echo "yes" # exit code 0
+source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion" # exit code 0
+Detected versions: boot 1.0.3, kernel 3.4.113.29-madmonkey, script v1.0.4-126
+hakchi eval 'echo "$sftype-$sfregion"' # exit code 0
+hakchi currentFirmware # exit code 0
+hakchi findGameSyncStorage # exit code 0
+hakchi get gamepath # exit code 0
+hakchi get rootfs # exit code 0
+hakchi get squashfs # exit code 0
+Reading p0000_config file
+cat /etc/preinit.d/p0000_config # exit code 0
+df "$(hakchi findGameSyncStorage)" | tail -n 1 | awk '{ print $2 " | " $3 " | " $4 }' # exit code 0
+mount | grep /var/lib/clover/profiles # exit code 1
+du -s "$(readlink /var/saves)" | awk '{ print $1 }' # exit code 0
+du -d 1 "/var/lib/hakchi/games" | head -n -1 | awk '{ print $2 " | " $1 }' # exit code 0
+Storage size: 352.6MB, used: 28.2MB, free: 313.5MB
+    Used by all games: 0.0MB
+    Used by non multi-boot games: 0.0MB
+    Used by current games collection: 0.0MB
+    Used by save-states: 0.1MB
+    Used by other files (mods, configs, etc.): 28.1MB
+    Reserved memory: 0.0MB
+    Available for games: 313.5MB
+which bluetoothctl # exit code 1
+hakchi get cfg_mdui_region # exit code 0
+..Executing task: GameCacheTask.UpdateLocal
+hakchi eval 'echo "$squashfs$gamepath"' # exit code 0
+[ -d "/var/squashfs/usr/share/games" ] && echo YES || echo NO # exit code 0
+ls "/var/squashfs/usr/share/games" -p -1 | grep '/' # exit code 0
+Tasker completed all tasks, conclusion: Success
+Done refreshing local original games cache.
+Success!
+....Executing task: AddGamesTask.AddGames
+Trying to convert ~/Documents/Games/SNES/Chrono Trigger.smc
+Game title: CHRONO TRIGGER
+ROM type: HiRom
+PresetID: 0x0000, extra byte: 00
+Patching override core: Canoe
+Saving application "CLV-U-ZJSQU" as CLV-U-ZJSQU
+Saving application "Chrono Trigger" as CLV-U-ZJSQU
+hakchi.exe Information: 0 : Open 7zip archive for writing.
+hakchi.exe Information: 0 : Adding file `~/Documents/Hakchi2-CE/hakchi_gui/bin/Release/net48/games/CLV-U-ZJSQU/Chrono_Trigger.sfrom`.
+Compressing ~/Documents/Hakchi2-CE/hakchi_gui/bin/Release/net48/games/CLV-U-ZJSQU/Chrono_Trigger.sfrom
+hakchi.exe Information: 0 : Compressing files.
+    hakchi.exe Information: 0 : Compressing `Chrono_Trigger.sfrom`, Size: `4194400 bytes`...
+hakchi.exe Information: 0 : Done compressing files.
+Saving application "Chrono Trigger" as CLV-U-ZJSQU
+Executing task: AddGamesTask.UpdateListView
+Tasker completed all tasks, conclusion: Success
+Web request: https://www.google.com/search?q=Chrono+Trigger+(snes+%7c+super+nintendo)+Clear+Logo+-%22project+lunar%22+site%3athegamesdb.net&source=lnms&tbm=isch&tbs=ift:png,ic:trans
+No results found
+Web request: https://www.google.com/search?q=Chrono+Trigger+(snes+%7c+super+nintendo)+Clear+Logo+-%22project+lunar%22+site%3agamesdb.launchbox-app.com&source=lnms&tbm=isch&tbs=ift:png,ic:trans
+No results found
+Web request: https://www.google.com/search?q=Chrono+Trigger+(snes+%7c+super+nintendo)+Clear+Logo+-%22project+lunar%22&source=lnms&tbm=isch&tbs=ift:png,ic:trans
+No results found
+Saving selected games
+Saving configuration
+.........Executing task: SyncTask.UploadGames
+Executing task: SyncTask.BuildMenu
+Executing task: SyncTask.BuildFiles
+Processing CLV-P-SACCE ('CONTRA III THE ALIEN WARS'), size: 4KB
+Processing CLV-P-SAALE ('Donkey Kong Country'), size: 4KB
+Processing CLV-P-SAAJE ('EarthBound'), size: 4KB
+Processing CLV-P-SABTE ('Final Fantasy III'), size: 4KB
+Processing CLV-P-SAABE ('F-ZERO'), size: 4KB
+Processing CLV-P-SAAQE ('Kirby Super Star'), size: 4KB
+Processing CLV-P-SAAKE ('Kirby's Dream Course'), size: 4KB
+Processing CLV-P-SABCE ('Mega Man X'), size: 4KB
+Processing CLV-P-SABRE ('Secret of Mana'), size: 4KB
+Processing CLV-P-SADGE ('Star Fox'), size: 4KB
+Processing CLV-P-SADKE ('Star Fox 2'), size: 4KB
+Processing CLV-P-SABHE ('Street Fighter II Turbo: Hyper Fighting'), size: 4KB
+Processing CLV-P-SACBE ('Super Castlevania IV'), size: 4KB
+Processing CLV-P-SABDE ('Super Ghouls'n Ghosts'), size: 4KB
+Processing CLV-P-SAAFE ('Super Mario Kart'), size: 4KB
+Processing CLV-P-SABQE ('Super Mario RPG: Legend of the Seven Stars'), size: 4KB
+Processing CLV-P-SAAAE ('Super Mario World'), size: 4KB
+Processing CLV-P-SAAHE ('Super Metroid'), size: 4KB
+Processing CLV-P-SAAXE ('Super Punch-Out!!'), size: 4KB
+Processing CLV-P-SAAEE ('The Legend of Zelda: A Link to the Past'), size: 4KB
+Processing CLV-P-SADJE ('Yoshi's Island'), size: 4KB
+Processing CLV-U-ZJSQU ('Chrono Trigger'), size: 2804KB
+"folder_back.png" did not need resizing, no processing done
+Processed folder CLV-S-00000 ('Original games'), size: 12KB
+"folder.png" did not need resizing, no processing done
+Processed folder CLV-S-00001 ('More games...'), size: 12KB
+Executing task: SyncTask.CheckRemoteStorageRequirements
+df "$(hakchi findGameSyncStorage)" | tail -n 1 | awk '{ print $2 " | " $3 " | " $4 }' # exit code 0
+mount | grep /var/lib/clover/profiles # exit code 1
+du -s "$(readlink /var/saves)" | awk '{ print $1 }' # exit code 0
+du -d 1 "/var/lib/hakchi/games" | head -n -1 | awk '{ print $2 " | " $1 }' # exit code 0
+Storage size: 352.6MB, used: 28.2MB, free: 313.5MB
+    Used by all games: 0.0MB
+    Used by non multi-boot games: 0.0MB
+    Used by current games collection: 0.0MB
+    Used by save-states: 0.1MB
+    Used by other files (mods, configs, etc.): 28.1MB
+    Reserved memory: 0.0MB
+    Available for games: 313.5MB
+Executing task: SyncTask.PrepareRemoteTransfer
+uistop # exit code 0
+gunzip -c - > /dev/fb0 # exit code 0
+hakchi eval 'umount "$gamepath"' # exit code 1
+Executing task: SyncTask.CalculateRemoteDiff
+find "/var/lib/hakchi/games/" -maxdepth 1 | tail -n +2 | grep -vEe '(/hvcj-jpn?|/snes(-usa|-eur|-jpn)?|/nes(-usa|-jpn)?|/md(-jpn|-usa|-eur|-asia)?|/)$' | while read f; do rm -rf "$f"; done # exit code 0
+find "/var/lib/hakchi/games/snes-eur" -type l | while read f; do rm "$f"; done # exit code 0
+mkdir -p "/var/lib/hakchi/games/snes-eur"; cd "/var/lib/hakchi/games/snes-eur"; find . -type f -exec sh -c "stat \"{}\" -c \"%n %s %y\"" \; # exit code 0
+cat > /tmp/cleanup.sh # exit code 0
+chmod +x /tmp/cleanup.sh && /tmp/cleanup.sh # exit code 0
+rm /tmp/cleanup.sh # exit code 0
+Executing task: SyncTask.SyncRemoteGamesFTP
+Uploading through FTP
+Upload size: 2.7 MB
+cat > /tmp/modtime.sh # exit code 0
+chmod +x /tmp/modtime.sh && /tmp/modtime.sh # exit code 0
+rm /tmp/modtime.sh # exit code 0
+Uploaded 2809kb in 0.418064 seconds
+Executing task: SyncTask.RemoteCleanup
+for f in $(find "/var/lib/hakchi/games/snes-eur" -type d -mindepth 1 -maxdepth 2); do { find "$f" -type f -mindepth 1 | grep -v pixelart | grep -v autoplay | wc -l | { read wc; test $wc -eq 0 && rm -rf "$f"; } } ; done # exit code 1
+Executing task: SyncTask.LinkGames
+cat > /tmp/linkgamessync.sh # exit code 0
+chmod +x /tmp/linkgamessync.sh && /tmp/linkgamessync.sh # exit code 0
+rm /tmp/linkgamessync.sh # exit code 0
+Executing task: ShellTasks.SyncConfig
+Saving p00000_config values
+hakchi eval # exit code 0
+Executing final task: SyncTask.FinishRemoteTransfer
+hakchi overmount_games; uistart # exit code 0
+df "$(hakchi findGameSyncStorage)" | tail -n 1 | awk '{ print $2 " | " $3 " | " $4 }' # exit code 0
+mount | grep /var/lib/clover/profiles # exit code 1
+du -s "$(readlink /var/saves)" | awk '{ print $1 }' # exit code 0
+du -d 1 "/var/lib/hakchi/games" | head -n -1 | awk '{ print $2 " | " $1 }' # exit code 0
+Storage size: 352.6MB, used: 31.2MB, free: 310.5MB
+    Used by all games: 3.0MB
+    Used by non multi-boot games: 0.0MB
+    Used by current games collection: 3.0MB
+    Used by save-states: 0.1MB
+    Used by other files (mods, configs, etc.): 28.1MB
+    Reserved memory: 0.0MB
+    Available for games: 313.5MB
+Tasker completed all tasks, conclusion: Success

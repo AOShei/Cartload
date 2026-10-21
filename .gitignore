@@ -1,0 +1,10 @@
+target/
+node_modules/
+dist/
+build/
+.agent/logs/
+.agent/.venv/
+__pycache__/
+*.log
+!docs/reference/*.log
+.env
