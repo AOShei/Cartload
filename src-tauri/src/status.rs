@@ -398,9 +398,7 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
         ),
         Detail::new("USB id", device.id_text()),
     ];
-    if let Some(manufacturer) = &device.manufacturer {
-        details.push(Detail::new("Manufacturer", manufacturer.clone()));
-    }
+    // The USB manufacturer string is not shown: the app names consoles by model only.
     if let Some(product) = &device.product {
         details.push(Detail::new("Product", product.clone()));
     }

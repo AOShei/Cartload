@@ -180,9 +180,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_window_state::Builder::default()
+                // Not SIZE: the window always opens at the size in tauri.conf.json. GNOME on
+                // Wayland reported a size taller than the screen, which came back on every
+                // start.
                 .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::SIZE
-                        | tauri_plugin_window_state::StateFlags::POSITION
+                    tauri_plugin_window_state::StateFlags::POSITION
                         | tauri_plugin_window_state::StateFlags::MAXIMIZED,
                 )
                 .build(),
@@ -222,7 +224,13 @@ pub fn run() {
 /// last size and position, and a size saved on a larger display (or by a compositor that
 /// reported more than the screen) would otherwise hang off the bottom of a 1080p screen.
 fn fit_to_monitor(window: &tauri::WebviewWindow) {
-    let Ok(Some(monitor)) = window.current_monitor() else {
+    // On Wayland the window cannot tell which monitor it is on; the primary one will do.
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
         return;
     };
     let Ok(size) = window.outer_size() else {

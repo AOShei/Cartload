@@ -45,7 +45,7 @@
       case "ShonenJump":
         return "Famicom Mini (Shonen Jump edition)";
       case "MdUsa":
-        return "Genesis Mini";
+        return "Mega Drive Mini (North America)";
       case "MdJpn":
       case "MdEur":
       case "MdAsia":
@@ -100,15 +100,11 @@
   {#if shape === "sfc"}
     <!-- SNES Classic Mini (Europe) / Super Famicom Mini: light grey body, a dark grey plate
          with the four-colour mark, the slot with its centre notch, then Power, Eject and
-         Reset in a row; the Nintendo badge and the LED on the light front. -->
+         Reset in a row; the LED on the light front. No marks or lettering: the drawing is a
+         guide to the controls, not a reproduction. -->
     <rect class="sfc-body" x="40" y="28" width="220" height="268" rx="20" />
     <line class="vents" x1="72" y1="37" x2="228" y2="37" />
     <path class="sfc-plate" d="M68 48h164q14 0 14 14v134l-14 30H68l-14-30V62q0-14 14-14z" />
-    <circle class="sfc-badge" cx="222" cy="74" r="12" />
-    <circle cx="217" cy="69" r="3.6" fill="#e03a2f" />
-    <circle cx="227" cy="69" r="3.6" fill="#f3c02b" />
-    <circle cx="217" cy="79" r="3.6" fill="#2fa84f" />
-    <circle cx="227" cy="79" r="3.6" fill="#2f68c9" />
     <rect class="sfc-dark" x="96" y="116" width="108" height="16" rx="5" />
     <line class="sfc-tick" x1="106" y1="120" x2="106" y2="128" />
     <line class="sfc-tick" x1="194" y1="120" x2="194" y2="128" />
@@ -125,10 +121,6 @@
     <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="4" />
     <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="206" text-anchor="middle">RESET</text>
     <!-- front -->
-    <rect x="98" y="240" width="40" height="11" rx="5.5" fill="none" stroke="#7a7a7e" />
-    <text class="brand-italic" x="118" y="248.5" text-anchor="middle">Nintendo</text>
-    <text class="brand-big" x="98" y="267">SUPER NINTENDO</text>
-    <text class="brand-tiny" x="98" y="276">ENTERTAINMENT SYSTEM</text>
     <rect x="214" y="258" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "snes-usa"}
     <!-- SNES Classic (North America): a boxy grey body, the raised deck with the slot and the
@@ -139,8 +131,6 @@
     <rect class="usa-dark" x="78" y="92" width="116" height="16" rx="4" />
     <rect x="206" y="84" width="18" height="32" rx="4" fill="#7f74c8" stroke="#5f55a8" />
     <text class="lbl on-light" x="215" y="128" text-anchor="middle">EJECT</text>
-    <text class="brand-mid" x="136" y="154" text-anchor="middle">SUPER NINTENDO</text>
-    <text class="brand-tiny" x="136" y="163" text-anchor="middle">ENTERTAINMENT SYSTEM</text>
     <!-- power slide -->
     <rect class="usa-dark" x="56" y="204" width="44" height="16" rx="8" />
     <circle cx="66" cy="212" r="6" fill="#7f74c8" />
@@ -152,8 +142,6 @@
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="234" text-anchor="middle">RESET</text>
     <!-- front band -->
     <path class="usa-band" d="M40 246h220v40q0 10-10 10H50q-10 0-10-10z" />
-    <rect x="98" y="262" width="40" height="11" rx="5.5" fill="none" stroke="#7a7a7e" />
-    <text class="brand-italic" x="118" y="270.5" text-anchor="middle">Nintendo</text>
     <rect x="214" y="268" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "nes"}
     <!-- NES Classic Mini: the vent lines at the back, the lower front with the cartridge
@@ -165,8 +153,6 @@
     {/each}
     <path class="nes-front" d="M40 150h220v138q0 8-8 8H48q-8 0-8-8z" />
     <rect x="86" y="168" width="128" height="68" rx="4" fill="#5f5f63" stroke="#4a4a4e" />
-    <text class="brand-italic on-dark" x="150" y="206" text-anchor="middle">Nintendo</text>
-    <text class="brand-tiny" x="150" y="254" text-anchor="middle">ENTERTAINMENT SYSTEM</text>
     <!-- power with the light -->
     <text class="lbl on-light" x="73" y="262" text-anchor="middle">POWER</text>
     <circle cx="50" cy="275" r="3" fill="#e03a2f" />
@@ -201,7 +187,6 @@
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#b8382f" stroke="#8f2a23" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="163" text-anchor="middle">RESET</text>
     <path class="fc-band" d="M40 238h220v46q0 12-12 12H52q-12 0-12-12z" />
-    <text class="brand-italic on-dark" x="150" y="268" text-anchor="middle">Family Computer</text>
   {:else}
     <!-- Mega Drive / Genesis Mini: black body, the 16-bit ring around the slot, the volume
          slider at the left, Power at the front left, Reset at the right of the ring. -->
@@ -209,8 +194,6 @@
     <circle cx="150" cy="150" r="72" fill="#222224" stroke="#4e4e50" stroke-width="2" />
     <circle cx="150" cy="150" r="58" fill="none" stroke="#4e4e50" />
     <rect x="116" y="146" width="68" height="12" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
-    <text class="brand-tiny on-md" x="150" y="112" text-anchor="middle">16-BIT</text>
-    <text class="brand-mid on-md" x="150" y="238" text-anchor="middle">{model === "MdUsa" ? "GENESIS" : "MEGA DRIVE"}</text>
     <rect x="56" y="120" width="10" height="48" rx="5" fill="#0f0f10" stroke="#3a3a3c" />
     <rect x="54" y="150" width="14" height="8" rx="2" fill="#6b6b6d" />
     <text class="lbl on-md" x="61" y="182" text-anchor="middle">VOL</text>
@@ -251,9 +234,6 @@
     stroke: #6f7074;
   }
 
-  .sfc-badge {
-    fill: #d7d5d1;
-  }
 
   .sfc-dark {
     fill: #44454a;
@@ -353,42 +333,10 @@
     fill: #5b4fc4;
   }
 
-  .brand-italic {
-    font-size: 6px;
-    font-weight: 700;
-    font-style: italic;
-    fill: #5a5a5e;
-  }
 
-  .brand-italic.on-dark {
-    fill: #ececee;
-  }
 
-  .brand-big {
-    font-size: 9.5px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    fill: #4a4a4e;
-  }
 
-  .brand-mid {
-    font-size: 8px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    fill: #6a6a70;
-  }
 
-  .brand-tiny {
-    font-size: 4.6px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    fill: #6a6a70;
-  }
-
-  .brand-mid.on-md,
-  .brand-tiny.on-md {
-    fill: #9a9a9c;
-  }
 
   /* the highlight and the pointer use the app's accent */
   .halo {

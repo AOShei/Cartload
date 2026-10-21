@@ -118,7 +118,6 @@ const fixtures: Record<string, () => StatusReport> = {
     details: [
       { label: "USB", value: "bus 1, device 9" },
       { label: "USB id", value: "1f3a:efe8" },
-      { label: "Manufacturer", value: "Nintendo" },
       { label: "Product", value: "CLV-S-SNPY" },
       { label: "Error", value: "the device did not answer within 1s (verify device)" },
     ],
