@@ -26,7 +26,17 @@ Windows needs WinUSB bound to `1f3a:efe8` (Zadig or libwdi). macOS needs nothing
 - mDNS: console advertises `_ssh._tcp` via tinysvcmdns, IPv4 only. Treat as secondary; probing
   `169.254.13.37:22` whenever a 169.254 interface exists is the primary discovery path.
   Wi‑Fi consoles (with a USB Wi‑Fi mod) are the only case where mDNS is needed.
-- SSH: port 22, user `root`, empty password. FTP: port 21, same credentials, used for bulk file transfer.
+- SSH: port 22, user `root`, empty password. The server is dropbear 2018.76 started by inetd as
+  `dropbear -iRB`: `-B` grants the blank password through the SSH `none` authentication method
+  and the same account is *rejected* through the `password` method, so a client must try `none`
+  first (SSH.NET does; russh needs `authenticate_none` before `authenticate_password`). The host
+  key (`ecdsa-sha2-nistp256`) is generated in RAM at each boot (`-R`) and cannot be pinned.
+  Verified negotiation: `curve25519-sha256`, `aes256-ctr`, `hmac-sha2-256`.
+- FTP: port 21, busybox `ftpd -Sw /` from inetd: writable, rooted at `/`, the password is not
+  checked. Used for bulk file transfer.
+- mDNS announcement (`S93mdnsd`, tinysvcmdns): instance `hakchi`, type `_ssh._tcp`, port 22,
+  host `madmonkey.local.`, TXT `hwid=<four hex words>`, `type=<nes|snes|hvcj|md>`,
+  `region=<usa|eur|jpn|asia>`.
 - firewalld on the host must trust the interface or the console's traffic is dropped.
 
 ## FEL memboot (first install and recovery)
@@ -62,6 +72,32 @@ by hakchi2 CE, most frequent first: `mount_base`, `umount_base`, `get <var>`, `e
 `pack_install`, `packs_install`, `pack_uninstall`, `pack_list`, `mod_uninstall`, `overmount_games`,
 `mmcUsed`, `ismdPartitioning`, `hwid`, `flashBoot2`, `findGameSyncStorage`.
 Other commands seen: `uistart`, `sntool check|kernel <img>`.
+
+`/bin/hakchi` dispatches to shell functions from `/etc/preinit.d/b0010_functions` in the ramdisk
+(`get` echoes a variable, `eval` runs its argument or, without one, stdin) and ends every
+invocation with `save_config`, which rewrites `p0000_config`. Exit codes to know: `uipause` and
+`uiresume` end with a `killall` of the Mega Drive UI process and so exit 1 on NES/SNES even when
+they worked; `overmount_games` exits 1 when no games are found; `ismdPartitioning` and `mmcUsed`
+answer with their exit code only; `hwid` prints four space-separated hex words
+(`0461872a 87280207 9d2818c7 6c118000`), which hakchi2 CE joins into one id.
+
+## Connect sequence, identification part (verified)
+
+```
+hakchi ismdPartitioning                      -> exit 1 on NES/SNES
+source /hakchi/config; [ "$cf_memboot" = "y" ]   -> exit 0 only on a minimal memboot
+hakchi hwid
+[ -f /var/version ] && echo "yes"
+source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion"   -> 1.0.3 3.4.113.29-madmonkey v1.0.4-126
+hakchi eval 'echo "$sftype-$sfregion"'       -> snes-eur
+hakchi currentFirmware                       -> _nand_ (or the path of a custom firmware)
+hakchi get rootfs; hakchi get squashfs       -> /var/lib/hakchi/rootfs, /var/squashfs
+cat /etc/preinit.d/p0000_config              -> cfg_xxx='value' lines
+```
+
+hakchi2 CE stops after `hwid` on a minimal memboot, and after the versions when the kernel is
+older than 3.4.113 / boot 1.0.2 (reflash needed) or the script older than v1.0.4-118 (rootfs
+update needed).
 
 ## Connect sequence (verified)
 

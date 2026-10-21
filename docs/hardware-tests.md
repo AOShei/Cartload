@@ -139,3 +139,109 @@ fes1 upload. Everything else is identical.
 | Date | Console | Host | Probe | Memboot | SSH | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | | | | | | | not yet run on hardware |
+
+## Console connect
+
+Crate: `crates/console`, binary `cartload-console`. `discover` only opens TCP connections (and,
+with `--mdns`, listens for mDNS). `info` runs the hakchi2 CE connect sequence: `hakchi` script
+calls, `cat`, `df`, `du` and `ls`. Every `hakchi` invocation ends with the script's own
+`save_config`, which rewrites `p0000_config` from the current values, exactly as every hakchi2 CE
+connect does. `exec` and `ls` run what you give them.
+
+### Prerequisites
+
+- Console running the hakchi kernel, installed or membooted (see "FEL memboot"): `lsusb` lists
+  `04e8:6863` with manufacturer `hakchi`, and `ip -br addr show hakchi0` shows a `169.254.x.y/16`
+  address with state `UNKNOWN` (the gadget has no carrier detection; `unknown` is normal).
+- `ping -c1 169.254.13.37` answers. If it does not, check firewalld / nftables on `hakchi0`.
+- The udev rule and NetworkManager profile from the "FEL memboot" prerequisites.
+
+### 1. Discover
+
+```
+cargo run -p cartload-console -- discover
+```
+
+Expected: log lines on stderr, the result on stdout, exit 0.
+
+```
+INFO link-local interface hakchi0 (169.254.68.74) operstate unknown
+INFO console at 169.254.13.37:22 via USB link on hakchi0 (host 169.254.68.74), SSH-2.0-dropbear_2018.76
+console at 169.254.13.37:22 via USB link on hakchi0 (host 169.254.68.74), SSH-2.0-dropbear_2018.76
+```
+
+The host address differs per boot (NetworkManager picks it). With `--all --mdns` the mDNS
+announcement (instance `hakchi` on `madmonkey.local.`) is merged into the same line:
+`..., SNES Classic Mini (EUR), hwid 0461872a872802079d2818c76c118000`. `--json` prints the
+structure instead. Record the banner (dropbear version) and whether mDNS answered.
+
+### 2. Info
+
+```
+cargo run -p cartload-console -- info
+```
+
+Expected for a European SNES Classic Mini with hakchi v1.0.4-126 and one game synced (the
+storage block is byte for byte the one hakchi2 CE logs, see
+`docs/reference/hakchi-ce-sync-trace.log`):
+
+```
+INFO console at 169.254.13.37:22 via USB link on hakchi0 (host 169.254.68.74), SSH-2.0-dropbear_2018.76
+INFO SSH session established address=169.254.13.37:22 user="root"
+INFO host key ecdsa-sha2-nistp256 SHA256:llATnWr35rHmZPcvq9oT9u3IZfo/CV5lO61RMHp+ws4
+hwid:            0461872a872802079d2818c76c118000
+versions:        boot 1.0.3, kernel 3.4.113.29-madmonkey, script v1.0.4-126
+console:         SNES Classic Mini (EUR) [snes-eur]
+firmware:        stock NAND firmware
+md partitioning: no
+games storage:   /var/lib/hakchi/games
+paths:           gamepath /usr/share/games, rootfs /var/lib/hakchi/rootfs, squashfs /var/squashfs
+Storage size: 352.6MB, used: 31.2MB, free: 310.5MB
+    Used by all games: 3.0MB
+    Used by non multi-boot games: 0.0MB
+    Used by current games collection: 3.0MB
+    Used by save-states: 0.1MB
+    Used by other files (mods, configs, etc.): 28.1MB
+    Reserved memory: 0.0MB
+    Available for games: 313.5MB
+config:          boot_logo=, boot_stock=n, clovercon_autofire=0, ... usb_host=y, usb_rw=n, wood=n
+original games:  21 (CLV-P-SAAAE, CLV-P-SAABE, ..., CLV-P-SADKE)
+```
+
+The host key fingerprint changes at every boot (dropbear generates it in RAM). With `-v` the
+negotiated algorithms are logged: `curve25519-sha256`, host key `ecdsa-sha2-nistp256`,
+`aes256-ctr`, `hmac-sha2-256`. `--json` prints the `ConsoleInfo` structure. Record console type,
+versions, the storage line and the number of original games (21 on the SNES Classic and Super
+Famicom Mini, 30 on the NES Classic and Famicom Mini, 20 on the Shonen Jump edition; none are
+listed on the Mega Drive Mini).
+
+### 3. Exec and ls
+
+```
+cargo run -p cartload-console -- exec -- uname -r
+cargo run -p cartload-console -- exec -- hakchi nope
+cargo run -p cartload-console -- ls /var/lib/hakchi/games
+cargo run -p cartload-console -- ls --ftp /var/lib/hakchi/games
+```
+
+Expected: `3.4.113.29-madmonkey` and exit 0; `no such function: nope` and exit 1 (the remote
+exit code is passed through); an `ls -la` listing with the `snes-eur` directory; the same
+directory as busybox `ftpd` LIST lines after `INFO FTP welcome: ...`. All four are read-only.
+
+### 4. Negative checks
+
+- Console unplugged or powered off: `discover` exits 1 with
+  `no network interface has a 169.254.x.x address ...` once `hakchi0` is gone, or
+  `no console answered at 169.254.13.37:22 (probed from hakchi0 (...))` while the interface
+  still exists. Both run in about a second.
+- Console in FEL mode or stock firmware: same as above (no network gadget).
+- `info --host 192.0.2.1 --timeout-ms 1000`: exits 1 with
+  `connecting to 192.0.2.1:22 did not complete within 1s`.
+- An SSH server that is not a hakchi kernel (for example `--host` pointing at a Linux box):
+  `SSH authentication as "root" with an empty password was refused ...`.
+
+### Results
+
+| Date | Console | Host | discover | info | exec / ls | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126, kernel 3.4.113.29-madmonkey | Linux 6.18.57, hakchi0 169.254.68.74 | OK, USB link and mDNS, dropbear_2018.76 | OK, output above | not run (brief allowed discover and info only) | first attempt failed auth until the `none` method was tried before `password` |

@@ -13,10 +13,28 @@ name = "cartload_console"
 [[bin]]
 name = "cartload-console"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# Command-line binary and its dependencies (argument parsing, log output, JSON output).
+cli = ["dep:anyhow", "dep:clap", "dep:serde_json", "dep:tracing-subscriber"]
 
 [dependencies]
+if-addrs = "0.15"
+mdns-sd = "0.21"
+russh = { version = "0.64", default-features = false, features = ["ring", "rsa"] }
+serde = { workspace = true, features = ["derive"] }
+suppaftp = { version = "12", default-features = false, features = ["tokio"] }
 thiserror.workspace = true
+tokio = { workspace = true, features = ["net", "io-util", "fs", "time", "macros", "rt-multi-thread"] }
 tracing.workspace = true
+
+# CLI only.
+anyhow = { workspace = true, optional = true }
+clap = { version = "4", features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 
 [lints]
 workspace = true
