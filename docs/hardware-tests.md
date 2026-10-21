@@ -754,6 +754,13 @@ anything on the console. Run on 2026-10-21 against the SNES Classic Mini (EUR) w
 in the library: 21 firmware entries cached, plan of 31 uploads (4 236 052 bytes), 5 removals
 and 21 stale links, fits; the same numbers task 06's CLI produced.
 
+Art of the built-in games (task 15): the same plan also reads the firmware's cover and
+thumbnail of every stock game (`<code>.png`, `<code>_small.png` under the squashfs games
+directory) into `originals/<system>/` the first time, read-only, skipping files already there.
+To check: delete `originals/snes-eur/*.png` in the library, open the Library page with the
+console attached, and expect 42 files back within a few seconds and the "Built in" tiles, the
+list thumbnails and the detail panel showing the console's own art instead of the glyph.
+
 Then the app (`WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev` on this host), Library page:
 
 1. **Tree and bar.** With the console connected, the tree reads "Console menu" with the
@@ -789,6 +796,7 @@ Then the app (`WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev` on this host), 
 | Date | Console | Steps | Notes |
 | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR) | headless plan only | app sync not run (user absent) |
+| 2026-10-22 | SNES Classic Mini (EUR) | headless plan only, read-only | task 15: with `originals/snes-eur/*.png` deleted locally, the plan example read the firmware's 42 art files over SSH in 3 s (`cached the firmware's art stored=42 wanted=42`; covers 228 × 160, thumbnails 40 × 28 PNG); a second plan fetched nothing. Not done in the window: the grid, list and detail panel showing them (checked in the browser preview only). |
 
 ## Window and polish (desktop app)
 

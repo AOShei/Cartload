@@ -37,7 +37,7 @@ export type ViewMode = "grid" | "list";
 /** One thing shown in the grid: a game, a firmware game or a folder. */
 export type Tile =
   | { kind: "game"; id: string; view: GameView }
-  | { kind: "original"; id: string; code: string; name: string }
+  | { kind: "original"; id: string; code: string; name: string; cover: string | null; thumbnail: string | null }
   | { kind: "folder"; id: string; path: MenuPath; folder: MenuFolder; games: number };
 
 export const IMPORT_EXTENSIONS = ["sfc", "smc", "fig", "swc", "nes", "zip"];
@@ -178,7 +178,7 @@ class LibraryStore {
    *  folders (back links are implicit). */
   get tiles(): Tile[] {
     const games = this.games;
-    const originals = new Map((this.menu?.originals ?? []).map((o) => [o.code, o.name]));
+    const originals = new Map((this.menu?.originals ?? []).map((o) => [o.code, o]));
     const left: Tile[] = [];
     const middle: Tile[] = [];
     const right: Tile[] = [];
@@ -189,11 +189,14 @@ class LibraryStore {
           middle.push({ kind: "game", id: entry.code, view });
         }
       } else if (entry.kind === "original") {
+        const original = originals.get(entry.code);
         middle.push({
           kind: "original",
           id: entry.code,
           code: entry.code,
-          name: originals.get(entry.code) ?? entry.code,
+          name: original?.name ?? entry.code,
+          cover: original?.cover ?? null,
+          thumbnail: original?.thumbnail ?? null,
         });
       } else if (entry.kind === "folder") {
         const path = [...this.folder, index];

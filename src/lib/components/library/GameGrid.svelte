@@ -387,7 +387,11 @@
                     <span class="noart">No art yet</span>
                   {/if}
                 {:else if tile.kind === "original"}
-                  <span class="builtin"><Icon name="builtIn" size={32} /></span>
+                  {#if tile.cover}
+                    <img src={tile.cover} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
+                  {:else}
+                    <span class="builtin"><Icon name="builtIn" size={32} /></span>
+                  {/if}
                 {:else}
                   <span class="folder-art">
                     <Icon name="folder" size={40} />
@@ -437,6 +441,8 @@
               <td class="name-cell">
                 {#if tile.kind === "game"}
                   <img class="thumb" src={tile.view.thumbnail} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
+                {:else if tile.kind === "original" && tile.thumbnail}
+                  <img class="thumb" src={tile.thumbnail} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
                 {:else}
                   <span class="thumb glyph"><Icon name={tile.kind === "folder" ? "folder" : "builtIn"} size={18} /></span>
                 {/if}

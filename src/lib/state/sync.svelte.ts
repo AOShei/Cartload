@@ -36,6 +36,8 @@ class SyncStore {
   private started = false;
   private timer: ReturnType<typeof setInterval> | null = null;
   private planTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Whether the tree was reloaded for this console's built-in games (entries and art). */
+  private originalsLoaded = false;
 
   get running(): boolean {
     return this.snapshot.state === "running";
@@ -88,6 +90,7 @@ class SyncStore {
     this.plan = null;
     this.planError = null;
     this.reviewing = false;
+    this.originalsLoaded = false;
   }
 
   /** Asks the console what a sync would do. */
@@ -99,8 +102,15 @@ class SyncStore {
     try {
       this.plan = await syncPlan();
       this.planError = null;
-      // The first plan against a console caches its built-in games: show them in the tree.
-      if (this.plan.originals > 0 && libraryStore.menu?.originals.length === 0) {
+      // The first plan against a console caches its built-in games and their art: show
+      // them in the tree. Once per connection, so a console without art is not polled.
+      const originals = libraryStore.menu?.originals ?? [];
+      if (
+        this.plan.originals > 0 &&
+        !this.originalsLoaded &&
+        (originals.length === 0 || originals.some((o) => !o.cover))
+      ) {
+        this.originalsLoaded = true;
         void libraryStore.load();
       }
     } catch (error: unknown) {

@@ -470,7 +470,12 @@ const ORIGINALS = [
   ["CLV-P-SAABE", "F-ZERO"],
   ["CLV-P-SAAEE", "The Legend of Zelda: A Link to the Past"],
   ["CLV-P-SAAFE", "Super Mario Kart"],
-].map(([code, name]) => ({ code: code!, name: name! }));
+].map(([code, name]) => ({
+  code: code!,
+  name: name!,
+  cover: previewCover(name!, "snes", false),
+  thumbnail: previewCover(name!, "snes", false),
+}));
 
 /** The library fixture named by `?library=`, or a dozen games. */
 export function previewLibrary(): { view: LibraryView; menu: MenuView } {

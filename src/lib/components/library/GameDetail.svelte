@@ -323,7 +323,13 @@
     </div>
   {:else if single?.kind === "original"}
     <div class="scroll">
-      <div class="cover plain"><Icon name="builtIn" size={48} /></div>
+      {#if single.cover}
+        <div class="cover">
+          <img src={single.cover} alt="Cover of {single.name}" decoding="async" crossorigin="anonymous" />
+        </div>
+      {:else}
+        <div class="cover plain"><Icon name="builtIn" size={48} /></div>
+      {/if}
       <h3>{single.name}</h3>
       <p class="muted">Built into the console. It can be moved between folders but not changed or removed.</p>
       <p class="mono muted">{single.code}</p>

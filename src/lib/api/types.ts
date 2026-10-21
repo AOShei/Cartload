@@ -306,6 +306,10 @@ export interface MenuOptions {
 export interface OriginalView {
   code: string;
   name: string;
+  /** URL of the firmware's cover, when cached from a console. */
+  cover: string | null;
+  /** URL of the firmware's thumbnail, when cached from a console. */
+  thumbnail: string | null;
 }
 
 export interface MenuView {

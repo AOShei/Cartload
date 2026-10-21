@@ -622,6 +622,60 @@ impl Library {
         originals.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(originals)
     }
+
+    /// The firmware art files (`<code>.png`, `<code>_small.png`) of the cached originals of a
+    /// console that are not cached yet, sorted by code.
+    pub fn missing_original_art(&self, system_code: &str) -> Result<Vec<String>> {
+        let dir = self.root.join(ORIGINALS_DIR).join(system_code);
+        let mut missing = Vec::new();
+        for (code, _, _) in self.originals(system_code)? {
+            for suffix in codes::ORIGINAL_ART_SUFFIXES {
+                let file = format!("{code}{suffix}");
+                if !dir.join(&file).is_file() {
+                    missing.push(file);
+                }
+            }
+        }
+        Ok(missing)
+    }
+
+    /// Stores firmware art files read from a console: (`<code>.png` or `<code>_small.png`,
+    /// bytes) pairs. Empty files are skipped (the console had none); the count of files
+    /// written is returned.
+    pub fn store_original_art(
+        &self,
+        system_code: &str,
+        files: &[(String, Vec<u8>)],
+    ) -> Result<usize> {
+        if !codes::is_system_code(system_code) {
+            return Err(Error::InvalidCode(system_code.to_string()));
+        }
+        let dir = self.root.join(ORIGINALS_DIR).join(system_code);
+        std::fs::create_dir_all(&dir).map_err(|e| io_error("create directory", &dir, e))?;
+        let mut stored = 0;
+        for (file, bytes) in files {
+            if codes::original_art_code(file).is_none() {
+                return Err(Error::InvalidCode(file.clone()));
+            }
+            if bytes.is_empty() {
+                continue;
+            }
+            let path = dir.join(file);
+            std::fs::write(&path, bytes).map_err(|e| io_error("write", &path, e))?;
+            stored += 1;
+        }
+        Ok(stored)
+    }
+
+    /// The cached firmware art file `file` (`<code>.png` or `<code>_small.png`) of a console,
+    /// when the names are valid and the file is there.
+    pub fn original_art(&self, system_code: &str, file: &str) -> Option<PathBuf> {
+        if !codes::is_system_code(system_code) || codes::original_art_code(file).is_none() {
+            return None;
+        }
+        let path = self.root.join(ORIGINALS_DIR).join(system_code).join(file);
+        path.is_file().then_some(path)
+    }
 }
 
 /// Seconds since the Unix epoch (0 for times before it).
@@ -850,6 +904,80 @@ mod tests {
         assert!(matches!(
             library.import(&dir.path().join("x.txt"), None),
             Err(Error::UnsupportedFile(_))
+        ));
+    }
+
+    #[test]
+    fn original_art_is_cached_per_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let library = Library::open(dir.path()).unwrap();
+        assert!(library.missing_original_art("snes-eur").unwrap().is_empty());
+        let stock = include_str!("../tests/fixtures/stock-snes-eur-CLV-P-SAAAE.desktop");
+        library
+            .store_originals(
+                "snes-eur",
+                &[
+                    ("CLV-P-SAAAE".to_string(), stock.to_string()),
+                    ("CLV-P-SAABE".to_string(), stock.to_string()),
+                ],
+            )
+            .unwrap();
+        assert_eq!(
+            library.missing_original_art("snes-eur").unwrap(),
+            [
+                "CLV-P-SAAAE.png",
+                "CLV-P-SAAAE_small.png",
+                "CLV-P-SAABE.png",
+                "CLV-P-SAABE_small.png"
+            ]
+        );
+        let stored = library
+            .store_original_art(
+                "snes-eur",
+                &[
+                    ("CLV-P-SAAAE.png".to_string(), b"\x89PNG cover".to_vec()),
+                    ("CLV-P-SAABE_small.png".to_string(), Vec::new()),
+                ],
+            )
+            .unwrap();
+        assert_eq!(stored, 1);
+        assert_eq!(
+            library.missing_original_art("snes-eur").unwrap(),
+            [
+                "CLV-P-SAAAE_small.png",
+                "CLV-P-SAABE.png",
+                "CLV-P-SAABE_small.png"
+            ]
+        );
+        let path = library.original_art("snes-eur", "CLV-P-SAAAE.png").unwrap();
+        assert_eq!(std::fs::read(path).unwrap(), b"\x89PNG cover");
+        assert!(
+            library
+                .original_art("snes-eur", "CLV-P-SAAAE_small.png")
+                .is_none()
+        );
+        assert!(
+            library
+                .original_art("snes-usa", "CLV-P-SAAAE.png")
+                .is_none()
+        );
+        assert!(
+            library
+                .original_art("../snes-eur", "CLV-P-SAAAE.png")
+                .is_none()
+        );
+        assert!(
+            library
+                .original_art("snes-eur", "CLV-P-SAAAE.desktop")
+                .is_none()
+        );
+        assert!(matches!(
+            library.store_original_art("snes-eur", &[("game.json".to_string(), b"x".to_vec())]),
+            Err(Error::InvalidCode(_))
+        ));
+        assert!(matches!(
+            library.store_original_art("nope", &[("CLV-P-SAAAE.png".to_string(), b"x".to_vec())]),
+            Err(Error::InvalidCode(_))
         ));
     }
 

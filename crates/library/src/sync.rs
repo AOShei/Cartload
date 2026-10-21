@@ -987,6 +987,65 @@ pub async fn fetch_originals<S: Shell>(
     Ok(parse_original_blocks(&output.stdout_lossy()))
 }
 
+/// Reads firmware art files of stock games from the console, read-only, in one command:
+/// `files` are `<code>.png` or `<code>_small.png` names, found under `<squashfs_games>/<code>/`.
+/// Answers `(file, bytes)` pairs, the bytes empty when the console has no such file. Nothing
+/// is run when `files` is empty.
+pub async fn fetch_original_art<S: Shell>(
+    shell: &S,
+    squashfs_games: &str,
+    files: &[String],
+) -> Result<Vec<(String, Vec<u8>)>> {
+    check_device_path(squashfs_games)?;
+    if files.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut paths = Vec::with_capacity(files.len());
+    for file in files {
+        let code = crate::codes::original_art_code(file)
+            .ok_or_else(|| Error::InvalidCode(file.clone()))?;
+        paths.push(format!("{code}/{file}"));
+    }
+    let command = art_command(squashfs_games, &paths);
+    let output = shell.exec(&command, None).await?.checked(&command)?;
+    Ok(parse_art_blocks(&output.stdout))
+}
+
+/// The command that prints each of `paths` (relative to `squashfs_games`) after a
+/// `==== <path> <size>` line; a missing file is announced with size 0.
+fn art_command(squashfs_games: &str, paths: &[String]) -> String {
+    format!(
+        r#"cd "{squashfs_games}" || exit 1; for f in {}; do echo "==== $f $(stat -c %s "$f" 2>/dev/null || echo 0)"; cat "$f" 2>/dev/null; done; :"#,
+        paths.join(" ")
+    )
+}
+
+/// Splits the output of the art command into `(file name, bytes)` pairs: a `==== <path>
+/// <size>` line announces each file and exactly `size` bytes follow. A file cut short by the
+/// end of the output is dropped.
+pub fn parse_art_blocks(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
+    let mut blocks = Vec::new();
+    let mut rest = bytes;
+    while let Some(end) = rest.iter().position(|&b| b == b'\n') {
+        let line = String::from_utf8_lossy(&rest[..end]).into_owned();
+        rest = &rest[end + 1..];
+        let Some(header) = line.strip_prefix("==== ") else {
+            continue;
+        };
+        let Some((path, size)) = header.rsplit_once(' ') else {
+            continue;
+        };
+        let size: usize = size.trim().parse().unwrap_or(0);
+        if size > rest.len() {
+            break;
+        }
+        let file = path.rsplit_once('/').map_or(path, |(_, file)| file);
+        blocks.push((file.to_string(), rest[..size].to_vec()));
+        rest = &rest[size..];
+    }
+    blocks
+}
+
 /// Splits the output of the originals command into `(code, text)` pairs.
 pub fn parse_original_blocks(text: &str) -> Vec<(String, String)> {
     let mut blocks = Vec::new();
@@ -1472,6 +1531,86 @@ mod tests {
     }
 
     #[test]
+    fn art_blocks_are_cut_by_the_announced_sizes() {
+        let mut output = b"==== CLV-P-SAAAE/CLV-P-SAAAE.png 12\n".to_vec();
+        output.extend_from_slice(b"\x89PNG\n==== x\n");
+        output.extend_from_slice(b"==== CLV-P-SAAAE/CLV-P-SAAAE_small.png 0\n");
+        output.extend_from_slice(b"==== CLV-P-SAABE/CLV-P-SAABE.png 5\nabc");
+        let blocks = parse_art_blocks(&output);
+        assert_eq!(
+            blocks,
+            [
+                ("CLV-P-SAAAE.png".to_string(), b"\x89PNG\n==== x\n".to_vec()),
+                ("CLV-P-SAAAE_small.png".to_string(), Vec::new()),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn original_art_fetch_asks_only_for_missing_files() {
+        let (_dir, library, _menus, paths) = trace_library();
+        let stock = include_str!("../tests/fixtures/stock-snes-eur-CLV-P-SAAAE.desktop");
+        library
+            .store_originals(
+                "snes-eur",
+                &[("CLV-P-SAABE".to_string(), stock.to_string())],
+            )
+            .unwrap();
+        library
+            .store_original_art(
+                "snes-eur",
+                &[("CLV-P-SAAAE_small.png".to_string(), b"small".to_vec())],
+            )
+            .unwrap();
+        let missing = library.missing_original_art("snes-eur").unwrap();
+        assert_eq!(
+            missing,
+            [
+                "CLV-P-SAAAE.png",
+                "CLV-P-SAABE.png",
+                "CLV-P-SAABE_small.png"
+            ]
+        );
+        let mut reply = b"==== CLV-P-SAAAE/CLV-P-SAAAE.png 9\n\x89PNG\r\n\x1a\n\0".to_vec();
+        reply.extend_from_slice(b"==== CLV-P-SAABE/CLV-P-SAABE.png 0\n");
+        reply.extend_from_slice(b"==== CLV-P-SAABE/CLV-P-SAABE_small.png 2\nok");
+        let shell = Scripted::new(vec![(
+            r#"cd "/var/squashfs/usr/share/games" || exit 1; for f in CLV-P-SAAAE/CLV-P-SAAAE.png CLV-P-SAABE/CLV-P-SAABE.png CLV-P-SAABE/CLV-P-SAABE_small.png; do echo "==== $f $(stat -c %s "$f" 2>/dev/null || echo 0)"; cat "$f" 2>/dev/null; done; :"#,
+            None,
+            ExecOutput {
+                exit_code: Some(0),
+                stdout: reply,
+                stderr: Vec::new(),
+            },
+        )]);
+        let files = fetch_original_art(&shell, &paths.squashfs_games, &missing)
+            .await
+            .unwrap();
+        assert_eq!(files.len(), 3);
+        assert_eq!(library.store_original_art("snes-eur", &files).unwrap(), 2);
+        assert_eq!(
+            std::fs::read(library.original_art("snes-eur", "CLV-P-SAAAE.png").unwrap()).unwrap(),
+            b"\x89PNG\r\n\x1a\n\0"
+        );
+        assert_eq!(
+            library.missing_original_art("snes-eur").unwrap(),
+            ["CLV-P-SAABE.png"]
+        );
+        // Nothing to fetch: nothing is sent.
+        let quiet = Scripted::new(vec![]);
+        assert!(
+            fetch_original_art(&quiet, &paths.squashfs_games, &[])
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(matches!(
+            fetch_original_art(&quiet, &paths.squashfs_games, &["game.json".to_string()]).await,
+            Err(Error::InvalidCode(_))
+        ));
+    }
+
+    #[test]
     fn config_scripts_escape_quotes() {
         let (_dir, library, menus, paths) = trace_library();
         let collection = collect(&library, &menus, &paths).unwrap();
@@ -1567,6 +1706,18 @@ mod tests {
                 });
                 Ok(total)
             }
+        }
+    }
+
+    impl Shell for Scripted {
+        async fn exec<'a>(
+            &'a self,
+            command: &'a str,
+            stdin: Option<&'a [u8]>,
+        ) -> cartload_console::Result<ExecOutput> {
+            Transport::exec(self, command, stdin).await.map_err(
+                |error| -> cartload_console::Error { unreachable!("scripted shell: {error}") },
+            )
         }
     }
 

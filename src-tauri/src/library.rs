@@ -69,6 +69,10 @@ pub struct OriginalView {
     pub code: String,
     /// Title from its launch entry.
     pub name: String,
+    /// URL of the firmware's cover, when cached.
+    pub cover: Option<String>,
+    /// URL of the firmware's thumbnail, when cached.
+    pub thumbnail: Option<String>,
 }
 
 /// The folder tree the console will show.
@@ -510,13 +514,24 @@ impl LibraryState {
         let system_code = self.system_code(status)?;
         let (menu, options, custom) = self.menu(system_code.as_deref())?;
         let originals = match &system_code {
-            Some(code) => self
+            Some(system) => self
                 .library
-                .originals(code)?
+                .originals(system)?
                 .into_iter()
-                .map(|(code, entry, _)| OriginalView {
-                    code,
-                    name: entry.name,
+                .map(|(code, entry, _)| {
+                    let art = |suffix: &str| {
+                        let file = format!("{code}{suffix}");
+                        self.library
+                            .original_art(system, &file)
+                            .and_then(|path| std::fs::metadata(path).ok())
+                            .map(|meta| original_art_url(system, &code, &file, meta.len()))
+                    };
+                    OriginalView {
+                        cover: art(".png"),
+                        thumbnail: art("_small.png"),
+                        code,
+                        name: entry.name,
+                    }
                 })
                 .collect(),
             None => Vec::new(),
@@ -614,21 +629,14 @@ impl LibraryState {
     }
 
     /// Caches the firmware's launch entries of a connected console once, for the tree and
-    /// the sync. Needs the session; failures are logged, not raised.
+    /// the sync, and the firmware's art of each stock game that has none cached yet. Needs
+    /// the session; reads only; failures are logged, not raised.
     pub async fn ensure_originals(&self, info: &ConsoleInfo, session: &cartload_console::Session) {
         let Some(code) = info.system_code.as_deref() else {
             return;
         };
         if info.original_games.is_empty() {
             return;
-        }
-        match self.library.originals(code) {
-            Ok(cached) if !cached.is_empty() => return,
-            Ok(_) => {}
-            Err(error) => {
-                warn!(%error, "could not read the cached firmware entries");
-                return;
-            }
         }
         let paths = match cartload_library::DevicePaths::from_info(info) {
             Ok(paths) => paths,
@@ -637,15 +645,68 @@ impl LibraryState {
                 return;
             }
         };
-        match cartload_library::sync::fetch_originals(session, &paths.squashfs_games).await {
-            Ok(originals) => match self.library.store_originals(code, &originals) {
-                Ok(()) => info!(
-                    count = originals.len(),
-                    code, "cached the firmware's launch entries"
+        match self.library.originals(code) {
+            Ok(cached) if !cached.is_empty() => {}
+            Ok(_) => {
+                let originals =
+                    match cartload_library::sync::fetch_originals(session, &paths.squashfs_games)
+                        .await
+                    {
+                        Ok(originals) => originals,
+                        Err(error) => {
+                            warn!(%error, "could not read the firmware's launch entries");
+                            return;
+                        }
+                    };
+                match self.library.store_originals(code, &originals) {
+                    Ok(()) => info!(
+                        count = originals.len(),
+                        code, "cached the firmware's launch entries"
+                    ),
+                    Err(error) => {
+                        warn!(%error, "could not store the firmware entries");
+                        return;
+                    }
+                }
+            }
+            Err(error) => {
+                warn!(%error, "could not read the cached firmware entries");
+                return;
+            }
+        }
+        self.ensure_original_art(code, &paths.squashfs_games, session)
+            .await;
+    }
+
+    /// Fetches the cover and thumbnail the firmware ships for each cached stock game, skipping
+    /// files already cached. A failure leaves the glyph in the grid and is logged.
+    async fn ensure_original_art(
+        &self,
+        code: &str,
+        squashfs_games: &str,
+        session: &cartload_console::Session,
+    ) {
+        let missing = match self.library.missing_original_art(code) {
+            Ok(missing) => missing,
+            Err(error) => {
+                warn!(%error, "could not check the cached firmware art");
+                return;
+            }
+        };
+        if missing.is_empty() {
+            return;
+        }
+        match cartload_library::sync::fetch_original_art(session, squashfs_games, &missing).await {
+            Ok(files) => match self.library.store_original_art(code, &files) {
+                Ok(stored) => info!(
+                    stored,
+                    wanted = missing.len(),
+                    code,
+                    "cached the firmware's art"
                 ),
-                Err(error) => warn!(%error, "could not store the firmware entries"),
+                Err(error) => warn!(%error, "could not store the firmware's art"),
             },
-            Err(error) => warn!(%error, "could not read the firmware's launch entries"),
+            Err(error) => warn!(%error, "could not read the firmware's art"),
         }
     }
 
@@ -860,17 +921,30 @@ impl LibraryState {
 
     fn cover_bytes(&self, path: &str) -> Option<Vec<u8>> {
         let path = path.split('?').next().unwrap_or(path);
-        let mut parts = path.trim_start_matches('/').splitn(3, '/');
-        let code = parts.next()?;
-        let file = parts.next()?;
-        if parts.next().is_some() || !codes::is_code(code) {
-            return None;
+        let segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+        match segments.as_slice() {
+            // `/<code>/<file>`: a library game's own art.
+            [code, file] => {
+                if !codes::is_code(code) || !is_art_file(code, file) {
+                    return None;
+                }
+                std::fs::read(self.library.game_dir(code).join(file)).ok()
+            }
+            // `/<system>/<code>/<file>`: the firmware's art of a stock game, cached per console.
+            [system, code, file] => {
+                if !codes::is_original(code) || !is_art_file(code, file) {
+                    return None;
+                }
+                std::fs::read(self.library.original_art(system, file)?).ok()
+            }
+            _ => None,
         }
-        if file != format!("{code}.png") && file != format!("{code}_small.png") {
-            return None;
-        }
-        std::fs::read(self.library.game_dir(code).join(file)).ok()
     }
+}
+
+/// Whether `file` is the cover (`<code>.png`) or the thumbnail (`<code>_small.png`) of `code`.
+fn is_art_file(code: &str, file: &str) -> bool {
+    file == format!("{code}.png") || file == format!("{code}_small.png")
 }
 
 /// `SNES`, `NES`, `Mega Drive`.
@@ -898,6 +972,11 @@ pub fn cover_url(code: &str, file: &str, version: u64) -> String {
     } else {
         format!("{COVER_SCHEME}://localhost/{code}/{file}?v={version}")
     }
+}
+
+/// The URL the webview loads a stock game's firmware art from (`/<system>/<code>/<file>`).
+pub fn original_art_url(system: &str, code: &str, file: &str, version: u64) -> String {
+    cover_url(&format!("{system}/{code}"), file, version)
 }
 
 fn is_importable(path: &Path) -> bool {
@@ -1274,6 +1353,64 @@ pub(crate) mod tests {
         let url = cover_url("CLV-U-AAAAA", "CLV-U-AAAAA.png", 7);
         assert!(url.ends_with("/CLV-U-AAAAA/CLV-U-AAAAA.png?v=7"));
         assert!(url.contains("cover"));
+
+        // The firmware's art of a stock game, cached per console under `originals/<system>/`.
+        state
+            .library
+            .store_originals(
+                "snes-eur",
+                &[(
+                    "CLV-P-SAAAE".to_string(),
+                    "[Desktop Entry]\nName=Super Mario World\n".to_string(),
+                )],
+            )
+            .unwrap();
+        state
+            .library
+            .store_original_art(
+                "snes-eur",
+                &[("CLV-P-SAAAE.png".to_string(), ok.body().clone())],
+            )
+            .unwrap();
+        let stock = state.cover_response("/snes-eur/CLV-P-SAAAE/CLV-P-SAAAE.png?v=3");
+        assert_eq!(stock.status(), http::StatusCode::OK);
+        assert!(stock.body().starts_with(b"\x89PNG"));
+        for bad in [
+            "/snes-eur/CLV-P-SAAAE/CLV-P-SAAAE_small.png",
+            "/snes-usa/CLV-P-SAAAE/CLV-P-SAAAE.png",
+            "/snes-eur/CLV-P-SAABE/CLV-P-SAAAE.png",
+            "/snes-eur/CLV-P-SAAAE/CLV-P-SAAAE.desktop",
+            "/snes-eur/CLV-P-SAAAE/CLV-P-SAAAE.png/extra",
+            "/snes-eur/CLV-P-SAAAE/",
+            "/CLV-P-SAAAE/CLV-P-SAAAE.png",
+            "/originals/snes-eur/CLV-P-SAAAE.png",
+            "/../originals/snes-eur/CLV-P-SAAAE.png",
+            "/snes-eur/../snes-eur/CLV-P-SAAAE.png",
+        ] {
+            assert_eq!(
+                state.cover_response(bad).status(),
+                http::StatusCode::NOT_FOUND,
+                "{bad}"
+            );
+        }
+        let url = original_art_url("snes-eur", "CLV-P-SAAAE", "CLV-P-SAAAE.png", 3);
+        assert!(url.ends_with("/snes-eur/CLV-P-SAAAE/CLV-P-SAAAE.png?v=3"));
+        let mut config = state.library.config().unwrap();
+        config.last_console = Some("snes-eur".into());
+        state.library.save_config(&config).unwrap();
+        let menu = state.menu_view(&no_console()).unwrap();
+        let original = menu
+            .originals
+            .iter()
+            .find(|o| o.code == "CLV-P-SAAAE")
+            .unwrap();
+        assert!(
+            original
+                .cover
+                .as_deref()
+                .is_some_and(|u| u.contains("/snes-eur/CLV-P-SAAAE/CLV-P-SAAAE.png?v="))
+        );
+        assert!(original.thumbnail.is_none());
     }
 
     #[test]

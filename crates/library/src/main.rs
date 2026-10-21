@@ -629,6 +629,16 @@ async fn prepare_target(
                     "cached the firmware's launch entries"
                 );
             }
+            let missing = library.missing_original_art(&system_code)?;
+            if !missing.is_empty() {
+                match sync::fetch_original_art(&session, &paths.squashfs_games, &missing).await {
+                    Ok(files) => {
+                        let stored = library.store_original_art(&system_code, &files)?;
+                        info!(stored, "cached the firmware's art");
+                    }
+                    Err(error) => warn!(%error, "could not read the firmware's art"),
+                }
+            }
             let upload_path = paths.upload_path();
             let links = session.exec(&commands::list_links(&upload_path)).await?;
             let remote_links = parse_link_listing(&links.stdout_lossy());

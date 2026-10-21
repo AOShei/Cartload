@@ -54,6 +54,26 @@ pub fn is_folder(code: &str) -> bool {
     is_code(code) && code.as_bytes()[4] == PREFIX_FOLDER as u8
 }
 
+/// Whether `code` is a system code the device uses (`snes-eur`, see
+/// `cartload_console::SYSTEM_CODES`), exactly as written.
+pub fn is_system_code(code: &str) -> bool {
+    code == code.trim()
+        && cartload_console::ConsoleType::from_system_code(code)
+            != cartload_console::ConsoleType::Unknown
+}
+
+/// Name suffixes of the two art files the firmware ships with each stock game: the cover
+/// `<code>.png` and the thumbnail `<code>_small.png`.
+pub const ORIGINAL_ART_SUFFIXES: [&str; 2] = [".png", "_small.png"];
+
+/// The stock game named by a firmware art file (`CLV-P-SAAAE_small.png` gives
+/// `CLV-P-SAAAE`); `None` for any other file name.
+pub fn original_art_code(file: &str) -> Option<&str> {
+    ORIGINAL_ART_SUFFIXES
+        .iter()
+        .find_map(|suffix| file.strip_suffix(suffix).filter(|code| is_original(code)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +103,23 @@ mod tests {
         assert!(!is_code("clv-u-zjsqu"));
         assert!(!is_code("CLV-U-ZJSQU/"));
         assert!(!is_code("../U-ZJSQU"));
+    }
+
+    #[test]
+    fn system_codes_and_art_names() {
+        assert!(is_system_code("snes-eur"));
+        assert!(is_system_code("md-asia"));
+        assert!(!is_system_code("snes-eur "));
+        assert!(!is_system_code("../snes-eur"));
+        assert!(!is_system_code("SNES-EUR"));
+        assert_eq!(original_art_code("CLV-P-SAAAE.png"), Some("CLV-P-SAAAE"));
+        assert_eq!(
+            original_art_code("CLV-P-SAAAE_small.png"),
+            Some("CLV-P-SAAAE")
+        );
+        assert_eq!(original_art_code("CLV-U-SAAAE.png"), None);
+        assert_eq!(original_art_code("CLV-P-SAAAE.desktop"), None);
+        assert_eq!(original_art_code("CLV-P-SAAAE_small.PNG"), None);
+        assert_eq!(original_art_code("../CLV-P-SAAAE.png"), None);
     }
 }
