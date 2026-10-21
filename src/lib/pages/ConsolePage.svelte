@@ -1,0 +1,157 @@
+<script lang="ts">
+  import { consoleExec } from "../api/commands";
+  import { AppError } from "../api/tauri";
+  import type { ExecResult } from "../api/types";
+  import DetailsList from "../components/DetailsList.svelte";
+  import Icon from "../components/Icon.svelte";
+  import StatusCard from "../components/StatusCard.svelte";
+  import { app, consoleStore, navigation, toasts } from "../state";
+
+  const report = $derived(consoleStore.report);
+  const status = $derived(report?.status ?? null);
+
+  /** The one primary action for the current state. */
+  const primary = $derived.by(() => {
+    if (!status) {
+      return null;
+    }
+    switch (status.state) {
+      case "connected":
+        if (status.info.minimal_memboot || !status.info.can_interact) {
+          return { label: "Open Kernel", run: () => navigation.go("kernel") };
+        }
+        return { label: "Open Library", run: () => navigation.go("library") };
+      case "fel":
+        return status.check.kind === "fel" && status.check.r16
+          ? { label: "Install kernel", run: () => navigation.go("kernel") }
+          : { label: "Check FEL mode", run: () => void consoleStore.probeFel() };
+      default:
+        return null;
+    }
+  });
+
+  let command = $state("");
+  let running = $state(false);
+  let result = $state<ExecResult | null>(null);
+
+  async function runCommand(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!command.trim() || running) {
+      return;
+    }
+    running = true;
+    try {
+      result = await consoleExec(command);
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(e.message, e.detail);
+    } finally {
+      running = false;
+    }
+  }
+</script>
+
+<div class="page">
+  <StatusCard
+    {report}
+    refreshing={consoleStore.refreshing}
+    {primary}
+    onrefresh={() => void consoleStore.refresh()}
+  />
+
+  {#if report && report.details.length > 0}
+    <section class="card details" aria-label="Detected details">
+      <h2>Detected</h2>
+      <DetailsList details={report.details} />
+    </section>
+  {/if}
+
+  {#if status}
+    <details class="raw">
+      <summary>Everything detected, as data</summary>
+      <pre>{JSON.stringify(status, null, 2)}</pre>
+    </details>
+  {/if}
+
+  {#if app.devExec && status?.state === "connected"}
+    <section class="card dev" aria-label="Run a command on the console">
+      <h2>Run a command <span class="muted">(development build)</span></h2>
+      <form onsubmit={runCommand}>
+        <input
+          type="text"
+          class="mono"
+          placeholder="hakchi get rootfs"
+          bind:value={command}
+          aria-label="Shell line to run on the console"
+          spellcheck="false"
+        />
+        <button type="submit" class="btn" disabled={running || !command.trim()}>
+          <Icon name="play" size={16} />
+          Run
+        </button>
+      </form>
+      {#if result}
+        <p class="muted num">exit code {result.exit_code ?? "none"}</p>
+        {#if result.stdout}<pre>{result.stdout}</pre>{/if}
+        {#if result.stderr}<pre class="stderr">{result.stderr}</pre>{/if}
+      {/if}
+    </section>
+  {/if}
+</div>
+
+<style>
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .details {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .details h2 {
+    margin-bottom: var(--space-3);
+  }
+
+  .raw {
+    font-size: 0.85rem;
+  }
+
+  .raw pre {
+    margin: var(--space-2) 0 0;
+    padding: var(--space-3);
+    max-height: 20rem;
+    overflow: auto;
+    background: var(--surface-raised);
+    border-radius: var(--radius-s);
+    user-select: text;
+  }
+
+  .dev {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .dev form {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .dev input {
+    flex: 1;
+  }
+
+  .dev pre {
+    margin: var(--space-2) 0 0;
+    padding: var(--space-3);
+    background: var(--surface-raised);
+    border-radius: var(--radius-s);
+    white-space: pre-wrap;
+    user-select: text;
+  }
+
+  .dev .stderr {
+    color: var(--danger);
+  }
+</style>

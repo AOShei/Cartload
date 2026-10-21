@@ -1,24 +1,54 @@
+/* Design tokens (docs/design.md): warm grey surfaces, one 16-bit purple-blue accent for the
+   primary action and focus, semantic green / amber / red. Light and dark are both first-class:
+   every token uses light-dark(), and the system preference can be overridden with
+   data-theme="light|dark" on <html>. */
+
 :root {
   color-scheme: light dark;
 
-  --bg: #ffffff;
-  --surface-raised: #f4f5f7;
-  --surface-hover: #e6e8ec;
-  --border: #d9dce1;
-  --text: #1f2328;
-  --text-muted: #636c76;
-  --accent: #2f6fdb;
-  --on-accent: #ffffff;
-  --danger: #c0392b;
+  --bg: light-dark(#f7f5f2, #1a1917);
+  --surface: light-dark(#ffffff, #222120);
+  --surface-raised: light-dark(#f1eee9, #2a2826);
+  --surface-hover: light-dark(#e7e3dd, #343230);
+  --border: light-dark(#dcd7cf, #3d3a36);
+  --border-strong: light-dark(#c4bdb2, #524e48);
+  --text: light-dark(#1f1d1a, #ece9e3);
+  --text-muted: light-dark(#6b665e, #a39d93);
+  --text-faint: light-dark(#9a948a, #726d64);
 
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
+  --accent: light-dark(#5546d4, #8f83ff);
+  --accent-strong: light-dark(#4538b8, #a79dff);
+  --accent-soft: light-dark(#ebe8fb, #2b284a);
+  --on-accent: light-dark(#ffffff, #14121f);
+
+  --ok: light-dark(#2f8f57, #5fcf8a);
+  --ok-soft: light-dark(#e3f4ea, #1f3a2b);
+  --warn: light-dark(#b2731a, #e8b24a);
+  --warn-soft: light-dark(#fbf0dc, #3d3017);
+  --danger: light-dark(#c43d33, #ff8a7a);
+  --danger-soft: light-dark(#fbe5e2, #40221f);
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --shadow: light-dark(0 1px 2px rgba(31, 29, 26, 0.06), 0 1px 2px rgba(0, 0, 0, 0.4));
+  --shadow-float: light-dark(
+    0 8px 24px rgba(31, 29, 26, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.55)
+  );
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  font-family: var(--font);
   font-size: 15px;
   line-height: 1.45;
   font-synthesis: none;
@@ -26,18 +56,12 @@
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1d21;
-    --surface-raised: #24272d;
-    --surface-hover: #2f333a;
-    --border: #363a42;
-    --text: #e6e8ec;
-    --text-muted: #9aa3ad;
-    --accent: #5b8def;
-    --on-accent: #0e1117;
-    --danger: #ff7b6b;
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 * {
@@ -59,4 +83,176 @@ body {
 
 #app {
   height: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Buttons: one primary per screen (accent), the rest quiet. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--surface-hover);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  box-shadow: var(--shadow);
+}
+
+/* Controls */
+input[type="text"],
+input[type="search"] {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+details > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+details > summary:hover {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

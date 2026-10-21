@@ -11,6 +11,12 @@ rust-version.workspace = true
 name = "cartload_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+# Exposes the `console_exec` command, which runs any shell line on the console. Development
+# builds only: `cargo tauri dev --features dev-exec`.
+dev-exec = []
+
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 
@@ -20,10 +26,14 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "std"] }
+tokio = { workspace = true, features = ["sync", "time", "macros", "rt-multi-thread", "signal"] }
+nusb = "0.2"
+# The device crates without their CLIs; hmod and library keep their HTTP fetchers.
 cartload-fel.workspace = true
 cartload-console.workspace = true
-cartload-hmod.workspace = true
-cartload-library.workspace = true
+cartload-hmod = { workspace = true, features = ["fetch"] }
+cartload-library = { workspace = true, features = ["fetch"] }
 
 [lints]
 workspace = true

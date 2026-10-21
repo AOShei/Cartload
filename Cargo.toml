@@ -24,11 +24,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
-cartload-fel = { path = "crates/fel" }
-cartload-console = { path = "crates/console" }
-cartload-hmod = { path = "crates/hmod" }
-cartload-library = { path = "crates/library" }
-cartload-flow = { path = "crates/flow" }
+cartload-fel = { path = "crates/fel", default-features = false }
+cartload-console = { path = "crates/console", default-features = false }
+cartload-hmod = { path = "crates/hmod", default-features = false }
+cartload-library = { path = "crates/library", default-features = false }
+cartload-flow = { path = "crates/flow", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "warn"

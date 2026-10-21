@@ -491,3 +491,67 @@ about 4.2 MB used by the current games collection.
 | Date | Console | Import | Plan | Sync | Second sync | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | OK (Chrono Trigger, code and .sfrom size as in the CE trace) | OK, read-only, 21 firmware entries cached | not run (user absent) | not run | the entries the plan generates have the sizes of CE's uploads |
+
+## Console page (desktop app)
+
+Crate: `src-tauri`, binary `cartload-app`; headless equivalent `cargo run -p cartload-app
+--example watch`. The app's watcher looks at the USB bus and the USB network link every 2 s,
+opens one SSH session when a hakchi kernel answers and runs the hakchi2 CE identification
+sequence once (`hakchi` script calls, `cat`, `df`, `du`, `ls`; see "Console connect" above for
+the `save_config` side effect). A device with the FEL ids is opened once for the FEL version
+query (read-only) when it appears. Nothing else is sent unless the build has the `dev-exec`
+feature and you type a command yourself.
+
+### Prerequisites
+
+- The udev rule and NetworkManager profile from "FEL memboot".
+- `pnpm install`, then `pnpm build` and `cargo build -p cartload-app`, or `pnpm tauri dev`.
+- On Wayland hosts where the window dies with `Gdk-Message: Error 71 (Protocol error)
+  dispatching to Wayland display`, run with `WEBKIT_DISABLE_DMABUF_RENDERER=1` (a WebKitGTK
+  issue with some GPU drivers; seen on the 2026-10-21 host).
+
+### 1. Nothing attached
+
+Start the app with no console attached (or with it switched off). Expected: within 2 s the
+status card reads "Nothing found. Connect the console with USB and turn it on." with the
+hint about holding Reset, the status bar shows the same line with a grey dot, and the log
+panel (Ctrl+L) shows "console watcher started". No toast.
+
+### 2. Installed hakchi kernel
+
+Switch the console on. Expected, in order and without any click: "hakchi kernel found on USB:
+waiting for its network link…" (blue, cartridge pulsing) as soon as `04e8:6863` enumerates,
+"Console found at 169.254.13.37:22: connecting…", "… identifying…", then the green card
+"SNES Classic Mini, EUR, hakchi v1.0.4-126, 311 MB free" (model, region, versions and free
+space as the console reports them), "Ready. Open the Library page to add and sync games.",
+the primary button "Open Library", and the details list (model, region, hardware id, hakchi,
+kernel, boot, firmware, games storage, storage sizes, games on console, save states, original
+games, address, link). The log shows the SSH session line and, with "Show details" on, each
+command of the identification sequence. "Refresh" (or F5) re-runs the sequence and keeps the
+card green.
+
+Unplug the USB cable: the card goes back to "Nothing found" within 2 s and the log says
+"console no longer reachable; closing the session". Plug it back in: the sequence above runs
+again by itself.
+
+### 3. FEL mode
+
+With the console off, hold Reset and switch it on. Expected: "Console attached over USB:
+checking for FEL mode…" for a moment, then the green "Console in FEL mode: ready to install
+the kernel." with the chip "Allwinner R16" in the details and the primary button "Install
+kernel". Power-cycle the console into normal boot: "Console left FEL mode: waiting for the
+hakchi kernel to come up…" and then, if hakchi is installed, the connected card as in step 2;
+otherwise "Nothing found" after 45 s.
+
+### 4. Stock firmware in normal boot
+
+A console without hakchi, switched on normally, enumerates with the FEL ids too. Expected:
+"Console attached over USB, but not in FEL mode." (amber) with the instruction to hold Reset,
+and "Check FEL mode" as the primary button, which repeats the query and reports the result in
+a toast.
+
+### Results
+
+| Date | Console | Host | 1 | 2 | 3 | 4 | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | Linux 6.18.57, Wayland, hakchi0 169.254.68.74 | not run (console attached all day) | OK: connected card and details in 2.4 s, both in the app and the `watch` example | not run | not run | native Wayland needed `WEBKIT_DISABLE_DMABUF_RENDERER=1`; GDK_BACKEND=x11 also works |
