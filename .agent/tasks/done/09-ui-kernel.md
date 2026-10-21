@@ -1,3 +1,11 @@
+> **Continuation.** An earlier run of this brief was interrupted after the implementation was
+> written and while it was taking screenshots. Its uncommitted work is in the working tree
+> (`git status`: new `src-tauri/src/{flow,failure,package}.rs`, `src/lib/components/
+> {FailureCard,FelIllustration}.svelte`, and changes across the app crate and `src/lib/`). It
+> compiles, is clippy-clean, passes `cargo test -p cartload-app` (43 tests) and `pnpm check`.
+> Start by reading `git diff` and the new files, keep what meets the brief, finish what is
+> missing, verify, and commit. Do not start over.
+
 # Task 09: the Kernel page
 
 Depends on tasks 05 and 08. Follow `docs/design.md`.
@@ -17,3 +25,8 @@ Depends on tasks 05 and 08. Follow `docs/design.md`.
   from the flow crate.
 
 Verify as in task 08. Do not run a flow against hardware unattended. Commit.
+
+> Continuation note 2: the previous run crashed after reading full-size PNG screenshots
+> (the driver's message buffer overflowed). Screenshots are fine, but downscale them before
+> reading (for example `magick in.png -resize 50% out.png`, or take them at a smaller
+> viewport) so each image stays well under 1 MB.

@@ -20,3 +20,11 @@ Depends on tasks 08 to 10. Read `docs/design.md` and audit every page against it
   tool is available.
 
 Verify everything still passes, then commit.
+
+Additional items found during review:
+- Native Wayland on this host crashes WebKitGTK with a DMA-BUF protocol error unless
+  `WEBKIT_DISABLE_DMABUF_RENDERER=1` is set. Set it from `main.rs` on Linux before the Tauri
+  builder runs (only when unset, so users can override), and note it in the README.
+- Clippy on Rust 1.96 flags seven `chunks_exact` calls with a constant size in
+  `crates/library` (`as_chunks` is the suggestion). Fix them so CI can move off the 1.95 pin.
+- `Cargo.toml` names a repository that does not exist; it is `https://github.com/AOShei/Cartload`.

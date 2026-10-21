@@ -17,6 +17,7 @@ import datetime as dt
 import os
 import shutil
 import sys
+import traceback
 from pathlib import Path
 
 from claude_agent_sdk import (
@@ -56,6 +57,22 @@ ALLOWED_TOOLS = [
 ]
 
 
+def ledger_total() -> float:
+    """Sum of the estimated cost column in logs/costs.tsv (0 if absent)."""
+    path = LOGS / "costs.tsv"
+    if not path.exists():
+        return 0.0
+    total = 0.0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 7:
+            try:
+                total += float(parts[6])
+            except ValueError:
+                pass
+    return total
+
+
 def summarize_tool(block: ToolUseBlock) -> str:
     inp = block.input or {}
     if block.name == "Bash":
@@ -90,6 +107,8 @@ async def run_task(task: Path, args: argparse.Namespace) -> bool:
         max_budget_usd=args.budget,
         max_turns=args.max_turns,
         env={"CLAUDE_AGENT_SDK_CLIENT_APP": "cartload-driver"},
+        # Screenshot reads come back as one JSON line; the SDK default (1 MB) crashed task 09.
+        max_buffer_size=64 * 1024 * 1024,
     )
     out(f"=== {name}  model={args.model} effort={args.effort} budget=${args.budget}  {stamp}")
     result: ResultMessage | None = None
@@ -120,11 +139,22 @@ async def run_task(task: Path, args: argparse.Namespace) -> bool:
     except ProcessError as e:
         out(f"!!! agent process error: {e}")
         return False
+    except KeyboardInterrupt:
+        out("!!! interrupted by the user; the task's uncommitted work stays in the tree")
+        raise
+    except Exception as e:  # noqa: BLE001 - anything else must not take the chain down silently
+        out(f"!!! driver exception: {type(e).__name__}: {e}")
+        out(traceback.format_exc(), echo=False)
+        with (LOGS / "costs.tsv").open("a", encoding="utf-8") as f:
+            f.write(f"{stamp}\t{name}\t{args.model}\tcrashed:{type(e).__name__}\t?\t?\t0\n")
+        return False
     finally:
         log.close()
 
     if result is None:
         print("!!! no result message received")
+        with (LOGS / "costs.tsv").open("a", encoding="utf-8") as f:
+            f.write(f"{stamp}\t{name}\t{args.model}\tno-result\t?\t?\t0\n")
         return False
 
     cost = result.total_cost_usd or 0.0
@@ -149,6 +179,8 @@ async def main() -> int:
     parser.add_argument("--budget", type=float, default=25.0, help="USD cap per task (estimate)")
     parser.add_argument("--max-turns", type=int, default=None)
     parser.add_argument("--keep-going", action="store_true", help="continue after a failed task")
+    parser.add_argument("--max-total", type=float, default=160.0,
+                        help="stop starting tasks once the ledger total plus the per-task budget would exceed this USD amount")
     args = parser.parse_args()
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -163,6 +195,11 @@ async def main() -> int:
     REPORTS.mkdir(exist_ok=True)
     print("tasks:", ", ".join(t.name for t in tasks))
     for task in tasks:
+        spent = ledger_total()
+        if spent + args.budget > args.max_total:
+            print(f"ledger shows ${spent:.2f} spent; starting another task with a ${args.budget:.0f} budget "
+                  f"would exceed --max-total ${args.max_total:.0f}. Stopping.")
+            return 3
         ok = await run_task(task, args)
         if not ok and not args.keep_going:
             print("stopping after failure; rerun with --keep-going to continue past failures")
