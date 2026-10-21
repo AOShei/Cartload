@@ -95,8 +95,10 @@ impl Step<Context> for GrowPartition {
 }
 
 /// After a grow the kernel still has the old partition table, so hakchi2 CE memboots again
-/// (kexec) before installing. Skipped when nothing was grown in this run, and not needed on
-/// the Mega Drive Mini (`sntool ismd`).
+/// before installing: `GrowTask` is built with `rebootToRecovery`, so its `Reboot` task runs
+/// `MembootTasks.Memboot`, the same `detached-fallback` kexec of the package's `boot.img` as
+/// a memboot from an installed kernel, not `ShellTasks.Reboot`. Skipped when nothing was
+/// grown in this run, and not needed on the Mega Drive Mini (`sntool ismd`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RebootAfterGrow;
 
@@ -107,7 +109,8 @@ impl Step<Context> for RebootAfterGrow {
     }
 
     fn description(&self) -> &str {
-        "Reboot into the memboot shell (kexec) so the kernel sees the new partition table"
+        "Reboot into the memboot shell (kexec with hakchi2 CE's detached-fallback) so the \
+         kernel sees the new partition table"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {

@@ -9,9 +9,10 @@ use crate::{ConsoleState, Context, Error, Outcome, Result, Step, steps::kexec_me
 /// Boots the hakchi kernel from RAM, the first step of every flow.
 ///
 /// Like hakchi2 CE's `WaitForFelOrMembootableShell`: when a hakchi kernel is already running
-/// (installed, booted normally) the kernel is kexec'd from it; otherwise the console must be
-/// in FEL mode (hold Reset while powering on) and the kernel goes in through USB. Already in
-/// the memboot shell: nothing to do.
+/// (installed, booted normally) the kernel is kexec'd from it with CE's own `kexec.static`
+/// and `detached-fallback` ([`kexec_memboot`]); otherwise the console must be in FEL mode
+/// (hold Reset while powering on) and the kernel goes in through USB. Already in the memboot
+/// shell: nothing to do.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Memboot {
     allow_nand_kernel: bool,

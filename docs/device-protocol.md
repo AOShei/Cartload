@@ -55,6 +55,38 @@ FEL message formats (AWUSBRequest, AWFELMessage, AWFELStandardRequest, AWFELStat
 AWFELVerifyDeviceResponse) are small fixed-layout structs; the C# files in `Libraries/FelLib/FelLib/`
 are the spec. `sunxi-tools` (`sunxi-fel`, C, GPL) is an independent reference for the same protocol.
 
+## Memboot from a running hakchi kernel (kexec)
+
+hakchi2 CE's `MembootTasks.Memboot`, used whenever the console answers SSH and has
+`/proc/atags` (an installed hakchi kernel booted normally, or the memboot shell after
+`sunxi-part grow`: `GrowTask` with `rebootToRecovery`). CE does not use the `kexec` in the
+console's ramdisk or rootfs, nor the device's `hakchi recovery`:
+
+```
+uistop                                    <- failure ignored
+mkdir -p /tmp/kexec/
+cat > /tmp/kexec/kexec && chmod +x ...    <- CE's tools/arm/kexec.static (kexec-tools, static ARM build)
+cat > /tmp/kexec/detached-fallback && chmod +x ...   <- CE's tools/arm/detached-fallback
+cat > /tmp/kexec/boot.img                 <- the package's boot/boot.img
+cd /tmp/kexec/; /bin/sh /tmp/kexec/detached-fallback recovery /tmp/kexec/boot.img   <- 100 ms limit, failure ignored
+```
+
+`detached-fallback` re-runs itself in the background (`--detached`), sources `/etc/preinit`,
+prepends its own directory to `PATH` (so `kexec` is the uploaded binary), and runs `recovery`,
+which calls `reboot_kexec` and then `memboot`: `sntool check` on the image, command line taken
+from the image with `hakchi-shell` appended (or `hakchi-clovershell` when clovershell is
+active), `kexec -l -t zImage <image> --command-line=... --atags`, then `killall clovershell`,
+`service inetd stop`, `uistop`, `sync`, `umount -a -r`, `disableUsbDevice`, `kexec -e`. Without
+an image argument it takes `$rootfs/boot/boot.img`, `$installpath/boot/boot.img` or the kernel
+partition (`readBoot2`). On a failure before the launch CE runs `uistart` and gives up. The
+console drops off USB and comes back as the RNDIS gadget in the memboot shell about 20 s later.
+
+Cartload's first hardware run (2026-10-21, SNES Classic Mini EUR, hakchi v1.0.4-126) ran the
+device's own `hakchi recovery` through a detached launcher instead and hung the console (power
+LED off, no USB device until a power cycle). Cartload now ships CE's two files (`data/`) and runs
+the sequence above under `/tmp/cartload`; that has not been run on hardware yet
+(`docs/hardware-tests.md`).
+
 ## hakchi.hmod
 
 The kernel package. A gzip tar with: `boot/boot.img`, `boot/uboot.bin`, `bin/` (sntool, kexec,

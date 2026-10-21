@@ -30,34 +30,53 @@ pub use reboot::Reboot;
 pub use verify::VerifyInstall;
 pub use wait::{WaitForConsole, WaitOffline};
 
-use crate::{Context, Error, Result, device_failure};
+use crate::{Context, Error, Result, device_failure, tools};
 
 /// The command strings the steps send, beyond the ones in
 /// [`cartload_console::commands`]. They are what hakchi2 CE sends in `MembootTasks.cs`,
-/// `GrowTask.cs` and `ModTasks.cs`, except for the kexec launcher, which replaces CE's
-/// `detached-fallback` helper with the device's own `recovery` function.
+/// `GrowTask.cs` and `ModTasks.cs`. The kexec memboot uploads the same `kexec.static` and
+/// `detached-fallback` as CE ([`crate::tools`]), under `/tmp/cartload` instead of
+/// `/tmp/kexec`, and starts the script through a small launcher so that it outlives the SSH
+/// session.
 pub mod commands {
     use cartload_console::parse::sh_quote;
 
     /// Whether the running kernel can kexec another one (hakchi2 CE's "membootable" test).
     pub const HAS_ATAGS: &str = "[ -f /proc/atags ]";
+    /// Stops the console's UI before a kexec memboot (hakchi2 CE `Memboot`, first command).
+    /// A non-zero exit is ignored, as in CE.
+    pub const UISTOP: &str = "uistop";
+    /// Starts the UI again when the memboot preparation failed after [`UISTOP`] (CE's
+    /// catch block).
+    pub const UISTART: &str = "uistart";
     /// Scratch directory for uploads on the console's tmpfs.
     pub const SCRATCH_DIR: &str = "/tmp/cartload";
     /// Creates the scratch directory.
     pub const MKDIR_SCRATCH: &str = "mkdir -p /tmp/cartload";
+    /// Where `kexec.static` is uploaded; `detached-fallback` looks for `kexec` next to itself.
+    pub const KEXEC_BINARY: &str = "/tmp/cartload/kexec";
+    /// Where `detached-fallback` is uploaded.
+    pub const DETACHED_FALLBACK: &str = "/tmp/cartload/detached-fallback";
+    /// Makes the two uploaded tools executable (CE's `UploadFile` runs `chmod +x` on each).
+    pub const CHMOD_KEXEC_TOOLS: &str =
+        "chmod +x /tmp/cartload/kexec /tmp/cartload/detached-fallback";
     /// Where a boot image for kexec is uploaded.
     pub const KEXEC_IMAGE: &str = "/tmp/cartload/boot.img";
     /// Where the kexec launcher script is uploaded.
     pub const KEXEC_SCRIPT: &str = "/tmp/cartload/kexec.sh";
     /// The kexec launcher: ignores the signals the dying SSH session sends, detaches from its
-    /// pipes (a write to a closed pipe would kill the script before `kexec -e`), and runs the
-    /// device's `recovery` function, which kexecs the image with `hakchi-shell` on the
-    /// command line so the console comes back in the memboot shell.
+    /// pipes (a write to a closed pipe would kill the script before `kexec -e`), and runs what
+    /// hakchi2 CE runs: `cd /tmp/kexec/; /bin/sh /tmp/kexec/detached-fallback recovery
+    /// /tmp/kexec/boot.img`. The uploaded script's `recovery` kexecs the image (or, with no
+    /// argument, the kernel in NAND) with `hakchi-shell` on the command line so the console
+    /// comes back in the memboot shell.
     pub const KEXEC_SCRIPT_BODY: &str = "#!/bin/sh\n\
-        # Written by Cartload: run the hakchi recovery kexec detached from the SSH session.\n\
+        # Written by Cartload: run hakchi2 CE's detached-fallback kexec detached from the SSH \
+        session.\n\
         trap '' HUP TERM PIPE\n\
         exec </dev/null >/dev/null 2>&1\n\
-        exec hakchi recovery \"$@\"\n";
+        cd /tmp/cartload || exit 1\n\
+        exec /bin/sh /tmp/cartload/detached-fallback recovery \"$@\"\n";
 
     /// Starts the launcher in the background and returns at once.
     pub fn launch_kexec(image: Option<&str>) -> String {
@@ -236,12 +255,17 @@ pub(crate) async fn remote_md5_list(
     Ok(Some(sums))
 }
 
-/// Memboots `image` (or, with `None`, the kernel in NAND) from a running hakchi kernel.
+/// Memboots `image` (or, with `None`, the kernel in NAND) from a running hakchi kernel the
+/// way hakchi2 CE's `MembootTasks.Memboot` does.
 ///
-/// hakchi2 CE uploads its own `kexec` and a `detached-fallback` script for this; the device's
-/// ramdisk and rootfs carry the same `kexec` and a `recovery` shell function, so Cartload
-/// uploads only a four-line launcher (see [`commands::KEXEC_SCRIPT_BODY`]). The console drops
-/// off the network and comes back in the memboot shell.
+/// CE does not use the console's own `kexec` (Cartload's first hardware run went through the
+/// device's `hakchi recovery` and hung the console): it stops the UI, uploads its static
+/// `kexec` and `detached-fallback` ([`crate::tools`]) and the boot image, and runs the script,
+/// which puts its directory first on `PATH`, loads the image with `kexec -l`, unmounts
+/// everything and `kexec -e`s. The launching command cannot return normally: the console
+/// drops off the network and comes back in the memboot shell. CE runs it in the memboot
+/// shell too, after `sunxi-part grow`. When a step before the launch fails, the UI is started
+/// again, as CE does, and the error is returned.
 pub(crate) async fn kexec_memboot(ctx: &mut Context, image: Option<&[u8]>) -> Result<()> {
     if !ctx.succeeds(commands::HAS_ATAGS).await? {
         return Err(Error::WrongState(
@@ -250,7 +274,66 @@ pub(crate) async fn kexec_memboot(ctx: &mut Context, image: Option<&[u8]>) -> Re
                 .to_string(),
         ));
     }
+    let uistop = ctx.exec(commands::UISTOP).await?;
+    if !uistop.success() {
+        ctx.reporter.debug(format!(
+            "uistop exited with {:?} (ignored, as hakchi2 CE does)",
+            uistop.exit_code
+        ));
+    }
+    let launch = match prepare_kexec(ctx, image).await {
+        Ok(launch) => launch,
+        Err(error) => {
+            match ctx.exec(commands::UISTART).await {
+                Ok(output) if output.success() => {}
+                Ok(output) => ctx.reporter.debug(format!(
+                    "uistart after the failed preparation exited with {:?}",
+                    output.exit_code
+                )),
+                Err(restart) => ctx.reporter.debug(format!(
+                    "uistart after the failed preparation returned {restart}"
+                )),
+            }
+            return Err(error);
+        }
+    };
+    ctx.reporter
+        .info("kexec: the console drops off the network now and comes back in the memboot shell");
+    if let Err(error) = ctx.exec_with(&launch, None, Duration::from_secs(10)).await {
+        ctx.reporter.debug(format!(
+            "kexec launch returned {error} (expected if the link dropped)"
+        ));
+    }
+    ctx.expect_cycle = true;
+    ctx.disconnect().await;
+    Ok(())
+}
+
+/// Uploads hakchi2 CE's `kexec.static` and `detached-fallback`, the boot image when there is
+/// one, and the launcher, and returns the command that starts the launcher.
+async fn prepare_kexec(ctx: &Context, image: Option<&[u8]>) -> Result<String> {
     ctx.exec_checked(commands::MKDIR_SCRATCH, ctx.options.command_timeout)
+        .await?;
+    ctx.reporter.info(format!(
+        "uploading hakchi2 CE's kexec.static ({} bytes) and detached-fallback ({} bytes)",
+        tools::kexec_static().len(),
+        tools::detached_fallback().len()
+    ));
+    upload(
+        ctx,
+        commands::KEXEC_BINARY,
+        tools::kexec_static(),
+        "kexec.static",
+    )
+    .await?;
+    upload(
+        ctx,
+        commands::DETACHED_FALLBACK,
+        tools::detached_fallback(),
+        "detached-fallback",
+    )
+    .await?;
+    ctx.exec_checked(commands::CHMOD_KEXEC_TOOLS, ctx.options.command_timeout)
         .await?;
     let image_path = match image {
         Some(image) => {
@@ -270,17 +353,7 @@ pub(crate) async fn kexec_memboot(ctx: &mut Context, image: Option<&[u8]>) -> Re
         "kexec launcher",
     )
     .await?;
-    ctx.reporter
-        .info("kexec: the console drops off the network now and comes back in the memboot shell");
-    let launch = commands::launch_kexec(image_path);
-    if let Err(error) = ctx.exec_with(&launch, None, Duration::from_secs(10)).await {
-        ctx.reporter.debug(format!(
-            "kexec launch returned {error} (expected if the link dropped)"
-        ));
-    }
-    ctx.expect_cycle = true;
-    ctx.disconnect().await;
-    Ok(())
+    Ok(commands::launch_kexec(image_path))
 }
 
 #[cfg(test)]
@@ -297,8 +370,26 @@ mod tests {
             commands::launch_kexec(None),
             "sh /tmp/cartload/kexec.sh </dev/null >/dev/null 2>&1 &"
         );
-        assert!(commands::KEXEC_SCRIPT_BODY.contains("trap '' HUP TERM PIPE"));
-        assert!(commands::KEXEC_SCRIPT_BODY.ends_with("exec hakchi recovery \"$@\"\n"));
+    }
+
+    /// The launcher runs what hakchi2 CE runs (`cd /tmp/kexec/; /bin/sh
+    /// /tmp/kexec/detached-fallback recovery /tmp/kexec/boot.img`), from Cartload's scratch
+    /// directory, detached from the SSH session, and never the device's own `hakchi recovery`.
+    #[test]
+    fn kexec_launcher_runs_ce_detached_fallback_detached_from_the_session() {
+        let body = commands::KEXEC_SCRIPT_BODY;
+        assert!(body.starts_with("#!/bin/sh\n"));
+        assert!(body.contains("\ntrap '' HUP TERM PIPE\n"));
+        assert!(body.contains("\nexec </dev/null >/dev/null 2>&1\n"));
+        assert!(body.contains("\ncd /tmp/cartload || exit 1\n"));
+        assert!(body.ends_with("\nexec /bin/sh /tmp/cartload/detached-fallback recovery \"$@\"\n"));
+        assert!(!body.contains("hakchi recovery"));
+        assert_eq!(
+            commands::CHMOD_KEXEC_TOOLS,
+            "chmod +x /tmp/cartload/kexec /tmp/cartload/detached-fallback"
+        );
+        assert_eq!(commands::KEXEC_BINARY, "/tmp/cartload/kexec");
+        assert!(commands::DETACHED_FALLBACK.starts_with(commands::SCRATCH_DIR));
     }
 
     #[test]

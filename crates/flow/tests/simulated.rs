@@ -20,7 +20,7 @@ use cartload_console::{ExecOutput, Versions, commands as console_commands, parse
 use cartload_fel::{MembootOptions, MembootReport, VerifyDeviceResponse};
 use cartload_flow::{
     Backend, Console, Context, Error, Event, Flow, FlowOptions, HmodPackage, Outcome, Reporter,
-    channel, flows, steps::commands,
+    channel, flows, steps::commands, tools,
 };
 use cartload_hmod::{
     BootFiles, Version,
@@ -64,12 +64,16 @@ struct Sim {
     transfer_dir: bool,
     mounted: bool,
     files: BTreeMap<String, Vec<u8>>,
+    /// Uploaded files that were `chmod +x`'d.
+    executable: BTreeSet<String>,
     offline_polls_left: usize,
     come_back: ComeBack,
     generation: u64,
     log: Vec<String>,
     /// Fault injection: the next hmod upload chunk fails.
     fail_hmod_upload: bool,
+    /// Fault injection: the next `chmod +x` of the kexec tools fails.
+    fail_kexec_chmod: bool,
     /// Fault injection: after a memboot (FEL or kexec) the console comes back like this
     /// instead of in the memboot shell.
     memboot_comes_back: Option<ComeBack>,
@@ -103,11 +107,13 @@ impl Sim {
             transfer_dir: false,
             mounted: false,
             files: BTreeMap::new(),
+            executable: BTreeSet::new(),
             offline_polls_left: 0,
             come_back: ComeBack::Stays,
             generation: 0,
             log: Vec::new(),
             fail_hmod_upload: false,
+            fail_kexec_chmod: false,
             memboot_comes_back: None,
             fel_memboots: 0,
             kexecs: 0,
@@ -160,6 +166,7 @@ impl Sim {
                         self.cf_update = false;
                         self.transfer_dir = false;
                         self.files.clear();
+                        self.executable.clear();
                     }
                     ComeBack::FullBoot => {
                         self.online = true;
@@ -171,6 +178,35 @@ impl Sim {
             }
         }
         self.online
+    }
+
+    /// What `detached-fallback recovery` needs when the launcher starts it: hakchi2 CE's
+    /// `kexec` and the script itself uploaded unchanged and executable, and a launcher that
+    /// runs the uploaded script from the scratch directory, never `hakchi recovery`.
+    fn check_kexec_tools(&self) {
+        for (path, expected) in [
+            (commands::KEXEC_BINARY, tools::kexec_static()),
+            (commands::DETACHED_FALLBACK, tools::detached_fallback()),
+        ] {
+            assert_eq!(
+                self.files.get(path).map(Vec::as_slice),
+                Some(expected),
+                "{path} uploaded unchanged"
+            );
+            assert!(self.executable.contains(path), "{path} executable");
+        }
+        let launcher = self
+            .files
+            .get(commands::KEXEC_SCRIPT)
+            .expect("launcher uploaded");
+        let launcher = std::str::from_utf8(launcher).unwrap();
+        assert!(launcher.starts_with("#!/bin/sh\n"), "{launcher}");
+        assert!(launcher.contains("cd /tmp/cartload"), "{launcher}");
+        assert!(
+            launcher.contains("/bin/sh /tmp/cartload/detached-fallback recovery \"$@\""),
+            "{launcher}"
+        );
+        assert!(!launcher.contains("hakchi recovery"), "{launcher}");
     }
 
     fn exec(&mut self, command: &str, stdin: Option<&[u8]>) -> ExecOutput {
@@ -319,26 +355,45 @@ impl Sim {
                 ok("")
             }
 
-            // kexec from a running kernel.
+            // kexec from a running kernel: hakchi2 CE's `Memboot` with its own tools.
             commands::HAS_ATAGS => ok(""),
+            // No UI to stop in the memboot shell; the flow ignores the failure as CE does.
+            commands::UISTOP => exit(!self.memboot_shell),
+            commands::UISTART => ok(""),
             commands::MKDIR_SCRATCH => ok(""),
+            commands::CHMOD_KEXEC_TOOLS => {
+                if self.fail_kexec_chmod {
+                    self.fail_kexec_chmod = false;
+                    return code(
+                        1,
+                        "",
+                        "chmod: /tmp/cartload/kexec: Operation not permitted\n",
+                    );
+                }
+                for path in [commands::KEXEC_BINARY, commands::DETACHED_FALLBACK] {
+                    assert!(
+                        self.files.contains_key(path),
+                        "{path} uploaded before chmod"
+                    );
+                    self.executable.insert(path.to_string());
+                }
+                ok("")
+            }
             c if c == commands::launch_kexec(Some(commands::KEXEC_IMAGE)) => {
+                self.check_kexec_tools();
                 assert!(
                     self.files.contains_key(commands::KEXEC_IMAGE),
                     "image uploaded"
-                );
-                assert!(
-                    self.files.contains_key(commands::KEXEC_SCRIPT),
-                    "script uploaded"
                 );
                 self.kexecs += 1;
                 self.memboot();
                 ok("")
             }
             c if c == commands::launch_kexec(None) => {
+                self.check_kexec_tools();
                 assert!(
-                    self.files.contains_key(commands::KEXEC_SCRIPT),
-                    "script uploaded"
+                    !self.files.contains_key(commands::KEXEC_IMAGE),
+                    "no image uploaded: the kernel in NAND is kexec'd"
                 );
                 assert_eq!(
                     self.nand_kernel,
@@ -763,7 +818,11 @@ async fn install_from_stock_runs_the_ce_sequence() {
             commands::SUNXI_PART,
             commands::SNTOOL_ISMD,
             commands::HAS_ATAGS,
+            commands::UISTOP,
             commands::MKDIR_SCRATCH,
+            &format!("cat > {}", sh_quote(commands::KEXEC_BINARY)),
+            &format!("cat > {}", sh_quote(commands::DETACHED_FALLBACK)),
+            commands::CHMOD_KEXEC_TOOLS,
             &format!("cat > {}", sh_quote(commands::KEXEC_IMAGE)),
             &format!("cat > {}", sh_quote(commands::KEXEC_SCRIPT)),
             &commands::launch_kexec(Some(commands::KEXEC_IMAGE)),
@@ -784,6 +843,12 @@ async fn install_from_stock_runs_the_ce_sequence() {
     );
     assert_eq!(count(&log, commands::SUNXI_PART_GROW), 1);
     assert_eq!(count(&log, commands::BOOT), 1);
+    assert_eq!(count(&log, commands::UISTOP), 1, "uistop before the kexec");
+    assert_eq!(
+        count(&log, commands::UISTART),
+        0,
+        "nothing failed after uistop"
+    );
     assert_eq!(count(&log, &format!("cat > {hmod_path}")), 1);
     assert_eq!(
         count(&log, &format!("cat >> {hmod_path}")),
@@ -937,6 +1002,13 @@ async fn install_over_a_running_hakchi_kernel_uses_kexec_not_fel() {
         &[
             console_commands::VERSIONS,
             commands::HAS_ATAGS,
+            commands::UISTOP,
+            commands::MKDIR_SCRATCH,
+            &format!("cat > {}", sh_quote(commands::KEXEC_BINARY)),
+            &format!("cat > {}", sh_quote(commands::DETACHED_FALLBACK)),
+            commands::CHMOD_KEXEC_TOOLS,
+            &format!("cat > {}", sh_quote(commands::KEXEC_IMAGE)),
+            &format!("cat > {}", sh_quote(commands::KEXEC_SCRIPT)),
             &commands::launch_kexec(Some(commands::KEXEC_IMAGE)),
             commands::BOOT,
         ],
@@ -1027,6 +1099,12 @@ async fn uninstall_from_a_running_kernel_restores_stock_without_a_package() {
         &backend.log(),
         &[
             commands::HAS_ATAGS,
+            commands::UISTOP,
+            commands::MKDIR_SCRATCH,
+            &format!("cat > {}", sh_quote(commands::KEXEC_BINARY)),
+            &format!("cat > {}", sh_quote(commands::DETACHED_FALLBACK)),
+            commands::CHMOD_KEXEC_TOOLS,
+            &format!("cat > {}", sh_quote(commands::KEXEC_SCRIPT)),
             &commands::launch_kexec(None),
             console_commands::IS_MINIMAL_MEMBOOT,
             commands::GET_BACKUP2,
@@ -1043,6 +1121,14 @@ async fn uninstall_from_a_running_kernel_restores_stock_without_a_package() {
             console_commands::UMOUNT_BASE,
             commands::REBOOT,
         ],
+    );
+    assert_eq!(
+        count(
+            &backend.log(),
+            &format!("cat > {}", sh_quote(commands::KEXEC_IMAGE))
+        ),
+        0,
+        "no package: the kernel in NAND is kexec'd"
     );
     backend.with(|sim| {
         assert_eq!(sim.nand_kernel, NandKernel::Stock);
@@ -1197,6 +1283,58 @@ async fn wrong_state_after_memboot_is_reported() {
         "{error}"
     );
     assert_eq!(flow.position(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn failed_kexec_preparation_restarts_the_ui_and_reports_the_command() {
+    // hakchi2 CE's catch block: a failure between `uistop` and the launch brings the UI back
+    // and the error out; the console keeps running its kernel.
+    let backend = SimBackend::new(Sim {
+        fail_kexec_chmod: true,
+        ..Sim::installed()
+    });
+    let (mut ctx, _events) = context(&backend, Some(package()));
+    let mut flow = flows::memboot();
+    let error = flow.run(&mut ctx).await.expect_err("chmod fails");
+    assert!(matches!(error.root(), Error::Device(_)), "{error}");
+    let text = error.to_string();
+    assert!(text.starts_with("step 1 (memboot) failed"), "{text}");
+    assert!(text.contains(commands::CHMOD_KEXEC_TOOLS), "{text}");
+    assert!(text.contains("Operation not permitted"), "{text}");
+    let log = backend.log();
+    assert_in_order(
+        &log,
+        &[
+            commands::UISTOP,
+            commands::CHMOD_KEXEC_TOOLS,
+            commands::UISTART,
+        ],
+    );
+    assert_eq!(count(&log, commands::UISTART), 1);
+    assert_eq!(
+        count(&log, &format!("cat > {}", sh_quote(commands::KEXEC_IMAGE))),
+        0,
+        "nothing more is uploaded after the failure"
+    );
+    assert_eq!(
+        count(&log, &commands::launch_kexec(Some(commands::KEXEC_IMAGE))),
+        0
+    );
+    backend.with(|sim| {
+        assert_eq!(sim.kexecs, 0);
+        assert!(
+            sim.online && !sim.memboot_shell,
+            "the console keeps running"
+        );
+    });
+
+    // Rerunning resumes at the memboot step and goes through this time.
+    flow.run(&mut ctx).await.expect("second attempt succeeds");
+    assert!(ctx.state.is_memboot_shell());
+    backend.with(|sim| {
+        assert_eq!(sim.kexecs, 1);
+        assert!(sim.online && sim.memboot_shell);
+    });
 }
 
 /// The tiny7zx mod with made-up content (the real files are downloaded, never bundled).

@@ -308,9 +308,20 @@ Classic Mini (`-v` adds the debug lines, among them the `sunxi-part` output):
    now B`. Record the sizes and, with `-v`, the raw `sunxi-part` lines: the parser follows
    hakchi2 CE's `(mbr|nand[a-z]):label:sectors` and has not seen real output yet.
    If `UDISK is still listed` appears, the grow did not take and the step ends `not needed`.
-6. `reboot-grown`: `uploading the boot image for kexec (4585472 bytes)`, progress, `kexec: the
-   console drops off the network now and comes back in the memboot shell`. On the host
-   `hakchi0` disappears and comes back.
+6. `reboot-grown`: `uploading hakchi2 CE's kexec.static (722876 bytes) and detached-fallback
+   (1873 bytes)`, `kexec.static: ... / 722876 bytes (100%)`, `uploading the boot image for kexec
+   (4585472 bytes)`, progress, `kexec: the console drops off the network now and comes back in
+   the memboot shell`. With `-v` a `uistop exited with ... (ignored, as hakchi2 CE does)` line
+   may precede the uploads: the memboot shell has no UI to stop. The step does what hakchi2
+   CE's `GrowTask` does with `rebootToRecovery` (`MembootTasks.Memboot`): `uistop`, `mkdir -p
+   /tmp/cartload`, upload `kexec.static` as `/tmp/cartload/kexec` and `detached-fallback`,
+   `chmod +x` both, upload the package's `boot.img`, then run `cd /tmp/cartload; /bin/sh
+   /tmp/cartload/detached-fallback recovery /tmp/cartload/boot.img` through a launcher that is
+   detached from the SSH session. On the host `hakchi0` disappears and comes back. **Untested
+   on hardware**: the test console's data partition was already grown, so this step was
+   skipped (section "Results"). If the console hangs here (power LED off, no USB device),
+   power-cycle it and rerun the command: step 1 then goes through FEL and the grow is already
+   done.
 7. `wait-console`: `the console left the USB network`, then `the console answers SSH at ...`
    within about 20 s.
 8. `detect`: the memboot shell again, same hwid.
@@ -349,10 +360,18 @@ had completed and the md5 matches) and the install continues as in section 2.
 
 Same command with the console booted normally. Expected difference in step 1: `found hakchi
 v1.0.4-126 (...) installed on ...`, `membooting the package's boot.img with kexec from the
-running kernel`, `uploading the boot image for kexec (4585472 bytes)`, progress, `kexec: the
-console drops off the network now ...`; no Reset button, no FEL. Step 2 reports `the console
-left the USB network` first. Step 5 is `already done` (no UDISK), step 6 too. Steps 9 to 13 as
-in section 2; the installer prints `updating hakchi...` lines instead of `installing`.
+running kernel`, `uploading hakchi2 CE's kexec.static (722876 bytes) and detached-fallback
+(1873 bytes)`, `kexec.static: ... (100%)`, `uploading the boot image for kexec (4585472
+bytes)`, progress, `kexec: the console drops off the network now ...`; no Reset button, no
+FEL. The console's menu goes away at `uistop` before the uploads. The sequence is the one of
+section 2 step 6 (hakchi2 CE's `Memboot`: its own `kexec.static` and `detached-fallback`
+under `/tmp/cartload`, not the console's `hakchi recovery`). **Untested on hardware** in this
+form: the first run (2026-10-21) used the console's own `hakchi recovery` and hung the console
+(power LED off, no USB device, a power cycle recovered it); the switch to CE's tools has not
+been run since. If it hangs again, power-cycle the console and record the `-v` output. Step 2
+reports `the console left the USB network` first. Step 5 is `already done` (no UDISK), step 6
+too. Steps 9 to 13 as in section 2; the installer prints `updating hakchi...` lines instead of
+`installing`.
 
 ### 5. Negative checks
 
@@ -443,7 +462,7 @@ console booted into its installed hakchi kernel`.
 
 | Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Base mods | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-10-21 | SNES Classic Mini EUR, hakchi v1.0.4-126 already installed | EndeavourOS, Linux 6.18 | ok (FEL) | | | kexec from running kernel: console hung, LED off, power-cycle recovered it (uses the console's own kexec; CE uploads kexec.static) | | | | first run panicked opening the FEL device (nusb needed its tokio feature, fixed 16fffd4); second run through FEL ran all 13 steps, installer printed "invalid image on nand at sector: 68" which the flow wrongly took as fatal (fixed 77e83e5); the console came back installed and `cartload-console info` verified it. grow/reboot-grown were skipped (partition already grown), so kexec from the memboot shell is still untested. haveBackup2 and isOriginalBoot2 both fail on this console: no stock kernel backup at sector 68 |
+| 2026-10-21 | SNES Classic Mini EUR, hakchi v1.0.4-126 already installed | EndeavourOS, Linux 6.18 | ok (FEL) | | | kexec from running kernel through the console's own `hakchi recovery`: console hung, LED off, power-cycle recovered it. Replaced since (task 13) by hakchi2 CE's sequence with its own `kexec.static` and `detached-fallback`; that sequence is untested on hardware, from a running kernel (step 1 of section 4) and from the memboot shell after a grow (step 6 of section 2) alike | | | | first run panicked opening the FEL device (nusb needed its tokio feature, fixed 16fffd4); second run through FEL ran all 13 steps, installer printed "invalid image on nand at sector: 68" which the flow wrongly took as fatal (fixed 77e83e5); the console came back installed and `cartload-console info` verified it. grow/reboot-grown were skipped (partition already grown), so kexec from the memboot shell is still untested. haveBackup2 and isOriginalBoot2 both fail on this console: no stock kernel backup at sector 68 |
 
 ## Sync one game
 
@@ -671,8 +690,14 @@ Library" as the only accent button. The status bar is back to the connected sent
 
 Click "Install again" with the console now running hakchi: stage 1 reads "hakchi v1.0.4-126 is
 installed. Installing again updates or repairs it from the running kernel; no Reset needed.",
-the first step logs the kexec instead of FEL, "Grow the data partition" is skipped ("no UDISK partition left; the data partition is already
-grown"), the rest runs as above.
+the first step logs the kexec instead of FEL ("uploading hakchi2 CE's kexec.static (722876
+bytes) and detached-fallback (1873 bytes)" with a progress bar for `kexec.static`, then the
+boot image's, then "kexec: the console drops off the network now and comes back in the
+memboot shell"; the console's menu disappears at `uistop` before the uploads), "Grow the data
+partition" is skipped ("no UDISK partition left; the data partition is already grown"), the
+rest runs as above. The kexec sequence is "Install kernel" section 4's and is untested on
+hardware; if the console hangs (power LED off), power-cycle it and the failure card for the
+wait step appears, then "Try again" goes through FEL.
 
 ### 3. Stop
 
