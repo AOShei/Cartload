@@ -1,0 +1,29 @@
+[Desktop Entry]
+Type=Application
+Exec=/bin/chmenu 000 /var/games
+Path=/var/saves/FOLDER
+Name=Original games
+CePrefix=
+Icon=/var/games/CLV-S-00000/CLV-S-00000.png
+
+[X-CLOVER Game]
+Code=CLV-S-00000
+TestID=777
+ID=0
+Players=1
+Simultaneous=0
+ReleaseDate=9999-99-99
+SaveCount=0
+SortRawTitle=Яoriginal games
+SortRawPublisher=ZZZZZZZZZZ
+Copyright=
+
+[m2engage]
+regionTag=
+sortRawGenre=
+index=
+demo_time=
+country=
+
+[Description]
+Text = 

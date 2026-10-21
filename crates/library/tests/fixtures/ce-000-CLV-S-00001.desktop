@@ -1,0 +1,29 @@
+[Desktop Entry]
+Type=Application
+Exec=/bin/chmenu 001 /var/games
+Path=/var/saves/FOLDER
+Name=More games...
+CePrefix=
+Icon=/var/games/CLV-S-00001/CLV-S-00001.png
+
+[X-CLOVER Game]
+Code=CLV-S-00001
+TestID=777
+ID=0
+Players=1
+Simultaneous=0
+ReleaseDate=8888-88-88
+SaveCount=0
+SortRawTitle=Юmore games...
+SortRawPublisher=ZZZZZZZZZY
+Copyright=
+
+[m2engage]
+regionTag=
+sortRawGenre=
+index=
+demo_time=
+country=
+
+[Description]
+Text = 

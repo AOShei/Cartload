@@ -1,0 +1,29 @@
+[Desktop Entry]
+Type=Application
+Exec=/bin/clover-canoe-shvc-wr -rom /var/lib/hakchi/games/snes-eur/.storage/CLV-U-ZJSQU/Chrono_Trigger.sfrom.7z --volume 100 -rollback-snapshot-period 600
+Path=/var/saves/CLV-U-ZJSQU
+Name=Chrono Trigger
+CePrefix=
+Icon=/var/lib/hakchi/games/snes-eur/.storage/CLV-U-ZJSQU/CLV-U-ZJSQU.png
+
+[X-CLOVER Game]
+Code=CLV-U-ZJSQU
+TestID=0
+ID=0
+Players=1
+Simultaneous=0
+ReleaseDate=1995-03-11
+SaveCount=3
+SortRawTitle=chrono trigger
+SortRawPublisher=SQUARESOFT
+Copyright=
+
+[m2engage]
+regionTag=
+sortRawGenre=
+index=
+demo_time=
+country=us
+
+[Description]
+Text = 

@@ -13,10 +13,42 @@ name = "cartload_library"
 [[bin]]
 name = "cartload-library"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["fetch", "cli"]
+# Downloading the hash database over HTTPS (reqwest on rustls with the ring provider).
+fetch = ["dep:reqwest", "dep:rustls"]
+# Command-line binary and its dependencies (argument parsing, log output).
+cli = ["fetch", "dep:anyhow", "dep:clap", "dep:tracing-subscriber"]
 
 [dependencies]
+# The console crate without its CLI: sessions, FTP, the hakchi wrappers and the console model.
+cartload-console = { path = "../console", default-features = false }
+crc32fast = "1"
+dirs = "7"
+flate2 = "1"
+png = "0.18"
+quick-xml = "0.38"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 thiserror.workspace = true
+tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
+zip = { version = "9", default-features = false, features = ["deflate"] }
+
+# fetch only. Same crypto setup as cartload-hmod: reqwest without a provider, rustls on ring.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "system-proxy"], optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
+
+# CLI only.
+anyhow = { workspace = true, optional = true }
+clap = { version = "4", features = ["derive"], optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true

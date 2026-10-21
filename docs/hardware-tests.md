@@ -408,3 +408,86 @@ dump; a file whose md5 is unknown is refused unless `--force-stock-kernel` is gi
 | Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | | | | | | | | | | not yet run on hardware |
+
+## Sync one game
+
+Crate: `crates/library`, binary `cartload-library`. `import`, `list` and `menu` never touch the
+console. `plan` connects, runs the hakchi2 CE connect sequence, reads the firmware's launch
+entries (`cat` of each `CLV-P-*.desktop` in the squashfs, cached under `originals/` in the
+library) and lists the games storage (`find`/`stat`); it changes nothing except that
+`mkdir -p` of the per-console games directory, which already exists on a synced console. `sync`
+**modifies the games storage**: it stops the menu, unmounts the games overlay, removes the files,
+symlinks and emptied directories named in the plan, uploads the plan's files over FTP, sets their
+times, runs the link script, writes the config and runs `hakchi overmount_games; uistart`. Save
+states and everything outside `<storage>/<system code>/` are untouched. A console synced with
+hakchi2 CE keeps working after a Cartload sync and vice versa (same layout); the first Cartload
+sync after a CE sync re-uploads every file because the timestamps differ.
+
+### Prerequisites
+
+- Everything from "Console connect".
+- A SNES ROM (`.sfc`/`.smc`) or NES ROM (`.nes`). The run below uses Chrono Trigger (USA),
+  CRC-32 `2D206BF7` after copier header removal, which hakchi2 CE's trace also used.
+- A scratch library so the default one is not touched: `export CARTLOAD_LIBRARY=/tmp/cartload-lib`.
+
+### 1. Import and inspect (no console needed)
+
+```
+cargo run -p cartload-library -- import "Chrono Trigger.smc"
+cargo run -p cartload-library -- list
+cargo run -p cartload-library -- menu --console snes-eur
+```
+
+Expected: the first download of `romfiles.xml.gz` (518 698 bytes, 19 932 records) into the
+cache, then `CLV-U-ZJSQU  Chrono Trigger  [Super Nintendo Entertainment System] matched`. The
+game directory holds `Chrono_Trigger.sfrom` (4 194 400 bytes = 48 + 4 194 304 + 48),
+`CLV-U-ZJSQU.desktop`, `CLV-U-ZJSQU.png`, `CLV-U-ZJSQU_small.png` and `game.json`. `menu` prints
+the game alone (no firmware entries are cached yet) and `1 menu directories on the console`.
+
+### 2. Plan against the console
+
+```
+cargo run -p cartload-library -- plan
+```
+
+Expected on a European SNES Classic Mini: `console: SNES Classic Mini (EUR) [snes-eur],
+storage /var/lib/hakchi/games`, `cached the firmware's launch entries count=21`, then
+`1 games, 21 firmware games, 2 folders in 31 files (4321280 bytes on the console)` and the
+free space line. The upload list has the 21 `./000/CLV-P-*/CLV-P-*.desktop` entries with the
+same sizes hakchi2 CE uploads (CLV-P-SAAAE 600 bytes, CLV-P-SABTE 796 bytes, ...), the
+`More games...` folder `CLV-S-00001` in `000`, the game's files under `./.storage/CLV-U-ZJSQU/`
+and its entry plus the `Original games` back folder `CLV-S-00000` in `001`. On a console
+hakchi2 CE synced before, the plan also removes CE's `_mdmini.png`, `metadata.json` and `.7z`
+files and the 21 `autoplay` symlinks (recreated by the link script). Verified 2026-10-21 on the
+console of the trace, read-only.
+
+### 3. Sync
+
+```
+cargo run -p cartload-library -- sync
+```
+
+Confirm with `y`. Expected: the nine steps `stop-ui`, `umount`, `diff`, `cleanup`, `upload`
+(progress lines, about 4.2 MB in a second or two over USB), `link`, `config`, `finish`, `done`,
+then `uploaded 31 files (4211699 bytes), removed ... games mounted: true`. The TV shows the
+stock menu with the 21 original games and a "More games..." folder on the right; inside it
+Chrono Trigger (placeholder cover) and an "Original games" folder leading back. Starting the
+game must work and offer 3 save slots. `cargo run -p cartload-console -- info` then reports
+about 4.2 MB used by the current games collection.
+
+### 4. Second sync and removal
+
+- `sync` again: the plan says `upload 0 files`, `keep 31`, nothing to remove; the sync still
+  relinks and remounts. Expected to finish in a few seconds with the menu unchanged.
+- `remove CLV-U-ZJSQU`, then `sync`: the plan removes the game's three files and its entry and
+  the two folders (`More games...` no longer has content), and the menu shows only the 21
+  original games.
+- Negative: with the console off, `plan --console snes-eur` prints `no console answered;
+  planning against an empty snes-eur console` and lists every file as an upload; `sync` exits 1
+  with `no console answered`.
+
+### Results
+
+| Date | Console | Import | Plan | Sync | Second sync | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | OK (Chrono Trigger, code and .sfrom size as in the CE trace) | OK, read-only, 21 firmware entries cached | not run (user absent) | not run | the entries the plan generates have the sizes of CE's uploads |
