@@ -89,7 +89,7 @@ pub async fn fetch_from(
     Err(Error::AllSourcesFailed(failures))
 }
 
-fn client() -> Result<reqwest::Client> {
+pub(crate) fn client() -> Result<reqwest::Client> {
     // reqwest is built without a crypto provider, so install ring as the process default. It is
     // the backend cartload-console's SSH stack uses too. A second install is refused, which is
     // fine: any provider already in place works as well.

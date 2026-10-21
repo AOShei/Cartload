@@ -123,7 +123,8 @@ Free space on the SNES Classic after install: about 313 MB on NAND.
 ## Games model
 
 - Each game is a directory `CLV-U-XXXXX` (user) or `CLV-P-XXXXX` (original) containing the ROM
-  (SNES: `.sfrom` container, converted from `.sfc/.smc`), a `.desktop` launch entry with the command
+  (SNES: `.sfrom` container, converted from `.sfc/.smc`; optionally packed as `.sfrom.7z`, see
+  "Compressed games"), a `.desktop` launch entry with the command
   line (e.g. `/bin/clover-canoe-shvc-wr -rom /var/games/CLV-U-ZJSQU/Chrono_Trigger.sfrom ...`),
   cover art PNG, and optional `pixelart`, `autoplay` folders.
 - Folders are `CLV-S-XXXXX` directories with their own `.desktop` entry and `folder.png`.
@@ -132,6 +133,56 @@ Free space on the SNES Classic after install: about 313 MB on NAND.
   (`romfiles.xml.gz` from TeamShinkansen/hash-db). It has no images.
 - Art: TheGamesDB API (needs an API key; CE bundles one) with
   `https://cdn.thegamesdb.net/images/original/clearlogo/{id}.png`. Google image scraping is dead.
+
+## Compressed games (verified on the console on 2026-10-21, read-only)
+
+hakchi2 CE's "Compress games" option packs each ROM file of a game (at most
+`NesApplication.MaxCompress` = 16 MiB) into `<file>.7z`: one entry with the ROM's own name,
+LZMA (CE's bundled `tiny7z` C# writer, method 1), and points the launch entry's `-rom`
+argument at the archive. Nothing else in the entry changes. Chrono Trigger's 4 194 400-byte
+`.sfrom` became 2 850 560 bytes in the trace; Cartload's pure-Rust LZMA archive of the same
+file is 2 850 539 bytes.
+
+Extraction happens on the console at launch, in the emulator wrappers that hakchi's rootfs
+ships for every game (`/bin/clover-canoe-shvc-wr`, `/bin/clover-kachikachi-wr`, `/bin/m2engage`
+in `hakchi.hmod`'s ramdisk under `hakchi/rootfs/bin/`): when the ROM path ends in `.7z` the
+wrapper runs `tiny7zx x "$filename"` in `$temppath/rom` (`/tmp/rom`, tmpfs), renames the one
+extracted file to `rom.<its extension>` and starts the emulator on that. So the entry inside the
+archive must keep the ROM's extension, and the archive must hold exactly one file.
+
+`tiny7zx` itself is not part of `hakchi.hmod`. It comes from CE's base mod `tiny7zx.hmod`
+(pts-tiny-7z-sfx by Péter Szabó, GPL-2, a 26 578-byte dynamically linked ARM binary, md5
+`eb8fa3b5a0d8a832e81eec9b5fccb60b`; decodes LZMA, LZMA2, BCJ, BCJ2 and COPY and keeps the whole
+uncompressed file in RAM, which is where the 16 MiB limit comes from). CE transfers all its base
+mods (`basehmods.tar`: `clovercon`, `tiny7zx`, `font_remount`, `gamepath-cleanup`, `copyleft`,
+`ntfs-3g`) during the kernel install and installs them with the kernel. `font_remount` only
+binds an extended title font over the firmware's; it has nothing to do with compression. The
+mods are directories in CE's source tree (`hakchi_gui/mods/hmods/<name>.hmod/`), which is where
+Cartload downloads them from, pinned to a commit and checked by MD5.
+
+On this console: `which tiny7zx` → `/bin/tiny7zx`; `/var/lib/hakchi/rootfs/bin/tiny7zx` is the
+same file; `/var/lib/hakchi/hmod/` holds one `uninstall-<name>` script per installed mod
+(`clovercon`, `copyleft`, `font_remount`, `ntfs-3g`, `tiny7zx` plus the user's RetroArch
+cores); 256 MB of RAM with about 128 MB free at idle. `/etc/hmodblacklist` lists mod names the
+device refuses to install (`tiny7zx-dynamic` among them; `tiny7zx` is not listed).
+
+Installing a mod on a running console (hakchi2 CE `ModTasks`, device script `b0030_package`):
+
+```
+mkdir -p '/tmp/hmods/<name>.hmod'
+tar -xvC '/tmp/hmods/<name>.hmod'        <- the mod's files as a plain tar on stdin
+hakchi packs_install '/tmp/hmods'        -> installing <name>... / package <name> installed
+```
+
+`packs_install` runs `pack_install` on every `*.hmod` in the directory: a `.hmod` file is
+untarred (`tar -xzf`) to a temporary directory, a directory is used as is; readmes are deleted,
+`bin/*` made executable, the mod's `install` script sourced with `$transferpath` set, everything
+except `install`, `uninstall` and `transfer` copied into `$rootfs` (`/var/lib/hakchi/rootfs`,
+the upper directory of the overlayfs mounted on `/`), and an auto-generated uninstall script
+written to `$installpath/hmod/uninstall-<name>`; `hakchi pack_list` prints those names and
+`hakchi pack_uninstall <name>` runs the script. CE memboots into recovery, installs with
+`mount_base` and then boots normally; Cartload installs on the booted kernel and reboots, so the
+files written into the overlay's upper directory are seen by the running system.
 
 ## Sync sequence (verified, see docs/reference/hakchi-ce-sync-trace.log)
 

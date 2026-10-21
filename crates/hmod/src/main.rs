@@ -3,7 +3,7 @@
 use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
-use cartload_hmod::{DOWNLOAD_URLS, EntryKind, Package, Progress, fetch_from};
+use cartload_hmod::{DOWNLOAD_URLS, EntryKind, Package, Progress, basemods, fetch_from};
 use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -67,6 +67,21 @@ enum Command {
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
     },
+    /// List hakchi2 CE's base mods (tiny7zx for compressed games, font_remount) and their
+    /// cache state; with --fetch, download the missing files into the cache.
+    BaseMods {
+        /// Download the files that are missing from the cache.
+        #[arg(long)]
+        fetch: bool,
+
+        /// Cache directory (default: the user cache directory, cartload/basemods).
+        #[arg(long, value_name = "DIR")]
+        cache: Option<PathBuf>,
+
+        /// Mods to fetch (default: the ones a compressed library needs).
+        #[arg(value_name = "NAME")]
+        names: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -90,6 +105,11 @@ async fn main() -> Result<()> {
         } => extract(&path, &entry, output.as_deref()),
         Command::Fetch { dest, url } => fetch(&dest, &url).await,
         Command::Fes1 { output } => fes1(output.as_deref()),
+        Command::BaseMods {
+            fetch,
+            cache,
+            names,
+        } => base_mods(fetch, cache, &names).await,
     }
 }
 
@@ -220,6 +240,84 @@ async fn fetch(dest: &std::path::Path, urls: &[String]) -> Result<()> {
         fetched.url
     );
     println!("version: {}", fetched.version);
+    Ok(())
+}
+
+async fn base_mods(fetch: bool, cache: Option<PathBuf>, names: &[String]) -> Result<()> {
+    let cache = match cache {
+        Some(cache) => cache,
+        None => basemods::default_cache_dir().context("no cache directory on this system")?,
+    };
+    let mods: Vec<&'static basemods::BaseMod> = if names.is_empty() {
+        basemods::FOR_COMPRESSION.to_vec()
+    } else {
+        names
+            .iter()
+            .map(|name| {
+                basemods::find(name).with_context(|| {
+                    format!(
+                        "{name} is not a known base mod; known: {}",
+                        basemods::CATALOG
+                            .iter()
+                            .map(|m| m.name)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })
+            })
+            .collect::<Result<_>>()?
+    };
+    println!(
+        "source:  {} at {}",
+        basemods::SOURCE_REPOSITORY,
+        basemods::SOURCE_COMMIT
+    );
+    println!("cache:   {}", cache.display());
+    if fetch {
+        let mut last = None;
+        let loaded = basemods::fetch(&mods, &cache, |p| {
+            let key = (p.name, p.file, p.done == p.total);
+            if last != Some(key) {
+                last = Some(key);
+                info!("{}: {} {} / {} bytes", p.name, p.file, p.done, p.total);
+            }
+        })
+        .await?;
+        for m in &loaded {
+            println!(
+                "fetched: {} ({} files, {} bytes, tar {} bytes)",
+                m.name(),
+                m.files.len(),
+                m.len(),
+                m.tar.len()
+            );
+        }
+    }
+    for spec in basemods::CATALOG {
+        let status = spec.status(&cache);
+        let wanted = mods.iter().any(|m| m.name == spec.name);
+        println!(
+            "{:<13} {}{}",
+            spec.name,
+            if status.is_complete() {
+                "cached".to_string()
+            } else {
+                format!(
+                    "{} of {} files missing",
+                    status.missing.len(),
+                    spec.files.len()
+                )
+            },
+            if wanted { "  (selected)" } else { "" }
+        );
+        println!("              {}", spec.summary);
+        for file in spec.files {
+            println!(
+                "              {:<32} {:>8} bytes  md5 {}",
+                file.path, file.size, file.md5
+            );
+        }
+    }
     Ok(())
 }
 

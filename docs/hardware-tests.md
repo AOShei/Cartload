@@ -8,8 +8,9 @@ Checklists land per crate as each one gains hardware-facing functionality:
 - `crates/fel`: FEL memboot (console in FEL mode, `1f3a:efe8`).
 - `crates/console`: discovery, SSH and FTP against a booted hakchi kernel (`04e8:6863`).
 - `crates/hmod`: kernel package install and version check on the console.
-- `crates/library`: sync of a small library and verification on the console menu.
-- `crates/flow`: the kernel install, memboot, dump and uninstall flows end to end.
+- `crates/library`: sync of a small library (compressed games included) and verification on the
+  console menu.
+- `crates/flow`: the kernel install, memboot, dump, uninstall and base mods flows end to end.
 
 Each checklist states the starting console state, the exact command to run, and the expected
 output, so that a run can be reproduced and compared.
@@ -403,11 +404,45 @@ boot) and no `04e8:6863`. `install` from section 2 puts hakchi back. A console w
 (`no stock kernel backup on the console: ...`) needs `--stock-kernel kernel.img` from an earlier
 dump; a file whose md5 is unknown is refused unless `--force-stock-kernel` is given.
 
+### Base mods
+
+```
+cargo run -p cartload-hmod -- base-mods
+cargo run -p cartload-flow -- --dry-run base-mods
+cargo run -p cartload-flow -- base-mods
+```
+
+Installs hakchi2 CE's `tiny7zx` mod (the 7z extractor compressed games need) on a console
+booted into its hakchi kernel; `--mods tiny7zx,font_remount` adds CE's extended title font. The
+files are downloaded from the CE repository at the pinned commit into the cache
+(`~/.cache/cartload/basemods/<commit>/<name>.hmod/`) the first time, checked against the MD5s
+in the catalog, and reused afterwards (`--offline` refuses to download). This **writes to the
+hakchi rootfs overlay** (`/var/lib/hakchi/rootfs/bin/tiny7zx`, `/var/lib/hakchi/hmod/
+uninstall-tiny7zx`) and reboots the console; the kernel partitions are untouched.
+
+Expected: `cartload-hmod base-mods` lists both mods with sizes and MD5s and `3 of 3 files
+missing` until fetched (`--fetch` downloads 30 116 bytes for tiny7zx in under a second; verified
+2026-10-21 against the live repository, every file's MD5 matching the local CE checkout). The
+dry run prints `mods:     tiny7zx from ... (https://github.com/TeamShinkansen/Hakchi2-CE at
+4fb3092c29cd)`, `tiny7zx: cached`, `flow:     base-mods (6 steps)` and the steps
+`wait-console`, `detect`, `base-mods`, `wait-console`, `detect`, `verify-mods`. The real run,
+on a console with CE's base mods already installed: step 3 `=> already done: tiny7zx: 1 file(s)
+in /var/lib/hakchi/rootfs with the expected MD5, registered in /var/lib/hakchi/hmod` and no
+reboot; step 6 `tiny7zx is on the console's PATH at /bin/tiny7zx`. On a console without the mod:
+step 3 `uploaded tiny7zx.hmod (3 files, 30116 bytes)`, `console: installing tiny7zx...`,
+`console: creating uninstall for tiny7zx...`, `console: package tiny7zx installed`,
+`installed tiny7zx; rebooting the console so the new files are seen`, then the console drops off
+the network and comes back (step 4), is identified (step 5) and step 6 reports the path. After
+that, `cargo run -p cartload-console -- exec -- hakchi pack_list` lists `tiny7zx`. Negative:
+`--mods clovercon` is refused with the list of known mods; `--offline` with an empty cache fails
+with `is not cached; download it first`; in the memboot shell step 2 fails with `expected a
+console booted into its installed hakchi kernel`.
+
 ### Results
 
-| Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | | | not yet run on hardware |
+| Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Base mods | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | | | not yet run on hardware; base mods: downloads and dry run verified 2026-10-21, the console already had tiny7zx (checked read-only), the flow was not run |
 
 ## Sync one game
 
@@ -421,7 +456,10 @@ symlinks and emptied directories named in the plan, uploads the plan's files ove
 times, runs the link script, writes the config and runs `hakchi overmount_games; uistart`. Save
 states and everything outside `<storage>/<system code>/` are untouched. A console synced with
 hakchi2 CE keeps working after a Cartload sync and vice versa (same layout); the first Cartload
-sync after a CE sync re-uploads every file because the timestamps differ.
+sync after a CE sync re-uploads every file because the timestamps differ. SNES and NES games are
+compressed by default (the ROM goes up as `<rom>.7z`, like CE's "Compress games"), so the
+console must have CE's `tiny7zx` mod ("Base mods" above); `sync` checks `which tiny7zx` before
+touching anything and `cartload-library compress --off <CODE>` turns compression off per game.
 
 ### Prerequisites
 
@@ -439,10 +477,22 @@ cargo run -p cartload-library -- menu --console snes-eur
 ```
 
 Expected: the first download of `romfiles.xml.gz` (518 698 bytes, 19 932 records) into the
-cache, then `CLV-U-ZJSQU  Chrono Trigger  [Super Nintendo Entertainment System] matched`. The
-game directory holds `Chrono_Trigger.sfrom` (4 194 400 bytes = 48 + 4 194 304 + 48),
-`CLV-U-ZJSQU.desktop`, `CLV-U-ZJSQU.png`, `CLV-U-ZJSQU_small.png` and `game.json`. `menu` prints
-the game alone (no firmware entries are cached yet) and `1 menu directories on the console`.
+cache, then `CLV-U-ZJSQU  Chrono Trigger  [Super Nintendo Entertainment System] matched,
+4194400 bytes packed to 2850539 (67%)` (about a second for the packing). The game directory
+holds `Chrono_Trigger.sfrom` (4 194 400 bytes = 48 + 4 194 304 + 48), `Chrono_Trigger.sfrom.7z`
+(2 850 539 bytes; hakchi2 CE's own archive of the same file is 2 850 560), `CLV-U-ZJSQU.desktop`
+(its `Exec` names the `.7z`), `CLV-U-ZJSQU.png`, `CLV-U-ZJSQU_small.png` and `game.json`
+(`"compress": true`). `list` shows `Chrono_Trigger.sfrom.7z`. `menu` prints the game alone (no
+firmware entries are cached yet) and `1 menu directories on the console`.
+
+```
+cargo run -p cartload-library -- compress --off CLV-U-ZJSQU
+cargo run -p cartload-library -- compress CLV-U-ZJSQU
+```
+
+Expected: `uncompressed: 4194400 bytes` with the `.7z` removed and the entry naming the `.sfrom`,
+then `compressed: 4194400 bytes packed to 2850539 (67%)` with the archive rebuilt (identical
+bytes: the packing is deterministic). `compress --all` reports `(unchanged)`.
 
 ### 2. Plan against the console
 
@@ -452,14 +502,18 @@ cargo run -p cartload-library -- plan
 
 Expected on a European SNES Classic Mini: `console: SNES Classic Mini (EUR) [snes-eur],
 storage /var/lib/hakchi/games`, `cached the firmware's launch entries count=21`, then
-`1 games, 21 firmware games, 2 folders in 31 files (4321280 bytes on the console)` and the
-free space line. The upload list has the 21 `./000/CLV-P-*/CLV-P-*.desktop` entries with the
-same sizes hakchi2 CE uploads (CLV-P-SAAAE 600 bytes, CLV-P-SABTE 796 bytes, ...), the
-`More games...` folder `CLV-S-00001` in `000`, the game's files under `./.storage/CLV-U-ZJSQU/`
-and its entry plus the `Original games` back folder `CLV-S-00000` in `001`. On a console
-hakchi2 CE synced before, the plan also removes CE's `_mdmini.png`, `metadata.json` and `.7z`
-files and the 21 `autoplay` symlinks (recreated by the link script). Verified 2026-10-21 on the
-console of the trace, read-only.
+`1 games (1 compressed), 21 firmware games, 2 folders in 31 files (2973696 bytes on the
+console)`, `upload 31 files (2867841 bytes)` and the free space line. The upload list has the
+21 `./000/CLV-P-*/CLV-P-*.desktop` entries with the same sizes hakchi2 CE uploads (CLV-P-SAAAE
+600 bytes, CLV-P-SABTE 796 bytes, ...), the `More games...` folder `CLV-S-00001` in `000`, the
+game's files under `./.storage/CLV-U-ZJSQU/` (`Chrono_Trigger.sfrom.7z`, 2850539 bytes) and its
+entry (578 bytes, the size of CE's own entry for the compressed game plus or minus the
+`country` line) plus the `Original games` back folder `CLV-S-00000` in `001`. On a console
+hakchi2 CE synced before, the plan also removes CE's `_mdmini.png` and `metadata.json` files and
+the 21 `autoplay` symlinks (recreated by the link script); CE's `.7z` at the same path is
+replaced by Cartload's, which differs in size and time. With compression off the game's line is
+`Chrono_Trigger.sfrom` (4194400 bytes) and the total `4321280 bytes on the console`. Verified
+2026-10-21 on the console of the trace, read-only, in both forms.
 
 ### 3. Sync
 
@@ -467,13 +521,18 @@ console of the trace, read-only.
 cargo run -p cartload-library -- sync
 ```
 
-Confirm with `y`. Expected: the nine steps `stop-ui`, `umount`, `diff`, `cleanup`, `upload`
-(progress lines, about 4.2 MB in a second or two over USB), `link`, `config`, `finish`, `done`,
-then `uploaded 31 files (4211699 bytes), removed ... games mounted: true`. The TV shows the
-stock menu with the 21 original games and a "More games..." folder on the right; inside it
-Chrono Trigger (placeholder cover) and an "Original games" folder leading back. Starting the
-game must work and offer 3 save slots. `cargo run -p cartload-console -- info` then reports
-about 4.2 MB used by the current games collection.
+Confirm with `y`. Expected: first `1 compressed games; the console extracts them with
+/bin/tiny7zx` (the `which tiny7zx` check; a console without the mod stops here with
+`1 compressed game(s) need the tiny7zx mod on the console` and nothing changed), then the nine
+steps `stop-ui`, `umount`, `diff`, `cleanup`, `upload` (progress lines, about 2.9 MB in a
+second over USB), `link`, `config`, `finish`, `done`, then `uploaded 31 files (2867841 bytes),
+removed ... games mounted: true`. The TV shows the stock menu with the 21 original games and a
+"More games..." folder on the right; inside it Chrono Trigger (placeholder cover) and an
+"Original games" folder leading back. Starting the game must work (the wrapper extracts the
+archive to `/tmp/rom` first; the console takes a moment longer than with a raw ROM) and offer 3
+save slots. `cargo run -p cartload-console -- info` then reports about 2.9 MB used by the
+current games collection. `compress --off CLV-U-ZJSQU` followed by `sync` must replace the
+archive with the 4.2 MB `.sfrom` and the game must still start.
 
 ### 4. Second sync and removal
 
@@ -491,6 +550,7 @@ about 4.2 MB used by the current games collection.
 | Date | Console | Import | Plan | Sync | Second sync | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | OK (Chrono Trigger, code and .sfrom size as in the CE trace) | OK, read-only, 21 firmware entries cached | not run (user absent) | not run | the entries the plan generates have the sizes of CE's uploads |
+| 2026-10-21 | same console | OK, compressed: 2 850 539-byte .7z in 0.9 s; compress --off/on round-trips | OK, read-only: 31 uploads, 2 973 696 bytes total, CE's .7z at the same path replaced | not run (user absent) | not run | `which tiny7zx` on the console answers /bin/tiny7zx (read-only check) |
 
 ## Console page (desktop app)
 

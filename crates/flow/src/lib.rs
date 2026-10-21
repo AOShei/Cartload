@@ -7,7 +7,8 @@
 //! failed step so the flow can be resumed without redoing finished work.
 //!
 //! The flows ([`flows::install_kernel`], [`flows::memboot`], [`flows::uninstall_kernel`],
-//! [`flows::dump_stock_kernel`]) follow the sequences hakchi2 CE runs in `MembootTasks.cs`:
+//! [`flows::dump_stock_kernel`], [`flows::install_base_mods`]) follow the sequences hakchi2 CE
+//! runs in `MembootTasks.cs` and `ModTasks.cs`:
 //! memboot through FEL (or kexec from a running kernel), wait for the console on the USB
 //! network, identify it, grow the data partition, upload `hakchi.hmod`, run the device-side
 //! installer (`boot`), wait for the reboot, reconnect and verify. The device knowledge is in

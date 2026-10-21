@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    archive,
     desktop::{DesktopEntry, fix_apostrophes, sort_title},
     rom::{NesInfo, SnesInfo, System},
 };
@@ -79,10 +80,19 @@ pub struct Game {
     /// Whether the cover PNGs are placeholders (no real art yet).
     #[serde(default)]
     pub placeholder_art: bool,
+    /// Whether the ROM goes to the console as a 7z archive that `tiny7zx` extracts at launch
+    /// (hakchi2 CE's "Compress games"). On by default for SNES and NES games; a `game.json`
+    /// without the field is treated as on.
+    #[serde(default = "default_compress")]
+    pub compress: bool,
 }
 
 fn one() -> u8 {
     1
+}
+
+fn default_compress() -> bool {
+    true
 }
 
 fn default_release_date() -> String {
@@ -123,10 +133,25 @@ impl Game {
         format!("{}.desktop", self.code)
     }
 
+    /// File name of the packed ROM (`Chrono_Trigger.sfrom.7z`).
+    pub fn archive_file(&self) -> String {
+        archive::archive_name(&self.rom_file)
+    }
+
+    /// The ROM file as the console gets it: the archive when compressed, else the ROM.
+    pub fn console_rom_file(&self) -> String {
+        if self.compress {
+            self.archive_file()
+        } else {
+            self.rom_file.clone()
+        }
+    }
+
     /// The launch entry with the game's files under `games_path/<code>/` (hakchi2 CE writes
-    /// `/var/games` locally and rewrites the paths when uploading).
+    /// `/var/games` locally and rewrites the paths when uploading). A compressed game's
+    /// command names the `.7z`; the console's wrapper extracts it at launch.
     pub fn desktop_entry(&self, games_path: &str) -> DesktopEntry {
-        let rom = format!("{games_path}/{}/{}", self.code, self.rom_file);
+        let rom = format!("{games_path}/{}/{}", self.code, self.console_rom_file());
         let exec = if self.args.is_empty() {
             format!("{} {rom}", self.application)
         } else {
@@ -182,18 +207,35 @@ pub(crate) mod tests {
             snes: None,
             nes: None,
             placeholder_art: true,
+            compress: true,
         }
     }
 
+    /// The entry hakchi2 CE uploaded for the compressed game of the trace, byte for byte. The
+    /// one field Cartload has no source for is `country`: CE fills it from its own cart
+    /// database (`snescarts.xml`, `SnesGame.TryAutofill`), which is not part of the library.
     #[test]
-    fn desktop_entry_matches_what_ce_uploaded_once_paths_are_the_device_ones() {
-        let mut entry = chrono_trigger().desktop_entry("/var/lib/hakchi/games/snes-eur/.storage");
-        // hakchi2 CE compressed the ROM and knew the region; everything else is identical.
-        entry.exec = entry.exec.replace(".sfrom ", ".sfrom.7z ");
+    fn compressed_entry_matches_what_ce_uploaded_byte_for_byte() {
+        let game = chrono_trigger();
+        assert!(game.compress);
+        assert_eq!(game.console_rom_file(), "Chrono_Trigger.sfrom.7z");
+        let mut entry = game.desktop_entry("/var/lib/hakchi/games/snes-eur/.storage");
         entry.country = "us".into();
         assert_eq!(
             entry.render(Format::Hakchi),
             include_str!("../tests/fixtures/ce-001-CLV-U-ZJSQU.desktop")
+        );
+    }
+
+    #[test]
+    fn uncompressed_entry_names_the_rom_itself() {
+        let mut game = chrono_trigger();
+        game.compress = false;
+        assert_eq!(game.console_rom_file(), "Chrono_Trigger.sfrom");
+        let entry = game.desktop_entry("/var/lib/hakchi/games/snes-eur/.storage");
+        assert_eq!(
+            entry.exec,
+            "/bin/clover-canoe-shvc-wr -rom /var/lib/hakchi/games/snes-eur/.storage/CLV-U-ZJSQU/Chrono_Trigger.sfrom --volume 100 -rollback-snapshot-period 600"
         );
     }
 
@@ -204,7 +246,7 @@ pub(crate) mod tests {
         let entry = game.desktop_entry(GAMES_PATH);
         assert_eq!(
             entry.exec,
-            "/bin/clover-canoe-shvc-wr -rom /var/games/CLV-U-ZJSQU/Chrono_Trigger.sfrom --volume 100 -rollback-snapshot-period 600"
+            "/bin/clover-canoe-shvc-wr -rom /var/games/CLV-U-ZJSQU/Chrono_Trigger.sfrom.7z --volume 100 -rollback-snapshot-period 600"
         );
         assert_eq!(entry.icon, "/var/games/CLV-U-ZJSQU/CLV-U-ZJSQU.png");
         assert_eq!(entry.path, "/var/saves/CLV-U-ZJSQU");
@@ -225,5 +267,9 @@ pub(crate) mod tests {
         assert_eq!(game.players, 1);
         assert_eq!(game.publisher, "UNKNOWN");
         assert_eq!(game.release_date, "1900-01-01");
+        assert!(
+            game.compress,
+            "a game.json from before compression is compressed"
+        );
     }
 }

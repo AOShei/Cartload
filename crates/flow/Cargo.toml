@@ -18,7 +18,8 @@ required-features = ["cli"]
 [features]
 default = ["cli"]
 # Command-line binary and its dependencies (argument parsing, log output).
-cli = ["dep:anyhow", "dep:clap", "dep:tracing-subscriber"]
+# The binary also downloads hakchi2 CE's base mods on demand; the library stays HTTP-free.
+cli = ["dep:anyhow", "dep:clap", "dep:tracing-subscriber", "cartload-hmod/fetch"]
 
 [dependencies]
 async-trait = "0.1"
@@ -39,6 +40,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = tr
 
 [dev-dependencies]
 serde_json.workspace = true
+tar = "0.4"
 tempfile = "3"
 tokio = { workspace = true, features = ["test-util"] }
 

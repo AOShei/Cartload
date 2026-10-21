@@ -10,6 +10,7 @@ mod install;
 mod kernel;
 mod md;
 mod memboot;
+mod mods;
 mod reboot;
 mod verify;
 mod wait;
@@ -24,6 +25,7 @@ pub use install::{PrepareInstall, RunInstaller, UploadHmod};
 pub use kernel::{DumpStockKernel, FlashStockKernel, ReadStockKernel, RemoveInstall};
 pub use md::CheckMegaDrive;
 pub use memboot::Memboot;
+pub use mods::{InstallBaseMods, VerifyBaseMods};
 pub use reboot::Reboot;
 pub use verify::VerifyInstall;
 pub use wait::{WaitForConsole, WaitOffline};
@@ -118,6 +120,42 @@ pub mod commands {
         format!("md5sum {}", sh_quote(path))
     }
 
+    /// `md5sum` of several files at once.
+    pub fn md5sum_all(paths: &[String]) -> String {
+        let quoted: Vec<String> = paths.iter().map(|p| sh_quote(p)).collect();
+        format!("md5sum {}", quoted.join(" "))
+    }
+
+    /// Where base mods are unpacked before `hakchi packs_install` (hakchi2 CE uses
+    /// `/tmp/hmods`).
+    pub const MODS_DIR: &str = "/tmp/cartload/hmods";
+    /// Creates the mods directory.
+    pub const MKDIR_MODS: &str = "mkdir -p '/tmp/cartload/hmods'";
+    /// Creates the directory of one mod (`<name>.hmod`, the directory form `pack_install`
+    /// takes).
+    pub fn mkdir_mod(name: &str) -> String {
+        format!("mkdir -p {}", sh_quote(&format!("{MODS_DIR}/{name}.hmod")))
+    }
+    /// Unpacks the mod's tar stream (on stdin) into its directory, as hakchi2 CE's
+    /// `ModTasks.TransferHmod` does.
+    pub fn extract_mod(name: &str) -> String {
+        format!("tar -xvC {}", sh_quote(&format!("{MODS_DIR}/{name}.hmod")))
+    }
+    /// Installs every `*.hmod` in the mods directory (hakchi2 CE `ModTasks.InstallHmods`).
+    pub const PACKS_INSTALL: &str = "hakchi packs_install '/tmp/cartload/hmods'";
+    /// Exit code 0 when the device registered the mod (`pack_install` wrote its uninstall
+    /// script).
+    pub fn mod_registered(installpath: &str, name: &str) -> String {
+        format!(
+            "[ -f {} ]",
+            sh_quote(&format!("{installpath}/hmod/uninstall-{name}"))
+        )
+    }
+    /// Exit code 0 (and the path on stdout) when `binary` is on the console's `PATH`.
+    pub fn which(binary: &str) -> String {
+        format!("which {}", sh_quote(binary))
+    }
+
     /// hakchi2 CE `CheckMdRootfs`: succeeds when the Mega Drive Mini's system partition has
     /// no Project Lunar init scripts.
     pub fn project_lunar_check(squashfs: &str) -> String {
@@ -173,6 +211,30 @@ pub(crate) async fn remote_md5(ctx: &Context, path: &str) -> Result<Option<Strin
         .split_whitespace()
         .next()
         .map(str::to_string))
+}
+
+/// MD5s of several files on the console, keyed by path, or `None` when any is missing.
+pub(crate) async fn remote_md5_list(
+    ctx: &Context,
+    paths: &[String],
+) -> Result<Option<std::collections::BTreeMap<String, String>>> {
+    if paths.is_empty() {
+        return Ok(Some(std::collections::BTreeMap::new()));
+    }
+    let command = commands::md5sum_all(paths);
+    let output = ctx
+        .exec_with(&command, None, ctx.options.flash_timeout)
+        .await?;
+    if !output.success() {
+        return Ok(None);
+    }
+    let mut sums = std::collections::BTreeMap::new();
+    for line in output.stdout_lossy().lines() {
+        if let Some((md5, path)) = line.trim_end().split_once("  ") {
+            sums.insert(path.to_string(), md5.to_string());
+        }
+    }
+    Ok(Some(sums))
 }
 
 /// Memboots `image` (or, with `None`, the kernel in NAND) from a running hakchi kernel.
@@ -238,6 +300,27 @@ mod tests {
         );
         assert!(commands::KEXEC_SCRIPT_BODY.contains("trap '' HUP TERM PIPE"));
         assert!(commands::KEXEC_SCRIPT_BODY.ends_with("exec hakchi recovery \"$@\"\n"));
+    }
+
+    #[test]
+    fn mod_commands_quote_their_paths() {
+        assert_eq!(
+            commands::mkdir_mod("tiny7zx"),
+            "mkdir -p '/tmp/cartload/hmods/tiny7zx.hmod'"
+        );
+        assert_eq!(
+            commands::extract_mod("tiny7zx"),
+            "tar -xvC '/tmp/cartload/hmods/tiny7zx.hmod'"
+        );
+        assert_eq!(
+            commands::mod_registered("/var/lib/hakchi", "tiny7zx"),
+            "[ -f '/var/lib/hakchi/hmod/uninstall-tiny7zx' ]"
+        );
+        assert_eq!(commands::which("tiny7zx"), "which 'tiny7zx'");
+        assert_eq!(
+            commands::md5sum_all(&["/a b".to_string(), "/c".to_string()]),
+            "md5sum '/a b' '/c'"
+        );
     }
 
     #[test]

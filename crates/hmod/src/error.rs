@@ -75,6 +75,31 @@ pub enum Error {
         reason: String,
     },
 
+    /// A base mod's file is not in the cache.
+    #[error(
+        "base mod {name}: {} is not cached; download it first (cartload-hmod base-mods --fetch)",
+        path.display()
+    )]
+    ModNotCached {
+        /// The mod.
+        name: String,
+        /// The missing file.
+        path: PathBuf,
+    },
+
+    /// A base mod's file does not have the catalogued size and MD5.
+    #[error("base mod {name}: {} should be {expected} but is {actual}", path.display())]
+    ModChecksum {
+        /// The mod.
+        name: String,
+        /// The file.
+        path: PathBuf,
+        /// Expected size and MD5.
+        expected: String,
+        /// What was found.
+        actual: String,
+    },
+
     /// The HTTP client could not be built.
     #[cfg(feature = "fetch")]
     #[error("cannot build the HTTP client: {0}")]

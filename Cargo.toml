@@ -14,7 +14,7 @@ version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/AOShei/Cartload"
-rust-version = "1.90"
+rust-version = "1.93"
 
 [workspace.dependencies]
 thiserror = "2"
@@ -36,6 +36,14 @@ missing_docs = "warn"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"
+
+# LZMA encoding is pure Rust and far too slow unoptimised (compressing one SNES ROM would take
+# the better part of a minute in a debug build); keep it fast in dev builds and tests.
+[profile.dev.package.lzma-rust2]
+opt-level = 3
+
+[profile.dev.package.sevenz-rust2]
+opt-level = 3
 
 [profile.release]
 codegen-units = 1

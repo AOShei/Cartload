@@ -275,6 +275,9 @@ pub struct Collection {
     pub originals: usize,
     /// Number of folders (including back links).
     pub folders: usize,
+    /// Number of library games whose ROM goes up as a 7z archive (they need `tiny7zx` on the
+    /// console).
+    pub compressed: usize,
 }
 
 impl Collection {
@@ -320,6 +323,9 @@ pub fn collect(
                             });
                         }
                         collection.games += 1;
+                        if game.compress {
+                            collection.compressed += 1;
+                        }
                     }
                     let text = game.desktop_entry(&storage).render(Format::Hakchi);
                     collection.files.push(LocalFile::generated(
@@ -398,6 +404,9 @@ fn link_line(paths: &DevicePaths, upload_path: &str, dir: &str, code: &str) -> S
 
 /// The exact command strings sent to the console.
 pub mod commands {
+    /// Exit code 0 when the console can extract compressed games: the emulator wrappers call
+    /// `tiny7zx` through `PATH`, so this is the check that matters.
+    pub const WHICH_EXTRACTOR: &str = "which tiny7zx";
     /// Stops the stock UI (the console's own `uistop` script).
     pub const UI_STOP: &str = "uistop";
     /// Unmounts the games overlay; exits 1 when nothing was mounted.
@@ -562,6 +571,11 @@ impl SyncPlan {
             .is_none_or(|available| self.total_size() <= available)
     }
 
+    /// Whether the plan has compressed games, which need `tiny7zx` on the console.
+    pub fn needs_extractor(&self) -> bool {
+        self.collection.compressed > 0
+    }
+
     /// Whether the console already holds everything.
     pub fn is_noop(&self) -> bool {
         self.uploads.is_empty()
@@ -619,8 +633,9 @@ impl SyncPlan {
     /// A few lines describing the plan.
     pub fn summary(&self) -> String {
         let mut out = format!(
-            "{} games, {} firmware games, {} folders in {} files ({} bytes on the console)\n",
+            "{} games ({} compressed), {} firmware games, {} folders in {} files ({} bytes on the console)\n",
             self.collection.games,
+            self.collection.compressed,
             self.collection.originals,
             self.collection.folders,
             self.collection.files.len(),
@@ -784,7 +799,8 @@ pub const STEPS: [&str; 9] = [
 /// Runs a plan: stops the UI, unmounts the games, re-reads the console's listings and
 /// recomputes the diff, removes stale files, uploads the rest over FTP and sets their
 /// modification times, runs the link script, writes the config, then `overmount_games` and
-/// `uistart`. Refuses to start when the collection does not fit.
+/// `uistart`. Refuses to start when the collection does not fit, or when it has compressed
+/// games and the console has no `tiny7zx` (nothing is touched in either case).
 pub async fn sync<T: Transport>(
     target: &T,
     plan: &SyncPlan,
@@ -795,6 +811,19 @@ pub async fn sync<T: Transport>(
             needed: plan.total_size(),
             available: plan.available.unwrap_or(0),
         });
+    }
+    if plan.needs_extractor() {
+        let which = target.exec(commands::WHICH_EXTRACTOR, None).await?;
+        if !which.success() {
+            return Err(Error::MissingExtractor {
+                games: plan.collection.compressed,
+            });
+        }
+        progress(SyncEvent::Log(format!(
+            "{} compressed games; the console extracts them with {}",
+            plan.collection.compressed,
+            which.stdout_trimmed()
+        )));
     }
     let total = STEPS.len();
     let step = |index: usize, detail: String, progress: &mut dyn FnMut(SyncEvent)| {
@@ -1256,7 +1285,7 @@ mod tests {
                 "./000/CLV-S-00001/CLV-S-00001_small.png".to_string(),
                 format!("./.storage/{code}/{code}.png"),
                 format!("./.storage/{code}/{code}_small.png"),
-                format!("./.storage/{code}/Chrono_Trigger.sfrom"),
+                format!("./.storage/{code}/Chrono_Trigger.sfrom.7z"),
                 format!("./001/{code}/{code}.desktop"),
                 "./001/CLV-S-00000/CLV-S-00000.desktop".to_string(),
                 "./001/CLV-S-00000/CLV-S-00000.png".to_string(),
@@ -1264,8 +1293,23 @@ mod tests {
             ]
         );
         assert_eq!(
-            (collection.games, collection.originals, collection.folders),
-            (1, 1, 2)
+            (
+                collection.games,
+                collection.originals,
+                collection.folders,
+                collection.compressed
+            ),
+            (1, 1, 2, 1)
+        );
+        let archive = &collection.files[6];
+        let Source::Path(path) = &archive.source else {
+            panic!()
+        };
+        assert!(path.ends_with("Chrono_Trigger.sfrom.7z"));
+        assert_eq!(archive.size, std::fs::metadata(path).unwrap().len());
+        assert!(
+            archive.size < 131_072,
+            "a 128 KiB synthetic ROM packs small"
         );
 
         let original = &collection.files[0];
@@ -1291,7 +1335,7 @@ mod tests {
         };
         let text = std::str::from_utf8(bytes).unwrap();
         assert!(text.contains(&format!(
-            "Exec=/bin/clover-canoe-shvc-wr -rom /var/lib/hakchi/games/snes-eur/.storage/{code}/Chrono_Trigger.sfrom --volume 100 -rollback-snapshot-period 600\n"
+            "Exec=/bin/clover-canoe-shvc-wr -rom /var/lib/hakchi/games/snes-eur/.storage/{code}/Chrono_Trigger.sfrom.7z --volume 100 -rollback-snapshot-period 600\n"
         )));
         assert!(text.contains(&format!(
             "Icon=/var/lib/hakchi/games/snes-eur/.storage/{code}/{code}.png\n"
@@ -1362,6 +1406,11 @@ mod tests {
         );
         assert!(plan.fits());
         assert!(!plan.is_noop());
+        assert!(plan.needs_extractor());
+        assert!(
+            plan.summary()
+                .starts_with("1 games (1 compressed), 1 firmware games")
+        );
         let script = plan.cleanup_script();
         assert!(script.starts_with("#!/bin/sh\ncd \"/var/lib/hakchi/games/snes-eur\"\nrm '"));
         assert!(script.contains("rm './.storage/CLV-U-ZJSQU/metadata.json'\n"));
@@ -1543,6 +1592,7 @@ mod tests {
         let modtime = expected.modtime_script();
         let up = "/var/lib/hakchi/games/snes-eur";
         let shell = Scripted::new(vec![
+            ("which tiny7zx", None, ok("/bin/tiny7zx\n")),
             ("uistop", None, ok("")),
             (r#"hakchi eval 'umount "$gamepath"'"#, None, code(1)),
             (
@@ -1621,6 +1671,7 @@ mod tests {
         let plan = sync_plan(collection.clone(), &[], &[], paths.clone(), None);
         let up = "/var/lib/hakchi/games/snes-eur";
         let shell = Scripted::new(vec![
+            ("which tiny7zx", None, ok("/bin/tiny7zx\n")),
             ("uistop", None, ok("")),
             (r#"hakchi eval 'umount "$gamepath"'"#, None, ok("")),
             (&format!(r#"cd "{up}" && find . -type l"#), None, ok("")),
@@ -1648,10 +1699,43 @@ mod tests {
         assert!(shell.uploads.lock().unwrap().is_empty());
         assert!(!report.games_mounted);
 
-        let full = sync_plan(collection, &[], &[], paths, Some(10));
+        let full = sync_plan(collection.clone(), &[], &[], paths.clone(), Some(10));
         let shell = Scripted::new(vec![]);
         assert!(matches!(
             sync(&shell, &full, |_| {}).await,
+            Err(Error::NotEnoughSpace { .. })
+        ));
+
+        // No extractor on the console: nothing else is sent.
+        let plan = sync_plan(collection, &[], &[], paths, None);
+        let shell = Scripted::new(vec![("which tiny7zx", None, code(1))]);
+        let error = sync(&shell, &plan, |_| {}).await.unwrap_err();
+        assert!(
+            matches!(error, Error::MissingExtractor { games: 1 }),
+            "{error}"
+        );
+        assert!(error.to_string().contains("cartload-flow base-mods"));
+        assert!(shell.steps.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn uncompressed_library_skips_the_extractor_check() {
+        let (_dir, library, menus, paths) = trace_library();
+        let mut game = library.games().unwrap().remove(0);
+        library.set_compress(&mut game, false).unwrap();
+        let collection = collect(&library, &menus, &paths).unwrap();
+        assert_eq!(collection.compressed, 0);
+        assert!(
+            collection
+                .files
+                .iter()
+                .any(|f| f.path.ends_with("/Chrono_Trigger.sfrom"))
+        );
+        let plan = sync_plan(collection, &[], &[], paths, Some(1));
+        assert!(!plan.needs_extractor());
+        let shell = Scripted::new(vec![]);
+        assert!(matches!(
+            sync(&shell, &plan, |_| {}).await,
             Err(Error::NotEnoughSpace { .. })
         ));
     }

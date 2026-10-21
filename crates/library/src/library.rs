@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::{
-    Error, Result, codes,
+    Error, Result, archive, codes,
     desktop::{DesktopEntry, Format},
     error::io_error,
     game::{GAMES_PATH, Game},
@@ -45,6 +45,34 @@ pub struct LibraryConfig {
     /// in `menu`, brought in line with the library's games on every read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_menu: Option<crate::menu::Menu>,
+}
+
+/// Choices for an import.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ImportOptions {
+    /// Pack the ROM as a 7z archive for the console (hakchi2 CE's "Compress games"). Applies
+    /// to SNES and NES games up to [`archive::MAX_SIZE`]; larger ROMs stay uncompressed with
+    /// a warning.
+    pub compress: bool,
+}
+
+impl Default for ImportOptions {
+    fn default() -> Self {
+        Self { compress: true }
+    }
+}
+
+/// What turning compression on or off did to a game.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CompressReport {
+    /// Whether the game is compressed now.
+    pub compressed: bool,
+    /// Whether anything changed (the archive was built or removed, the setting flipped).
+    pub changed: bool,
+    /// Size of the ROM file.
+    pub rom_size: u64,
+    /// Size of the archive, when the game is compressed.
+    pub archive_size: Option<u64>,
 }
 
 /// The result of importing one ROM.
@@ -179,25 +207,40 @@ impl Library {
         Ok(())
     }
 
-    /// Imports a ROM file (`.sfc`, `.smc`, `.fig`, `.swc`, `.nes`) or a zip of those. A zip
-    /// gives one game per ROM inside it. The hash database, when given, supplies the title
-    /// and TheGamesDB ids.
+    /// Imports a ROM file (`.sfc`, `.smc`, `.fig`, `.swc`, `.nes`) or a zip of those with the
+    /// default options (compressed). A zip gives one game per ROM inside it. The hash
+    /// database, when given, supplies the title and TheGamesDB ids.
     pub fn import(&self, path: &Path, db: Option<&HashDb>) -> Result<Vec<Imported>> {
+        self.import_with(path, db, &ImportOptions::default())
+    }
+
+    /// [`Library::import`] with explicit options.
+    pub fn import_with(
+        &self,
+        path: &Path,
+        db: Option<&HashDb>,
+        options: &ImportOptions,
+    ) -> Result<Vec<Imported>> {
         let file_name = path
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| Error::UnsupportedFile(path.to_path_buf()))?;
         if file_name.to_ascii_lowercase().ends_with(".zip") {
-            return self.import_zip(path, db);
+            return self.import_zip(path, db, options);
         }
         if System::from_path(path).is_none() {
             return Err(Error::UnsupportedFile(path.to_path_buf()));
         }
         let data = std::fs::read(path).map_err(|e| io_error("read", path, e))?;
-        Ok(vec![self.import_bytes(file_name, data, db)?])
+        Ok(vec![self.import_bytes_with(file_name, data, db, options)?])
     }
 
-    fn import_zip(&self, path: &Path, db: Option<&HashDb>) -> Result<Vec<Imported>> {
+    fn import_zip(
+        &self,
+        path: &Path,
+        db: Option<&HashDb>,
+        options: &ImportOptions,
+    ) -> Result<Vec<Imported>> {
         let file = std::fs::File::open(path).map_err(|e| io_error("open", path, e))?;
         let mut archive = zip::ZipArchive::new(file).map_err(|source| Error::Zip {
             path: path.to_path_buf(),
@@ -230,7 +273,7 @@ impl Library {
             entry
                 .read_to_end(&mut data)
                 .map_err(|e| io_error("read", path, e))?;
-            imported.push(self.import_bytes(&name, data, db)?);
+            imported.push(self.import_bytes_with(&name, data, db, options)?);
         }
         if imported.is_empty() {
             return Err(Error::EmptyArchive(path.to_path_buf()));
@@ -238,14 +281,38 @@ impl Library {
         Ok(imported)
     }
 
-    /// Imports a ROM given its file name and content.
+    /// Imports a ROM given its file name and content, with the default options.
     pub fn import_bytes(
         &self,
         file_name: &str,
         data: Vec<u8>,
         db: Option<&HashDb>,
     ) -> Result<Imported> {
-        let prepared = rom::prepare(file_name, data)?;
+        self.import_bytes_with(file_name, data, db, &ImportOptions::default())
+    }
+
+    /// [`Library::import_bytes`] with explicit options.
+    pub fn import_bytes_with(
+        &self,
+        file_name: &str,
+        data: Vec<u8>,
+        db: Option<&HashDb>,
+        options: &ImportOptions,
+    ) -> Result<Imported> {
+        let mut prepared = rom::prepare(file_name, data)?;
+        let compress = options.compress && prepared.system != System::MegaDrive;
+        let compress = if compress && !archive::can_compress(prepared.data.len() as u64) {
+            prepared.warnings.push(
+                Error::TooLargeToCompress {
+                    name: prepared.file_name.clone(),
+                    size: prepared.data.len() as u64,
+                }
+                .to_string(),
+            );
+            false
+        } else {
+            compress
+        };
         let code = prepared.code();
         let record = db.and_then(|db| {
             db.lookup(prepared.crc32)
@@ -280,6 +347,7 @@ impl Library {
             snes: prepared.snes.clone(),
             nes: prepared.nes.clone(),
             placeholder_art: true,
+            compress,
         };
         let replaced = self.write_game_dir(&game, &prepared)?;
         self.save(&game)?;
@@ -289,6 +357,7 @@ impl Library {
             system = %game.system,
             matched = record.is_some(),
             replaced,
+            compressed = game.compress,
             "imported game"
         );
         Ok(Imported {
@@ -310,6 +379,12 @@ impl Library {
         std::fs::create_dir_all(&dir).map_err(|e| io_error("create directory", &dir, e))?;
         let rom_path = dir.join(&prepared.file_name);
         std::fs::write(&rom_path, &prepared.data).map_err(|e| io_error("write", &rom_path, e))?;
+        if game.compress {
+            let archive_path = dir.join(game.archive_file());
+            let packed = archive::pack(&prepared.file_name, &prepared.data)?;
+            std::fs::write(&archive_path, packed)
+                .map_err(|e| io_error("write", &archive_path, e))?;
+        }
         let cover = dir.join(game.cover_file());
         std::fs::write(&cover, images::cover_placeholder(game.system)?)
             .map_err(|e| io_error("write", &cover, e))?;
@@ -362,11 +437,99 @@ impl Library {
         crate::art::ArtStore::open(self.root.join(crate::art::ART_DIR))
     }
 
+    /// Path of the ROM file of a game.
+    pub fn rom_path(&self, game: &Game) -> PathBuf {
+        self.game_dir(&game.code).join(&game.rom_file)
+    }
+
+    /// Path of the packed ROM of a game (whether or not it exists).
+    pub fn archive_path(&self, game: &Game) -> PathBuf {
+        self.game_dir(&game.code).join(game.archive_file())
+    }
+
+    /// Makes sure the archive of a compressed game exists and is newer than its ROM, packing
+    /// the ROM when it is missing or stale. Returns whether it was (re)built. Does nothing for
+    /// an uncompressed game.
+    pub fn ensure_archive(&self, game: &Game) -> Result<bool> {
+        if !game.compress {
+            return Ok(false);
+        }
+        let rom_path = self.rom_path(game);
+        let archive_path = self.archive_path(game);
+        let rom_meta = std::fs::metadata(&rom_path).map_err(|e| io_error("stat", &rom_path, e))?;
+        if let Ok(archive_meta) = std::fs::metadata(&archive_path)
+            && archive_meta.is_file()
+            && archive_meta.len() > 0
+            && let (Ok(rom_time), Ok(archive_time)) = (rom_meta.modified(), archive_meta.modified())
+            && archive_time >= rom_time
+        {
+            return Ok(false);
+        }
+        let data = std::fs::read(&rom_path).map_err(|e| io_error("read", &rom_path, e))?;
+        let packed = archive::pack(&game.rom_file, &data)?;
+        let temp = archive_path.with_extension("7z.tmp");
+        std::fs::write(&temp, &packed).map_err(|e| io_error("write", &temp, e))?;
+        std::fs::rename(&temp, &archive_path).map_err(|e| io_error("rename", &temp, e))?;
+        info!(
+            code = game.code,
+            rom = game.rom_file,
+            rom_size = data.len(),
+            archive_size = packed.len(),
+            "packed the ROM"
+        );
+        Ok(true)
+    }
+
+    /// Turns compression on or off for a game: builds the archive (or removes it), updates
+    /// `game.json` and the launch entry. A ROM above [`archive::MAX_SIZE`] cannot be
+    /// compressed and the error says so.
+    pub fn set_compress(&self, game: &mut Game, compress: bool) -> Result<CompressReport> {
+        if !self.game_dir(&game.code).is_dir() {
+            return Err(Error::NoSuchGame(game.code.clone()));
+        }
+        let rom_path = self.rom_path(game);
+        let rom_size = std::fs::metadata(&rom_path)
+            .map_err(|e| io_error("stat", &rom_path, e))?
+            .len();
+        let changed = game.compress != compress;
+        game.compress = compress;
+        let archive_path = self.archive_path(game);
+        let archive_size = if compress {
+            let built = self.ensure_archive(game)?;
+            let size = std::fs::metadata(&archive_path)
+                .map_err(|e| io_error("stat", &archive_path, e))?
+                .len();
+            if built || changed {
+                self.save(game)?;
+            }
+            Some(size)
+        } else {
+            if archive_path.exists() {
+                std::fs::remove_file(&archive_path)
+                    .map_err(|e| io_error("remove", &archive_path, e))?;
+            }
+            if changed {
+                self.save(game)?;
+            }
+            None
+        };
+        Ok(CompressReport {
+            compressed: compress,
+            changed,
+            rom_size,
+            archive_size,
+        })
+    }
+
     /// The files of a game that go to the console's storage: everything in the directory
-    /// except `game.json` and the launch entry (which is generated per menu).
+    /// except `game.json`, the launch entry (which is generated per menu) and, depending on
+    /// the compression setting, the raw ROM or its archive. The archive of a compressed game
+    /// is built here when it is missing (a library from before compression existed).
     pub fn game_files(&self, game: &Game) -> Result<Vec<GameFile>> {
+        self.ensure_archive(game)?;
         let dir = self.game_dir(&game.code);
         let entries = std::fs::read_dir(&dir).map_err(|e| io_error("read", &dir, e))?;
+        let archive_file = game.archive_file();
         let mut files = Vec::new();
         for entry in entries {
             let entry = entry.map_err(|e| io_error("read", &dir, e))?;
@@ -375,6 +538,14 @@ impl Library {
                 continue;
             };
             if name == GAME_JSON || name == game.desktop_file() || !path.is_file() {
+                continue;
+            }
+            let skipped = if game.compress {
+                name == game.rom_file
+            } else {
+                name == archive_file
+            };
+            if skipped || name.ends_with(".7z.tmp") {
                 continue;
             }
             let metadata = entry.metadata().map_err(|e| io_error("stat", &path, e))?;
@@ -520,6 +691,7 @@ mod tests {
         assert_eq!(game.rom_file, "Chrono_Trigger.sfrom");
         assert_eq!(game.tgdb_ids, [1255]);
         assert_eq!(game.save_count, 3);
+        assert!(game.compress, "SNES games are compressed by default");
 
         let game_dir = library.game_dir(&game.code);
         let mut names: Vec<String> = std::fs::read_dir(&game_dir)
@@ -534,14 +706,17 @@ mod tests {
                 format!("{}.png", game.code),
                 format!("{}_small.png", game.code),
                 "Chrono_Trigger.sfrom".to_string(),
+                "Chrono_Trigger.sfrom.7z".to_string(),
                 "game.json".to_string()
             ]
         );
         let sfrom = std::fs::read(game_dir.join("Chrono_Trigger.sfrom")).unwrap();
         assert_eq!(sfrom.len(), rom.len() + 96);
+        let packed = std::fs::read(game_dir.join("Chrono_Trigger.sfrom.7z")).unwrap();
+        assert_eq!(archive::unpack(&packed).unwrap().1, sfrom);
         let desktop = std::fs::read_to_string(game_dir.join(game.desktop_file())).unwrap();
         assert!(desktop.contains(&format!(
-            "Exec=/bin/clover-canoe-shvc-wr -rom /var/games/{}/Chrono_Trigger.sfrom --volume 100 -rollback-snapshot-period 600\n",
+            "Exec=/bin/clover-canoe-shvc-wr -rom /var/games/{}/Chrono_Trigger.sfrom.7z --volume 100 -rollback-snapshot-period 600\n",
             game.code
         )));
         assert!(desktop.contains("SortRawTitle=chrono trigger\n"));
@@ -555,8 +730,9 @@ mod tests {
             [
                 format!("{}.png", game.code),
                 format!("{}_small.png", game.code),
-                "Chrono_Trigger.sfrom".to_string()
-            ]
+                "Chrono_Trigger.sfrom.7z".to_string()
+            ],
+            "the archive goes to the console, not the ROM"
         );
         assert!(library.game_mtime(&game.code).unwrap() > 0);
 
@@ -568,6 +744,54 @@ mod tests {
             again[0].game.name, "Chrono Trigger",
             "falls back to the file name"
         );
+
+        // Compression off: the archive goes, the ROM is what gets uploaded.
+        let mut game = again[0].game.clone();
+        let report = library.set_compress(&mut game, false).unwrap();
+        assert!(report.changed && !report.compressed);
+        assert_eq!(report.archive_size, None);
+        assert_eq!(report.rom_size, sfrom.len() as u64);
+        assert!(!game_dir.join("Chrono_Trigger.sfrom.7z").exists());
+        assert!(!library.game(&game.code).unwrap().compress);
+        let names: Vec<String> = library
+            .game_files(&game)
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name)
+            .collect();
+        assert!(names.contains(&"Chrono_Trigger.sfrom".to_string()));
+        assert!(!names.iter().any(|n| n.ends_with(".7z")));
+        let desktop = std::fs::read_to_string(game_dir.join(game.desktop_file())).unwrap();
+        assert!(desktop.contains("/Chrono_Trigger.sfrom --volume"));
+        assert!(!library.set_compress(&mut game, false).unwrap().changed);
+
+        // Back on: the archive is rebuilt and the entry names it again.
+        let report = library.set_compress(&mut game, true).unwrap();
+        assert!(report.changed && report.compressed);
+        assert_eq!(
+            report.archive_size,
+            Some(
+                std::fs::metadata(game_dir.join("Chrono_Trigger.sfrom.7z"))
+                    .unwrap()
+                    .len()
+            )
+        );
+        assert!(library.game(&game.code).unwrap().compress);
+        assert!(
+            !library.ensure_archive(&game).unwrap(),
+            "already up to date"
+        );
+
+        // A library from before compression: the archive is missing and game_files builds it.
+        std::fs::remove_file(game_dir.join("Chrono_Trigger.sfrom.7z")).unwrap();
+        let names: Vec<String> = library
+            .game_files(&game)
+            .unwrap()
+            .into_iter()
+            .map(|f| f.name)
+            .collect();
+        assert!(names.contains(&"Chrono_Trigger.sfrom.7z".to_string()));
+        assert!(game_dir.join("Chrono_Trigger.sfrom.7z").exists());
 
         library.remove(&game.code).unwrap();
         assert!(library.games().unwrap().is_empty());
@@ -598,13 +822,18 @@ mod tests {
                 .unwrap();
             writer.finish().unwrap();
         }
-        let imported = library.import(&zip_path, None).unwrap();
+        let options = ImportOptions { compress: false };
+        let imported = library.import_with(&zip_path, None, &options).unwrap();
         assert_eq!(imported.len(), 2);
         assert_eq!(imported[0].game.name, "Game A");
         assert_eq!(imported[0].game.system, System::Nes);
         assert_eq!(imported[1].game.name, "Game B");
         assert_eq!(imported[1].game.system, System::Snes);
         assert_eq!(library.games().unwrap().len(), 2);
+        for item in &imported {
+            assert!(!item.game.compress, "--no-compress import");
+            assert!(!library.archive_path(&item.game).exists());
+        }
 
         let empty = dir.path().join("empty.zip");
         {

@@ -36,6 +36,8 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util"] }
 tracing.workspace = true
 zip = { version = "9", default-features = false, features = ["deflate"] }
+# 7z (LZMA) packing of ROMs for the console, pure Rust: no external binary, no AES, no extras.
+sevenz-rust2 = { version = "0.24", default-features = false, features = ["compress"] }
 
 # fetch only. Same crypto setup as cartload-hmod: reqwest without a provider, rustls on ring.
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "system-proxy"], optional = true }

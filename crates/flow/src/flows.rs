@@ -6,9 +6,10 @@ use std::path::PathBuf;
 use crate::{
     Context, Flow,
     steps::{
-        CheckMegaDrive, DetectState, DumpStockKernel, FlashStockKernel, GrowPartition, Memboot,
-        PrepareInstall, ReadStockKernel, Reboot, RebootAfterGrow, RemoveInstall, RunInstaller,
-        UploadHmod, VerifyInstall, WaitForConsole, WaitOffline,
+        CheckMegaDrive, DetectState, DumpStockKernel, FlashStockKernel, GrowPartition,
+        InstallBaseMods, Memboot, PrepareInstall, ReadStockKernel, Reboot, RebootAfterGrow,
+        RemoveInstall, RunInstaller, UploadHmod, VerifyBaseMods, VerifyInstall, WaitForConsole,
+        WaitOffline,
     },
 };
 
@@ -20,6 +21,8 @@ pub const MEMBOOT: &str = "memboot";
 pub const UNINSTALL: &str = "uninstall";
 /// Name of the dump flow.
 pub const DUMP_KERNEL: &str = "dump-kernel";
+/// Name of the base mods flow.
+pub const BASE_MODS: &str = "base-mods";
 
 /// Install (or repair) the hakchi kernel. Needs the package in the context.
 ///
@@ -40,6 +43,30 @@ pub fn install_kernel() -> Flow<Context> {
         .step(RunInstaller)
         .step(WaitForConsole)
         .step(VerifyInstall)
+}
+
+/// [`install_kernel`] followed by the base mods: once the installed kernel is verified, upload
+/// and install the mods in the context (`tiny7zx` for compressed games), reboot, and check
+/// them. Needs the mods in the context ([`Context::with_base_mods`]).
+pub fn install_kernel_with_base_mods() -> Flow<Context> {
+    install_kernel()
+        .step(InstallBaseMods)
+        .step(WaitForConsole)
+        .step(DetectState::any())
+        .step(VerifyBaseMods)
+}
+
+/// Install hakchi2 CE's base mods on a console already running its hakchi kernel: identify
+/// it, upload and `hakchi packs_install` the mods in the context, reboot, verify. Nothing
+/// touches the kernel partitions.
+pub fn install_base_mods() -> Flow<Context> {
+    Flow::new(BASE_MODS)
+        .step(WaitForConsole)
+        .step(DetectState::expect_installed())
+        .step(InstallBaseMods)
+        .step(WaitForConsole)
+        .step(DetectState::any())
+        .step(VerifyBaseMods)
 }
 
 /// Memboot only, for recovery: the console ends up in the memboot shell with SSH open.
@@ -103,6 +130,23 @@ mod tests {
             ]
         );
         assert_eq!(names(memboot()), ["memboot", "wait-console", "detect"]);
+        let with_mods = names(install_kernel_with_base_mods());
+        assert_eq!(with_mods.len(), 17);
+        assert_eq!(
+            &with_mods[13..],
+            ["base-mods", "wait-console", "detect", "verify-mods"]
+        );
+        assert_eq!(
+            names(install_base_mods()),
+            [
+                "wait-console",
+                "detect",
+                "base-mods",
+                "wait-console",
+                "detect",
+                "verify-mods",
+            ]
+        );
         assert_eq!(
             names(uninstall_kernel()),
             [
@@ -127,7 +171,12 @@ mod tests {
                 "wait-offline",
             ]
         );
-        for flow in [install_kernel(), memboot(), uninstall_kernel()] {
+        for flow in [
+            install_kernel(),
+            memboot(),
+            uninstall_kernel(),
+            install_base_mods(),
+        ] {
             for step in flow.steps() {
                 assert!(
                     !step.description.is_empty(),

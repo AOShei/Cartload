@@ -10,12 +10,16 @@
 //! - [`Package`] opens a package on disk, lists it and reads entries.
 //! - [`fetch_latest`] downloads the current package from the known locations (feature `fetch`,
 //!   on by default).
+//! - [`basemods`] knows hakchi2 CE's base mods (`tiny7zx` for compressed games,
+//!   `font_remount`): a catalog with sizes and MD5s, a cache, a downloader (feature `fetch`)
+//!   and the tar stream the console's `pack_install` takes.
 //! - [`fes1`] returns the DRAM init binary that a FEL memboot runs before anything else. It is
 //!   not part of the hmod, so it is embedded from `data/fes1.bin` at the repository root.
 //!
 //! The protocol knowledge comes from hakchi2 CE (`hakchi.cs`, `MembootTasks.cs`); the code is
 //! new. Nothing here needs hardware.
 
+pub mod basemods;
 mod error;
 #[cfg(feature = "fetch")]
 mod fetch;

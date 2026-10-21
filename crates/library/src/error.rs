@@ -52,6 +52,39 @@ pub enum Error {
         source: zip::result::ZipError,
     },
 
+    /// A 7z archive could not be written or read.
+    #[error("7z {name}: {message}")]
+    Archive {
+        /// The archive or entry name.
+        name: String,
+        /// What went wrong.
+        message: String,
+    },
+
+    /// A file is larger than what the console's extractor can handle.
+    #[error(
+        "{name} is {size} bytes, above the {} bytes hakchi2 CE compresses (tiny7zx holds the \
+         whole file in the console's RAM); compression is off for this game",
+        crate::archive::MAX_SIZE
+    )]
+    TooLargeToCompress {
+        /// The file.
+        name: String,
+        /// Its size.
+        size: u64,
+    },
+
+    /// Compressed games are in the plan but the console has no extractor.
+    #[error(
+        "{games} compressed game(s) need the tiny7zx mod on the console and `which tiny7zx` \
+         found none; install hakchi2 CE's base mods (cartload-flow base-mods) or turn \
+         compression off (cartload-library compress --off)"
+    )]
+    MissingExtractor {
+        /// Compressed games in the plan.
+        games: usize,
+    },
+
     /// A zip archive contains no ROM.
     #[error("{}: the archive contains no .sfc, .smc, .fig, .swc or .nes file", .0.display())]
     EmptyArchive(PathBuf),

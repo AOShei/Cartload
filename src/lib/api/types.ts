@@ -260,6 +260,8 @@ export interface Game {
   snes: unknown;
   nes: unknown;
   placeholder_art: boolean;
+  /** The ROM goes to the console as a 7z archive (needs the tiny7zx mod there). */
+  compress: boolean;
 }
 
 export interface GameView {
@@ -367,6 +369,8 @@ export interface GameEdit {
   description: string;
   application: string;
   args: string;
+  /** Compress the ROM for the console; omitted leaves the setting alone. */
+  compress?: boolean;
 }
 
 export type MatchSource = "hash_db" | "search" | "manual";

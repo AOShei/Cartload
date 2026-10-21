@@ -22,6 +22,7 @@
       description: g.description,
       application: g.application,
       args: g.args,
+      compress: g.compress,
     };
   }
 
@@ -197,13 +198,17 @@
             <span>Arguments</span>
             <input type="text" class="mono" bind:value={form.args} />
           </label>
-          <p class="mono preview">{form.application} /var/games/{game.game.code}/{game.game.rom_file} {form.args}</p>
+          <label class="check">
+            <input type="checkbox" bind:checked={form.compress} />
+            <span>Compress for the console (7z, needs the tiny7zx mod; roughly halves the space a SNES game takes)</span>
+          </label>
+          <p class="mono preview">{form.application} /var/games/{game.game.code}/{game.game.rom_file}{form.compress ? ".7z" : ""} {form.args}</p>
           <dl class="facts">
             <dt>Code</dt><dd class="mono">{game.game.code}</dd>
             <dt>ROM</dt><dd class="mono">{game.game.rom_file}</dd>
             <dt>Imported from</dt><dd>{game.game.original_file}</dd>
             <dt>CRC-32</dt><dd class="mono">{game.game.crc32.toString(16).toUpperCase().padStart(8, "0")}</dd>
-            <dt>Size</dt><dd class="num">{formatBytes(game.size)}</dd>
+            <dt>Size on the console</dt><dd class="num">{formatBytes(game.size)}{game.game.compress ? " (compressed)" : ""}</dd>
             <dt>Saves</dt><dd class="num">{game.game.save_count}</dd>
             {#if game.game.db_name}<dt>Hash database</dt><dd>{game.game.db_name}</dd>{/if}
             {#if game.game.tgdb_id}<dt>TheGamesDB</dt><dd class="num">{game.game.tgdb_id}</dd>{/if}

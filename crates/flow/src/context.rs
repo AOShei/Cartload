@@ -4,7 +4,7 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use cartload_console::{ExecOutput, Hakchi};
 use cartload_fel::MembootOptions;
-use cartload_hmod::{BootFiles, Package};
+use cartload_hmod::{BootFiles, Package, basemods::LoadedMod};
 use tracing::debug;
 
 use crate::{
@@ -150,6 +150,8 @@ pub struct Context {
     pub options: FlowOptions,
     /// The kernel package, when the flow has one.
     pub hmod: Option<HmodPackage>,
+    /// hakchi2 CE base mods to install (loaded from the cache), when the flow installs any.
+    pub base_mods: Vec<LoadedMod>,
     /// The open SSH session, if any.
     pub console: Option<Box<dyn Console>>,
     /// What the last state detection found.
@@ -167,6 +169,14 @@ impl std::fmt::Debug for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Context")
             .field("hmod", &self.hmod.as_ref().map(|h| &h.path))
+            .field(
+                "base_mods",
+                &self
+                    .base_mods
+                    .iter()
+                    .map(LoadedMod::name)
+                    .collect::<Vec<_>>(),
+            )
             .field("connected", &self.console.is_some())
             .field("state", &self.state)
             .field("grew", &self.grew)
@@ -183,6 +193,7 @@ impl Context {
             reporter,
             options,
             hmod: None,
+            base_mods: Vec::new(),
             console: None,
             state: ConsoleState::Offline,
             grew: false,
@@ -194,6 +205,12 @@ impl Context {
     /// Attaches the kernel package.
     pub fn with_hmod(mut self, hmod: HmodPackage) -> Self {
         self.hmod = Some(hmod);
+        self
+    }
+
+    /// Attaches base mods to install.
+    pub fn with_base_mods(mut self, mods: Vec<LoadedMod>) -> Self {
+        self.base_mods = mods;
         self
     }
 

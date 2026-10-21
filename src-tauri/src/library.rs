@@ -188,6 +188,9 @@ pub struct GameEdit {
     /// Arguments after the ROM path (advanced).
     #[serde(default)]
     pub args: String,
+    /// Compress the ROM for the console (7z); `None` leaves the setting alone.
+    #[serde(default)]
+    pub compress: Option<bool>,
 }
 
 fn one() -> u8 {
@@ -420,6 +423,17 @@ impl LibraryState {
     pub fn update(&self, edit: &GameEdit) -> Result<GameView, CommandError> {
         let mut game = self.library.game(&edit.code)?;
         apply_edit(&mut game, edit)?;
+        if let Some(compress) = edit.compress
+            && compress != game.compress
+        {
+            let report = self.library.set_compress(&mut game, compress)?;
+            info!(
+                code = game.code,
+                compress,
+                archive_size = report.archive_size,
+                "compression changed"
+            );
+        }
         self.library.save(&game)?;
         info!(code = game.code, name = game.name, "game updated");
         self.game_view(game)
@@ -1033,7 +1047,15 @@ pub(crate) mod tests {
         let names: Vec<&str> = view.games.iter().map(|g| g.game.name.as_str()).collect();
         assert!(names.contains(&"Alpha Game") && names.contains(&"Beta"));
         let first = &view.games[0];
-        assert!(first.size > 16 * 1024);
+        // Compressed by default: the size is the archive's plus the art, not the ROM's.
+        assert!(first.game.compress);
+        let archive = state.library().archive_path(&first.game);
+        let archive_size = std::fs::metadata(&archive).unwrap().len();
+        assert!(archive_size > 0 && first.size > archive_size);
+        assert!(
+            first.size < 16 * 1024,
+            "a zero-filled 16 KiB ROM packs small"
+        );
         assert!(
             first
                 .cover
@@ -1074,6 +1096,7 @@ pub(crate) mod tests {
             description: "A game.".into(),
             application: "/bin/clover-kachikachi-wr".into(),
             args: "--guest-overscan-dimensions 0,0,9,3".into(),
+            compress: None,
         };
         let view = state.update(&edit).unwrap();
         assert_eq!(view.game.name, "Alpha");

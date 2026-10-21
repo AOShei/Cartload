@@ -8,7 +8,8 @@
 #![allow(clippy::unwrap_used)]
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
+    io::Read,
     net::SocketAddr,
     sync::{Arc, Mutex},
     time::Duration,
@@ -21,9 +22,13 @@ use cartload_flow::{
     Backend, Console, Context, Error, Event, Flow, FlowOptions, HmodPackage, Outcome, Reporter,
     channel, flows, steps::commands,
 };
-use cartload_hmod::{BootFiles, Version};
+use cartload_hmod::{
+    BootFiles, Version,
+    basemods::{self, LoadedMod},
+};
 
 const ADDRESS: &str = "169.254.13.37:22";
+const ROOTFS: &str = "/var/lib/hakchi/rootfs";
 const HWID: &str = "0461872a 87280207 9d2818c7 6c118000";
 const STOCK_KERNEL_LEN: usize = 4096;
 const OFFLINE_POLLS: usize = 3;
@@ -72,6 +77,13 @@ struct Sim {
     kexecs: usize,
     boots: usize,
     installed_versions: Versions,
+    /// Files in the hakchi rootfs overlay (absolute paths), as `pack_install` copies them.
+    rootfs_files: BTreeMap<String, Vec<u8>>,
+    /// Mods with an `uninstall-<name>` file in `/var/lib/hakchi/hmod`.
+    mods_registered: BTreeSet<String>,
+    /// Whether a reboot happened since the last mod install (new files are visible to
+    /// `which` only then).
+    mods_live: bool,
 }
 
 impl Sim {
@@ -101,6 +113,9 @@ impl Sim {
             kexecs: 0,
             boots: 0,
             installed_versions: package_versions(),
+            rootfs_files: BTreeMap::new(),
+            mods_registered: BTreeSet::new(),
+            mods_live: true,
         }
     }
 
@@ -181,6 +196,80 @@ impl Sim {
                 self.files.insert(key, data);
             }
             return ok("");
+        }
+
+        // Base mods: `tar -xvC <dir>` with the hmod's tar on stdin.
+        if let Some(name) = ["tiny7zx", "font_remount"]
+            .into_iter()
+            .find(|name| command == commands::extract_mod(name))
+        {
+            let mut archive = tar::Archive::new(stdin.unwrap_or_default());
+            for entry in archive.entries().unwrap() {
+                let mut entry = entry.unwrap();
+                let path = entry.path().unwrap().to_string_lossy().into_owned();
+                let mut data = Vec::new();
+                entry.read_to_end(&mut data).unwrap();
+                self.files
+                    .insert(format!("{}/{name}.hmod/{path}", commands::MODS_DIR), data);
+            }
+            return ok("");
+        }
+        if command == commands::MKDIR_MODS
+            || ["tiny7zx", "font_remount"]
+                .iter()
+                .any(|name| command == commands::mkdir_mod(name))
+        {
+            return ok("");
+        }
+        if let Some(name) = ["tiny7zx", "font_remount"]
+            .into_iter()
+            .find(|name| command == commands::mod_registered("/var/lib/hakchi", name))
+        {
+            return exit(self.mods_registered.contains(name));
+        }
+        if command == commands::which("tiny7zx") {
+            let present = self
+                .rootfs_files
+                .contains_key(&format!("{ROOTFS}/bin/tiny7zx"));
+            return if present && self.mods_live {
+                ok("/bin/tiny7zx\n")
+            } else {
+                code(1, "", "")
+            };
+        }
+        if command == commands::PACKS_INSTALL {
+            assert!(
+                self.installed && !self.memboot_shell,
+                "mods install on the booted kernel"
+            );
+            let prefix = format!("{}/", commands::MODS_DIR);
+            let uploaded: Vec<(String, Vec<u8>)> = self
+                .files
+                .iter()
+                .filter(|(k, _)| k.starts_with(&prefix))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            let mut out = String::new();
+            let mut names = BTreeSet::new();
+            for (key, data) in uploaded {
+                let rest = &key[prefix.len()..];
+                let (dir, rel) = rest.split_once('/').unwrap();
+                let name = dir.strip_suffix(".hmod").unwrap().to_string();
+                let base = rel.rsplit('/').next().unwrap();
+                if !(rel == "install" || rel == "uninstall" || base.starts_with("readme")) {
+                    self.rootfs_files.insert(format!("{ROOTFS}/{rel}"), data);
+                }
+                names.insert(name);
+                self.files.remove(&key);
+            }
+            for name in names {
+                out.push_str(&format!(
+                    "installing {name}...\ncreating uninstall for {name}...\npackage {name} installed\n"
+                ));
+                self.mods_registered.insert(name);
+            }
+            self.mods_live = false;
+            return ok(&out);
         }
 
         match command {
@@ -297,6 +386,19 @@ impl Sim {
                     None => code(1, "", "md5sum: can't open '/hakchi/transfer/hakchi.hmod'\n"),
                 }
             }
+            c if c.starts_with("md5sum '") => {
+                let mut out = String::new();
+                for path in c["md5sum ".len()..]
+                    .split(' ')
+                    .map(|p| p.trim_matches('\''))
+                {
+                    match self.rootfs_files.get(path) {
+                        Some(data) => out.push_str(&format!("{:x}  {path}\n", md5::compute(data))),
+                        None => return code(1, &out, &format!("md5sum: can't open '{path}'\n")),
+                    }
+                }
+                ok(&out)
+            }
             commands::BOOT => {
                 assert!(self.memboot_shell, "boot runs in the memboot shell");
                 self.boots += 1;
@@ -376,6 +478,7 @@ impl Sim {
                 } else {
                     ComeBack::Stays
                 };
+                self.mods_live = true;
                 self.go_offline(come_back);
                 ExecOutput::default()
             }
@@ -1094,4 +1197,181 @@ async fn wrong_state_after_memboot_is_reported() {
         "{error}"
     );
     assert_eq!(flow.position(), 2);
+}
+
+/// The tiny7zx mod with made-up content (the real files are downloaded, never bundled).
+fn fake_mods() -> Vec<LoadedMod> {
+    let files = vec![
+        ("bin/tiny7zx".to_string(), b"ELF fake tiny7zx".to_vec()),
+        (
+            "install".to_string(),
+            b"chmod +x \"$transferpath/bin/tiny7zx\"\n".to_vec(),
+        ),
+        ("readme.md".to_string(), b"# tiny7zx".to_vec()),
+    ];
+    let mut builder = tar::Builder::new(Vec::new());
+    for (path, data) in &files {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(data.len() as u64);
+        header.set_mode(0o644);
+        builder
+            .append_data(&mut header, path, data.as_slice())
+            .unwrap();
+    }
+    vec![LoadedMod {
+        spec: &basemods::TINY7ZX,
+        files,
+        tar: builder.into_inner().unwrap(),
+    }]
+}
+
+#[tokio::test(start_paused = true)]
+async fn base_mods_flow_uploads_installs_reboots_and_verifies() {
+    let backend = SimBackend::new(Sim::installed());
+    let (mut ctx, mut events) = context(&backend, None);
+    ctx = ctx.with_base_mods(fake_mods());
+    let mut flow = flows::install_base_mods();
+
+    flow.run(&mut ctx).await.expect("base mods install");
+
+    assert_eq!(
+        outcomes(&flow),
+        expected(&[
+            ("wait-console", "already"),
+            ("detect", "done"),
+            ("base-mods", "done"),
+            ("wait-console", "done"),
+            ("detect", "done"),
+            ("verify-mods", "done"),
+        ])
+    );
+    let log = backend.log();
+    let md5 = commands::md5sum_all(&[format!("{ROOTFS}/bin/tiny7zx")]);
+    assert_in_order(
+        &log,
+        &[
+            console_commands::VERSIONS,
+            &md5,
+            commands::MKDIR_MODS,
+            &commands::mkdir_mod("tiny7zx"),
+            &commands::extract_mod("tiny7zx"),
+            commands::PACKS_INSTALL,
+            &md5,
+            &commands::mod_registered("/var/lib/hakchi", "tiny7zx"),
+            commands::REBOOT,
+            console_commands::VERSIONS,
+            &md5,
+            &commands::mod_registered("/var/lib/hakchi", "tiny7zx"),
+            &commands::which("tiny7zx"),
+        ],
+    );
+    assert_eq!(count(&log, commands::PACKS_INSTALL), 1);
+    assert_eq!(count(&log, commands::REBOOT), 1);
+    backend.with(|sim| {
+        assert!(sim.mods_registered.contains("tiny7zx"));
+        assert_eq!(
+            sim.rootfs_files.get(&format!("{ROOTFS}/bin/tiny7zx")),
+            Some(&b"ELF fake tiny7zx".to_vec())
+        );
+        assert!(
+            !sim.rootfs_files.contains_key(&format!("{ROOTFS}/install")),
+            "install script is consumed, not copied"
+        );
+        assert!(
+            sim.files.keys().all(|k| !k.starts_with(commands::MODS_DIR)),
+            "packs_install removed the uploaded directory"
+        );
+        assert!(sim.mods_live && sim.online && sim.installed);
+        assert_eq!(sim.boots, 0, "the kernel install never ran");
+    });
+    let mut saw_console_line = false;
+    let mut saw_path = false;
+    while let Ok(event) = events.try_recv() {
+        if let Event::Log { message, .. } = event {
+            saw_console_line |= message == "console: package tiny7zx installed";
+            saw_path |= message.contains("tiny7zx is on the console's PATH at /bin/tiny7zx");
+        }
+    }
+    assert!(saw_console_line && saw_path);
+
+    // A second run finds everything in place and does not reboot again.
+    let before = backend.log().len();
+    let (mut ctx, _events) = context(&backend, None);
+    ctx = ctx.with_base_mods(fake_mods());
+    let mut flow = flows::install_base_mods();
+    flow.run(&mut ctx).await.expect("second run");
+    assert_eq!(
+        outcomes(&flow)[2],
+        ("base-mods".to_string(), "already".to_string())
+    );
+    assert_eq!(count(&backend.log()[before..], commands::REBOOT), 0);
+    assert_eq!(count(&backend.log()[before..], commands::PACKS_INSTALL), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn base_mods_need_a_booted_console_and_loaded_mods() {
+    // In the memboot shell: refused before anything is uploaded.
+    let backend = SimBackend::new(Sim {
+        memboot_shell: true,
+        ..Sim::installed()
+    });
+    let (mut ctx, _events) = context(&backend, None);
+    ctx = ctx.with_base_mods(fake_mods());
+    let mut flow = flows::install_base_mods();
+    let error = flow.run(&mut ctx).await.expect_err("memboot shell");
+    assert!(matches!(error.root(), Error::WrongState(_)), "{error}");
+    assert!(
+        error.to_string().contains("installed hakchi kernel"),
+        "{error}"
+    );
+    assert_eq!(flow.position(), 1);
+    assert_eq!(count(&backend.log(), commands::PACKS_INSTALL), 0);
+
+    // Nothing loaded: the step says what to do.
+    let backend = SimBackend::new(Sim::installed());
+    let (mut ctx, _events) = context(&backend, None);
+    let mut flow = flows::install_base_mods();
+    let error = flow.run(&mut ctx).await.expect_err("no mods");
+    assert!(matches!(error.root(), Error::Precondition(_)), "{error}");
+    assert!(error.to_string().contains("--mods"), "{error}");
+    assert_eq!(flow.position(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn install_with_base_mods_adds_them_after_the_kernel_is_verified() {
+    let backend = SimBackend::new(Sim {
+        fel_present: true,
+        ..Sim::stock()
+    });
+    let (mut ctx, _events) = context(&backend, Some(package()));
+    ctx = ctx.with_base_mods(fake_mods());
+    let mut flow = flows::install_kernel_with_base_mods();
+    let report = flow.run(&mut ctx).await.expect("install with mods");
+    assert_eq!(report.results.len(), 17);
+    let results = outcomes(&flow);
+    assert_eq!(
+        &results[12..],
+        &expected(&[
+            ("verify", "done"),
+            ("base-mods", "done"),
+            ("wait-console", "done"),
+            ("detect", "done"),
+            ("verify-mods", "done"),
+        ])[..]
+    );
+    assert_in_order(
+        &backend.log(),
+        &[
+            commands::BOOT,
+            console_commands::VERSIONS,
+            commands::PACKS_INSTALL,
+            commands::REBOOT,
+            &commands::which("tiny7zx"),
+        ],
+    );
+    backend.with(|sim| {
+        assert_eq!(sim.boots, 1);
+        assert!(sim.mods_registered.contains("tiny7zx"));
+        assert!(sim.online && sim.installed && sim.mods_live);
+    });
 }

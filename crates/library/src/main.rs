@@ -12,7 +12,8 @@ use cartload_console::{
     ConsoleInfo, ConsoleType, DiscoverOptions, Hakchi, SSH_PORT, Session, SessionOptions, discover,
 };
 use cartload_library::{
-    DevicePaths, HashDb, Library, LibraryConfig, Menu, MenuOptions, Structure, SyncEvent, SyncPlan,
+    DevicePaths, HashDb, ImportOptions, Library, LibraryConfig, Menu, MenuOptions, Structure,
+    SyncEvent, SyncPlan,
     art::{self, ApiKey, ArtEvent, ArtOptions, ArtSize, Client, CoverStatus, HttpTransport},
     hashdb,
     images::CoverOptions,
@@ -90,6 +91,25 @@ enum Command {
         /// Hash database file (romfiles.xml or .gz) instead of the cached download.
         #[arg(long, value_name = "FILE")]
         db: Option<PathBuf>,
+
+        /// Store the ROM uncompressed (by default SNES and NES ROMs go to the console as
+        /// 7z archives, which need the tiny7zx mod there).
+        #[arg(long)]
+        no_compress: bool,
+    },
+    /// Turn 7z compression on (default) or off for games, building or removing the archives.
+    Compress {
+        /// Game codes.
+        #[arg(value_name = "CODE", required_unless_present = "all")]
+        codes: Vec<String>,
+
+        /// Every game in the library.
+        #[arg(long, conflicts_with = "codes")]
+        all: bool,
+
+        /// Turn compression off: the ROM itself goes to the console.
+        #[arg(long)]
+        off: bool,
     },
     /// List the games in the library.
     List {
@@ -248,7 +268,18 @@ async fn main() -> Result<()> {
     info!(library = %root.display(), "library");
 
     match cli.command {
-        Command::Import { files, no_db, db } => run_import(&library, &files, no_db, db).await,
+        Command::Import {
+            files,
+            no_db,
+            db,
+            no_compress,
+        } => {
+            let options = ImportOptions {
+                compress: !no_compress,
+            };
+            run_import(&library, &files, no_db, db, &options).await
+        }
+        Command::Compress { codes, all, off } => run_compress(&library, &codes, all, !off),
         Command::List { json } => run_list(&library, json),
         Command::Remove { codes } => {
             for code in codes {
@@ -301,16 +332,17 @@ async fn run_import(
     files: &[PathBuf],
     no_db: bool,
     db: Option<PathBuf>,
+    options: &ImportOptions,
 ) -> Result<()> {
     let db = load_db(no_db, db).await?;
     let mut failures = 0;
     for file in files {
-        match library.import(file, db.as_ref()) {
+        match library.import_with(file, db.as_ref(), options) {
             Ok(imported) => {
                 for item in imported {
                     let game = &item.game;
                     println!(
-                        "{}  {}  [{}] {}{}",
+                        "{}  {}  [{}] {}{}{}",
                         game.code,
                         game.name,
                         game.system,
@@ -319,7 +351,14 @@ async fn run_import(
                         } else {
                             "not in the hash database"
                         },
-                        if item.replaced { ", replaced" } else { "" }
+                        if item.replaced { ", replaced" } else { "" },
+                        match sizes(library, game) {
+                            (rom, Some(archive)) => format!(
+                                ", {rom} bytes packed to {archive} ({}%)",
+                                percent(archive, rom)
+                            ),
+                            (rom, None) => format!(", {rom} bytes uncompressed"),
+                        }
                     );
                     for warning in &item.warnings {
                         println!("    warning: {warning}");
@@ -334,6 +373,55 @@ async fn run_import(
     }
     if failures > 0 {
         bail!("{failures} file(s) could not be imported");
+    }
+    Ok(())
+}
+
+/// ROM size and, for a compressed game, archive size.
+fn sizes(library: &Library, game: &cartload_library::Game) -> (u64, Option<u64>) {
+    let size = |path: PathBuf| std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    let rom = size(library.rom_path(game));
+    let archive = game.compress.then(|| size(library.archive_path(game)));
+    (rom, archive)
+}
+
+fn percent(part: u64, whole: u64) -> u64 {
+    (part * 100).checked_div(whole).unwrap_or(100)
+}
+
+fn run_compress(library: &Library, codes: &[String], all: bool, compress: bool) -> Result<()> {
+    let codes: Vec<String> = if all {
+        library.games()?.into_iter().map(|g| g.code).collect()
+    } else {
+        codes.to_vec()
+    };
+    let mut total_rom = 0u64;
+    let mut total_console = 0u64;
+    for code in &codes {
+        let mut game = library.game(code)?;
+        let report = library.set_compress(&mut game, compress)?;
+        total_rom += report.rom_size;
+        total_console += report.archive_size.unwrap_or(report.rom_size);
+        println!(
+            "{code}  {:<40}  {}{}",
+            game.name,
+            match report.archive_size {
+                Some(archive) => format!(
+                    "compressed: {} bytes packed to {archive} ({}%)",
+                    report.rom_size,
+                    percent(archive, report.rom_size)
+                ),
+                None => format!("uncompressed: {} bytes", report.rom_size),
+            },
+            if report.changed { "" } else { "  (unchanged)" }
+        );
+    }
+    if codes.len() > 1 {
+        println!(
+            "{} games: {total_rom} bytes of ROMs, {total_console} bytes on the console ({}%)",
+            codes.len(),
+            percent(total_console, total_rom)
+        );
     }
     Ok(())
 }
@@ -358,7 +446,7 @@ fn run_list(library: &Library, json: bool) -> Result<()> {
                 cartload_library::System::Nes => "NES",
                 cartload_library::System::MegaDrive => "MD",
             },
-            game.rom_file,
+            game.console_rom_file(),
             game.crc32,
             match (game.tgdb_id, game.tgdb_ids.is_empty()) {
                 (Some(id), _) => format!("tgdb {id}"),

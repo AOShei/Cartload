@@ -23,7 +23,9 @@ fetch = ["dep:reqwest", "dep:rustls", "dep:tokio"]
 cli = ["fetch", "dep:anyhow", "dep:clap", "dep:tracing-subscriber"]
 
 [dependencies]
+dirs = "7"
 flate2 = "1"
+md5 = "0.8"
 tar = "0.4"
 thiserror.workspace = true
 tracing.workspace = true

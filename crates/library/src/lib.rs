@@ -4,6 +4,8 @@
 //! - [`Library`]: one directory per game under a user data directory, with `game.json`, the
 //!   ROM in the console's container (SNES `.sfrom`, NES `.nes`), the launch entry and art.
 //!   [`Library::import`] takes `.sfc`/`.smc`/`.fig`/`.swc`/`.nes` files or zips of them.
+//! - [`archive`]: 7z packing of ROMs (hakchi2 CE's "Compress games"), extracted on the console
+//!   by `tiny7zx` at launch; on by default for SNES and NES games.
 //! - [`rom`]: header handling, the checksums hakchi2 CE uses and the `.sfrom` conversion.
 //! - [`hashdb`]: the `romfiles.xml` hash database (names and TheGamesDB ids).
 //! - [`desktop`]: the `.desktop` entry format, byte-compatible with the stock firmware and
@@ -18,6 +20,7 @@
 //! The device-side formats follow hakchi2 CE (`NesApplication`, `SnesGame`, `DesktopFile`,
 //! `NesMenuCollection`, `SyncTask`) and were checked against a console CE had synced.
 
+pub mod archive;
 pub mod art;
 pub mod codes;
 pub mod desktop;
@@ -34,7 +37,7 @@ pub use art::{ApiKey, ArtOptions, ArtReport, fetch_art};
 pub use error::{Error, Result};
 pub use game::Game;
 pub use hashdb::HashDb;
-pub use library::{Imported, Library, LibraryConfig};
+pub use library::{CompressReport, ImportOptions, Imported, Library, LibraryConfig};
 pub use menu::{Menu, MenuOptions, Structure};
 pub use rom::System;
 pub use sync::{DevicePaths, SyncEvent, SyncPlan, SyncReport, collect, sync, sync_plan};
