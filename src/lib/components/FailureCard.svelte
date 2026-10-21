@@ -80,23 +80,19 @@
     gap: var(--space-2);
   }
 
-  h2 {
-    font-size: 1.1rem;
-  }
-
   .step {
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
 
   .k {
     display: inline-block;
-    min-width: 7.5rem;
+    min-width: 120px;
     color: var(--text-muted);
   }
 
   details {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   pre {
@@ -117,7 +113,7 @@
     align-items: stretch;
   }
 
-  @media (max-width: 860px) {
+  @media (max-width: 1023px) {
     .failure {
       grid-template-columns: auto 1fr;
     }

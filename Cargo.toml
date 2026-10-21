@@ -13,7 +13,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/cartload/cartload"
+repository = "https://github.com/AOShei/Cartload"
 rust-version = "1.90"
 
 [workspace.dependencies]

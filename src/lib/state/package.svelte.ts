@@ -24,6 +24,8 @@ class PackageStore {
   loading = $state(false);
   updating = $state(false);
   progress = $state<DownloadProgress | null>(null);
+  /** Why the last download failed, shown in place until the next attempt. */
+  error = $state<string | null>(null);
   private started = false;
 
   /** Subscribes to download progress and reads the current status. */
@@ -68,12 +70,14 @@ class PackageStore {
     }
     this.updating = true;
     this.progress = { done: 0, total: null };
+    this.error = null;
     try {
       this.status = await packageUpdate();
       const version = this.status.package?.version ?? "unknown";
       toasts.success(`Kernel package ${version} is ready.`);
     } catch (error: unknown) {
       const e = AppError.from(error);
+      this.error = e.message;
       toasts.error(e.message, e.detail);
     } finally {
       this.updating = false;

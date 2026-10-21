@@ -141,6 +141,12 @@ class LibraryStore {
   artProgress = $state<ArtProgress | null>(null);
   saving = $state(false);
   removing = $state(false);
+  /** The detail panel shows its remove confirmation (Delete in the grid asks for it). */
+  removePrompt = $state(false);
+  /** A folder edit, move or structure change is on its way to the backend. */
+  menuBusy = $state(false);
+  /** A cover image is being replaced. */
+  coverBusy = $state(false);
   /** Bumped on every change to the games or the tree, so the sync plan follows. */
   revision = $state(0);
   private anchor: string | null = null;
@@ -248,6 +254,14 @@ class LibraryStore {
       this.view = fixture.view;
       this.menu = fixture.menu;
       this.loaded = true;
+      // `?folder=1` opens a folder of the fixture (index path, `/`-separated) for screenshots.
+      const wanted = new URLSearchParams(location.search).get("folder");
+      if (wanted) {
+        const path = wanted.split("/").map(Number);
+        if (entriesAt(fixture.menu.entries, path)) {
+          this.folder = path;
+        }
+      }
       return;
     }
     await on<ImportEvent>("library-import", (event) => this.onImportEvent(event));
@@ -327,6 +341,13 @@ class LibraryStore {
 
   selectAll(): void {
     this.selected = this.visibleTiles.map((t) => t.id);
+  }
+
+  /** Asks the detail panel to confirm removing the selected games, when there are any. */
+  requestRemove(): void {
+    if (this.selectedGames.length > 0) {
+      this.removePrompt = true;
+    }
   }
 
   clearSelection(): void {
@@ -527,12 +548,15 @@ class LibraryStore {
     if (!path) {
       return;
     }
+    this.coverBusy = true;
     try {
       this.patchGame(await artSetCover(code, path));
       toasts.success("Cover replaced.");
     } catch (error: unknown) {
       const e = AppError.from(error);
       toasts.error(e.message, e.detail);
+    } finally {
+      this.coverBusy = false;
     }
   }
 
@@ -542,12 +566,15 @@ class LibraryStore {
       toasts.info("Structures apply inside the desktop app only.");
       return;
     }
+    this.menuBusy = true;
     try {
       this.applyMenu(await menuSetStructure(options));
       this.openFolder([]);
     } catch (error: unknown) {
       const e = AppError.from(error);
       toasts.error(e.message, e.detail);
+    } finally {
+      this.menuBusy = false;
     }
   }
 
@@ -560,12 +587,15 @@ class LibraryStore {
       toasts.info("Moving works inside the desktop app only.");
       return;
     }
+    this.menuBusy = true;
     try {
       this.applyMenu(await menuMove(items, target, index));
       this.clearSelection();
     } catch (error: unknown) {
       const e = AppError.from(error);
       toasts.error(e.message, e.detail);
+    } finally {
+      this.menuBusy = false;
     }
   }
 
@@ -575,6 +605,7 @@ class LibraryStore {
       toasts.info("Editing folders works inside the desktop app only.");
       return false;
     }
+    this.menuBusy = true;
     try {
       this.applyMenu(await menuEdit(edit));
       if (edit.op === "remove_folder" && samePath(edit.path, this.folder)) {
@@ -585,6 +616,8 @@ class LibraryStore {
       const e = AppError.from(error);
       toasts.error(e.message, e.detail);
       return false;
+    } finally {
+      this.menuBusy = false;
     }
   }
 

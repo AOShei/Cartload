@@ -68,7 +68,7 @@
   }
 </script>
 
-<li role="treeitem" aria-expanded={children.length > 0 ? open : undefined} aria-selected={selected}>
+<li role="treeitem" aria-expanded={children.length > 0 ? open : undefined} aria-selected={selected} aria-level={depth + 1}>
   <div
     class="row"
     role="presentation"
@@ -97,7 +97,14 @@
     {:else}
       <span class="twisty"></span>
     {/if}
-    <button type="button" class="label" onclick={() => libraryStore.openFolder(path)} ondblclick={toggle}>
+    <!-- One tab stop for the tree: the folder being viewed. Arrows move between rows. -->
+    <button
+      type="button"
+      class="label focus-inset"
+      tabindex={selected ? 0 : -1}
+      onclick={() => libraryStore.openFolder(path)}
+      ondblclick={toggle}
+    >
       <span class="glyph"><Icon name={isRoot ? "console" : "folder"} size={16} /></span>
       <span class="name">{name}</span>
       <span class="count num">{games}</span>
@@ -134,6 +141,7 @@
     gap: 2px;
     border-radius: var(--radius-s);
     border: 1px solid transparent;
+    transition: background-color var(--motion-fast) var(--ease-out);
   }
 
   .row:hover {
@@ -146,7 +154,7 @@
 
   .row.selected .label {
     color: var(--accent-strong);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
   }
 
   .row.dropping {
@@ -158,8 +166,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 18px;
+    height: 18px;
     padding: 0;
     border: 0;
     border-radius: var(--radius-s);
@@ -170,7 +178,7 @@
   }
 
   .twisty :global(svg) {
-    transition: transform 120ms ease-out;
+    transition: transform var(--motion-fast) var(--ease-out);
   }
 
   .twisty.open :global(svg) {
@@ -183,14 +191,15 @@
     gap: var(--space-2);
     flex: 1;
     min-width: 0;
-    padding: 0.3rem 0.4rem;
+    min-height: 28px;
+    padding: 0 var(--space-1);
     border: 0;
     border-radius: var(--radius-s);
     background: transparent;
     color: var(--text);
     text-align: left;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
 
   .glyph {
@@ -208,7 +217,7 @@
   }
 
   .count {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-faint);
   }
 </style>

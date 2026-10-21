@@ -28,11 +28,11 @@
   });
 </script>
 
-<section class="import" aria-live="polite" aria-label="Import results">
+<section class="import" aria-live="polite" aria-label="Import results" aria-busy={libraryStore.importing}>
   <div class="head">
     <h3>{heading}</h3>
     {#if !libraryStore.importing}
-      <button type="button" class="icon-btn" aria-label="Close the import results" onclick={() => libraryStore.closeImport()}>
+      <button type="button" class="icon-btn icon-btn-sm" aria-label="Close the import results" onclick={() => libraryStore.closeImport()}>
         <Icon name="close" size={16} />
       </button>
     {/if}
@@ -46,7 +46,7 @@
     {#each files as file (file.index)}
       <li class="file state-{file.outcome?.state ?? 'pending'}">
         <span class="mark">
-          {#if !file.outcome}<span class="spinner" aria-hidden="true"></span>
+          {#if !file.outcome}<span class="spinner spinner-sm" aria-hidden="true"></span>
           {:else if file.outcome.state === "imported"}<Icon name="check" size={14} />
           {:else if file.outcome.state === "failed"}<Icon name="warning" size={14} />
           {:else}<Icon name="dash" size={14} />{/if}
@@ -71,6 +71,8 @@
           {/if}
         </span>
       </li>
+    {:else}
+      <li class="muted">Waiting for the first file…</li>
     {/each}
   </ul>
 </section>
@@ -84,18 +86,14 @@
     gap: var(--space-2);
     max-height: 40%;
     background: var(--surface-raised);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-  }
-
-  h3 {
-    margin: 0;
-    font-size: 0.95rem;
+    min-height: var(--control-sm);
   }
 
   .bar {
@@ -109,7 +107,7 @@
     display: block;
     height: 100%;
     background: var(--accent);
-    transition: width 150ms linear;
+    transition: width var(--motion-fast) linear;
   }
 
   .files {
@@ -122,7 +120,7 @@
 
   .file {
     display: grid;
-    grid-template-columns: 1.25rem minmax(8rem, 1fr) 2fr;
+    grid-template-columns: 20px minmax(128px, 1fr) 2fr;
     gap: var(--space-2);
     align-items: baseline;
     padding: 2px 0;
@@ -151,7 +149,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 
   .game {
@@ -166,20 +164,5 @@
 
   .error {
     color: var(--danger);
-  }
-
-  .spinner {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    border: 2px solid var(--border-strong);
-    border-top-color: var(--accent);
-    animation: spin 0.8s linear infinite;
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 </style>

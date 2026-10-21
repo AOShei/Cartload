@@ -38,10 +38,10 @@
     });
   });
 
-  let confirmRemove = $state(false);
+  /* The remove confirmation lives in the store so Delete in the grid can open it. */
   $effect(() => {
     libraryStore.selected;
-    confirmRemove = false;
+    libraryStore.removePrompt = false;
   });
 
   async function save(): Promise<void> {
@@ -60,8 +60,8 @@
 
   async function removeSelected(): Promise<void> {
     const codes = selectedGames.map((g) => g.game.code);
-    confirmRemove = false;
     await libraryStore.remove(codes);
+    libraryStore.removePrompt = false;
   }
 
   /** Every folder of the tree, for "Move to". */
@@ -71,7 +71,7 @@
       entries.forEach((entry, index) => {
         if (entry.kind === "folder") {
           const path = [...prefix, index];
-          out.push({ path, label: `${"  ".repeat(depth)}${entry.name}` });
+          out.push({ path, label: `${"  ".repeat(depth)}${entry.name}` });
           walk(entry.entries, path, depth + 1);
         }
       });
@@ -124,23 +124,23 @@
   {#if game && form}
     <div class="scroll">
       <div class="cover">
-        <img src={game.cover} alt="Cover of {game.game.name}" />
+        <img src={game.cover} alt="Cover of {game.game.name}" decoding="async" />
         {#if game.game.placeholder_art}
           <span class="noart">No art yet</span>
         {/if}
       </div>
       <div class="art-actions">
         <button type="button" class="btn" onclick={() => libraryStore.fetchArt([game.game.code], true)} disabled={libraryStore.artBusy}>
-          <Icon name="download" size={16} />
-          <span>Fetch art</span>
+          {#if libraryStore.artBusy}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="download" size={16} />{/if}
+          <span>{libraryStore.artBusy ? "Fetching…" : "Fetch art"}</span>
         </button>
-        <button type="button" class="btn btn-quiet" onclick={() => libraryStore.chooseCover(game.game.code)}>
-          <Icon name="image" size={16} />
-          <span>Choose image…</span>
+        <button type="button" class="btn btn-quiet" onclick={() => libraryStore.chooseCover(game.game.code)} disabled={libraryStore.coverBusy}>
+          {#if libraryStore.coverBusy}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="image" size={16} />{/if}
+          <span>{libraryStore.coverBusy ? "Replacing…" : "Choose image…"}</span>
         </button>
       </div>
       {#if artLine}
-        <p class="art-line muted">{artLine}</p>
+        <p class="art-line muted" role="status">{artLine}</p>
       {/if}
 
       <form class="fields" onsubmit={(e) => { e.preventDefault(); void save(); }}>
@@ -179,8 +179,11 @@
         </label>
         {#if dirty}
           <div class="save-row">
-            <button type="submit" class="btn" disabled={libraryStore.saving}>{libraryStore.saving ? "Saving…" : "Save"}</button>
-            <button type="button" class="btn btn-quiet" onclick={revert}>Revert</button>
+            <button type="submit" class="btn btn-primary" disabled={libraryStore.saving}>
+              {#if libraryStore.saving}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+              {libraryStore.saving ? "Saving…" : "Save"}
+            </button>
+            <button type="button" class="btn btn-quiet" onclick={revert} disabled={libraryStore.saving}>Revert</button>
           </div>
         {/if}
 
@@ -209,14 +212,19 @@
       </form>
 
       <div class="remove">
-        {#if confirmRemove}
-          <p>Remove “{game.game.name}” from the library? It leaves the console at the next sync.</p>
-          <div class="save-row">
-            <button type="button" class="btn danger" onclick={removeSelected} disabled={libraryStore.removing}>Remove 1 game</button>
-            <button type="button" class="btn btn-quiet" onclick={() => (confirmRemove = false)}>Keep</button>
+        {#if libraryStore.removePrompt}
+          <div class="confirm" role="group" aria-label="Confirm removing the game">
+            <p>Remove “{game.game.name}” from the library? It leaves the console at the next sync.</p>
+            <div class="confirm-actions">
+              <button type="button" class="btn btn-danger btn-sm" onclick={removeSelected} disabled={libraryStore.removing}>
+                {#if libraryStore.removing}<span class="spinner" aria-hidden="true"></span>{/if}
+                {libraryStore.removing ? "Removing…" : "Remove 1 game"}
+              </button>
+              <button type="button" class="btn btn-quiet btn-sm" onclick={() => (libraryStore.removePrompt = false)}>Keep</button>
+            </div>
           </div>
         {:else}
-          <button type="button" class="btn btn-quiet" onclick={() => (confirmRemove = true)}>
+          <button type="button" class="btn btn-quiet" onclick={() => (libraryStore.removePrompt = true)} title="Remove (Delete)">
             <Icon name="trash" size={16} />
             <span>Remove from the library…</span>
           </button>
@@ -244,13 +252,13 @@
       <p class="muted">{selectedGames.length} game{selectedGames.length === 1 ? "" : "s"} from the library.</p>
       <div class="bulk">
         <button type="button" class="btn" onclick={() => libraryStore.fetchArt(selectedGames.map((g) => g.game.code), false)} disabled={libraryStore.artBusy || selectedGames.length === 0}>
-          <Icon name="download" size={16} />
-          <span>Fetch art for {selectedGames.length} game{selectedGames.length === 1 ? "" : "s"}</span>
+          {#if libraryStore.artBusy}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="download" size={16} />{/if}
+          <span>{libraryStore.artBusy ? "Fetching…" : `Fetch art for ${selectedGames.length} game${selectedGames.length === 1 ? "" : "s"}`}</span>
         </button>
-        {#if artLine}<p class="art-line muted">{artLine}</p>{/if}
+        {#if artLine}<p class="art-line muted" role="status">{artLine}</p>{/if}
         <label class="move">
           <span>Move to</span>
-          <select onchange={(e) => { moveTo(e.currentTarget.value); e.currentTarget.value = ""; }}>
+          <select onchange={(e) => { moveTo(e.currentTarget.value); e.currentTarget.value = ""; }} disabled={libraryStore.menuBusy}>
             <option value="">Choose a folder…</option>
             {#each folders as f (f.path.join("/"))}
               <option value={f.path.length === 0 ? "root" : f.path.join("/")}>{f.label}</option>
@@ -258,14 +266,19 @@
           </select>
         </label>
         {#if selectedGames.length > 0}
-          {#if confirmRemove}
-            <p>Remove {selectedGames.length} games from the library? They leave the console at the next sync.</p>
-            <div class="save-row">
-              <button type="button" class="btn danger" onclick={removeSelected} disabled={libraryStore.removing}>Remove {selectedGames.length} games</button>
-              <button type="button" class="btn btn-quiet" onclick={() => (confirmRemove = false)}>Keep</button>
+          {#if libraryStore.removePrompt}
+            <div class="confirm" role="group" aria-label="Confirm removing the games">
+              <p>Remove {selectedGames.length} games from the library? They leave the console at the next sync.</p>
+              <div class="confirm-actions">
+                <button type="button" class="btn btn-danger btn-sm" onclick={removeSelected} disabled={libraryStore.removing}>
+                  {#if libraryStore.removing}<span class="spinner" aria-hidden="true"></span>{/if}
+                  {libraryStore.removing ? "Removing…" : `Remove ${selectedGames.length} games`}
+                </button>
+                <button type="button" class="btn btn-quiet btn-sm" onclick={() => (libraryStore.removePrompt = false)}>Keep</button>
+              </div>
             </div>
           {:else}
-            <button type="button" class="btn btn-quiet" onclick={() => (confirmRemove = true)}>
+            <button type="button" class="btn btn-quiet" onclick={() => (libraryStore.removePrompt = true)} title="Remove (Delete)">
               <Icon name="trash" size={16} />
               <span>Remove {selectedGames.length} games…</span>
             </button>
@@ -274,9 +287,9 @@
       </div>
     </div>
   {:else}
-    <div class="scroll empty">
-      <p class="muted">Select a game to see and edit its details.</p>
-      <p class="muted small">Ctrl-click or Shift-click to select several. Drag games onto a folder to move them.</p>
+    <div class="scroll empty-note">
+      <p>Select a game to see and edit its details.</p>
+      <p class="small">Ctrl-click or Shift-click to select several. Drag games onto a folder to move them.</p>
     </div>
   {/if}
 </div>
@@ -297,21 +310,15 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
 
-  .empty {
+  .scroll.empty-note {
     justify-content: center;
-    text-align: center;
   }
 
   .small {
-    font-size: 0.8rem;
-  }
-
-  h3 {
-    margin: 0;
-    font-size: 1.05rem;
+    font-size: var(--text-sm);
   }
 
   .cover {
@@ -340,14 +347,14 @@
 
   .noart {
     position: absolute;
-    bottom: 6px;
-    right: 6px;
-    padding: 1px 8px;
+    bottom: var(--space-2);
+    right: var(--space-2);
+    padding: 1px var(--space-2);
     border-radius: 999px;
     background: var(--surface);
     border: 1px dashed var(--border-strong);
     color: var(--text-muted);
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
   }
 
   .art-actions,
@@ -358,7 +365,7 @@
   }
 
   .art-line {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 
   .fields {
@@ -374,7 +381,7 @@
   }
 
   label > span {
-    font-size: 0.75rem;
+    font-size: var(--text-sm);
     color: var(--text-muted);
   }
 
@@ -382,12 +389,6 @@
   textarea,
   select {
     width: 100%;
-    padding: 0.35rem 0.5rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-s);
-    background: var(--surface);
-    font: inherit;
-    color: inherit;
   }
 
   textarea {
@@ -401,18 +402,18 @@
   }
 
   .row label:first-child {
-    width: 5rem;
+    width: 80px;
   }
 
   .check {
     flex-direction: row;
     align-items: center;
     gap: var(--space-2);
-    padding-bottom: 0.4rem;
+    min-height: var(--control);
   }
 
   .check > span {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     color: var(--text);
   }
 
@@ -428,7 +429,7 @@
   }
 
   .advanced summary {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .preview {
@@ -442,7 +443,7 @@
     grid-template-columns: max-content 1fr;
     gap: 2px var(--space-3);
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 
   .facts dt {
@@ -461,11 +462,6 @@
     border-top: 1px solid var(--border);
   }
 
-  .danger {
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-
   .bulk {
     display: flex;
     flex-direction: column;
@@ -475,5 +471,10 @@
 
   .move {
     width: 100%;
+  }
+
+  .spinner.on-accent {
+    border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
+    border-top-color: var(--on-accent);
   }
 </style>

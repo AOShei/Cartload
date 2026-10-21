@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import Icon from "../Icon.svelte";
-  import type { MenuPath } from "../../api/types";
+  import type { MenuItem, MenuPath } from "../../api/types";
   import { DRAG_TYPE, breadcrumbs, formatBytes, libraryStore, type Tile } from "../../state";
 
   const tiles = $derived(libraryStore.visibleTiles);
@@ -20,11 +21,103 @@
     return parts.join(" · ");
   });
 
-  let grid: HTMLElement | undefined = $state();
+  /* The cover grid is windowed: only the rows in view (plus a margin) exist in the DOM, so a
+     library of hundreds of games scrolls as one of a dozen. The tile width follows the pane,
+     the row height is measured from the first rendered tile. The list view is a plain table. */
+  const GAP = 12;
+  const PAD = 12;
+  const MIN_TILE = 128;
+  const MAX_TILE = 200;
+  const OVERSCAN_ROWS = 2;
+
+  let viewport: HTMLElement | undefined = $state();
+  let viewportWidth = $state(0);
+  let viewportHeight = $state(0);
+  let scrollTop = $state(0);
+  let measuredTile = $state(0);
+
+  const cols = $derived(
+    libraryStore.viewMode === "grid"
+      ? Math.max(1, Math.floor((viewportWidth - PAD * 2 + GAP) / (MIN_TILE + GAP)))
+      : 1,
+  );
+  const tileWidth = $derived(
+    Math.min(MAX_TILE, Math.floor((viewportWidth - PAD * 2 - GAP * (cols - 1)) / Math.max(1, cols))),
+  );
+  /** Art at 228:204 inside the tile padding, two title lines and a subtitle. */
+  const tileHeight = $derived(measuredTile || Math.round((tileWidth - 16) * (204 / 228) + 66));
+  const rowHeight = $derived(tileHeight + GAP);
+  const rows = $derived(Math.ceil(tiles.length / cols));
+  const totalHeight = $derived(rows > 0 ? rows * rowHeight - GAP + PAD * 2 : 0);
+  const firstRow = $derived(Math.max(0, Math.floor((scrollTop - PAD) / rowHeight) - OVERSCAN_ROWS));
+  const lastRow = $derived(
+    Math.min(rows - 1, Math.ceil((scrollTop + viewportHeight - PAD) / rowHeight) + OVERSCAN_ROWS),
+  );
+  const windowStart = $derived(firstRow * cols);
+  const visible = $derived(
+    libraryStore.viewMode === "grid" ? tiles.slice(windowStart, (lastRow + 1) * cols) : tiles,
+  );
+  const offsetY = $derived(PAD + firstRow * rowHeight);
+
+  $effect(() => {
+    if (!viewport) {
+      return;
+    }
+    const node = viewport;
+    const observer = new ResizeObserver(() => {
+      viewportWidth = node.clientWidth;
+      viewportHeight = node.clientHeight;
+    });
+    observer.observe(node);
+    viewportWidth = node.clientWidth;
+    viewportHeight = node.clientHeight;
+    return () => observer.disconnect();
+  });
+
+  /** Measures the first rendered tile; every tile has the same height. */
+  function measure(node: HTMLElement, first: boolean): { update: (first: boolean) => void; destroy: () => void } {
+    let observer: ResizeObserver | null = null;
+    const apply = (on: boolean) => {
+      if (on && !observer) {
+        observer = new ResizeObserver(() => {
+          if (node.offsetHeight > 0) {
+            measuredTile = node.offsetHeight;
+          }
+        });
+        observer.observe(node);
+      } else if (!on && observer) {
+        observer.disconnect();
+        observer = null;
+      }
+    };
+    apply(first);
+    return { update: apply, destroy: () => observer?.disconnect() };
+  }
+
+  function onscroll(): void {
+    if (viewport) {
+      scrollTop = viewport.scrollTop;
+    }
+  }
+
   let focusId = $state<string | null>(null);
   let dropTarget = $state<string | null>(null);
 
-  const tabTarget = $derived(focusId && tiles.some((t) => t.id === focusId) ? focusId : (tiles[0]?.id ?? null));
+  /** The one tab stop: the focused tile when it is rendered, else the first rendered one. */
+  const tabTarget = $derived(
+    focusId && visible.some((t) => t.id === focusId) ? focusId : (visible[0]?.id ?? null),
+  );
+
+  /** Keeps keyboard handling alive when the focused tile scrolls out of the window. */
+  function keepFocus(node: HTMLElement): { destroy: () => void } {
+    return {
+      destroy: () => {
+        if (document.activeElement === node) {
+          viewport?.focus({ preventScroll: true });
+        }
+      },
+    };
+  }
 
   function title(tile: Tile): string {
     return tile.kind === "game" ? tile.view.game.name : tile.kind === "original" ? tile.name : tile.folder.name;
@@ -52,20 +145,30 @@
     }
   }
 
-  function focusTile(id: string): void {
+  /** Scrolls the tile's row into the window, waits for it to render, then focuses it. */
+  async function focusTile(id: string): Promise<void> {
     focusId = id;
-    grid?.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`)?.focus();
-  }
-
-  function columns(): number {
-    if (!grid || libraryStore.viewMode !== "grid") {
-      return 1;
+    if (!viewport) {
+      return;
     }
-    const first = grid.querySelector<HTMLElement>("[role='option']");
-    if (!first) {
-      return 1;
+    if (libraryStore.viewMode === "grid") {
+      const index = tiles.findIndex((t) => t.id === id);
+      if (index < 0) {
+        return;
+      }
+      const top = PAD + Math.floor(index / cols) * rowHeight;
+      const bottom = top + tileHeight;
+      if (top < viewport.scrollTop) {
+        viewport.scrollTop = top - PAD;
+      } else if (bottom > viewport.scrollTop + viewport.clientHeight) {
+        viewport.scrollTop = bottom + PAD - viewport.clientHeight;
+      }
+      scrollTop = viewport.scrollTop;
+      await tick();
     }
-    return Math.max(1, Math.floor(grid.clientWidth / first.offsetWidth));
+    const node = viewport.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);
+    node?.focus({ preventScroll: true });
+    node?.scrollIntoView({ block: "nearest" });
   }
 
   function onGridKey(event: KeyboardEvent): void {
@@ -83,6 +186,11 @@
       libraryStore.goUp();
       return;
     }
+    if (event.key === "Delete") {
+      event.preventDefault();
+      libraryStore.requestRemove();
+      return;
+    }
     const index = tiles.findIndex((t) => t.id === focusId);
     const current = tiles[index];
     if (!current) {
@@ -97,7 +205,6 @@
       libraryStore.select(current.id, { toggle: true });
       return;
     }
-    const cols = columns();
     let next = index;
     switch (event.key) {
       case "ArrowRight":
@@ -112,6 +219,12 @@
       case "ArrowUp":
         next = Math.max(0, index - cols);
         break;
+      case "PageDown":
+        next = Math.min(tiles.length - 1, index + cols * Math.max(1, Math.floor(viewportHeight / rowHeight)));
+        break;
+      case "PageUp":
+        next = Math.max(0, index - cols * Math.max(1, Math.floor(viewportHeight / rowHeight)));
+        break;
       case "Home":
         next = 0;
         break;
@@ -125,7 +238,7 @@
     const target = tiles[next];
     if (target) {
       libraryStore.select(target.id, { range: event.shiftKey });
-      focusTile(target.id);
+      void focusTile(target.id);
     }
   }
 
@@ -160,7 +273,7 @@
       return;
     }
     event.preventDefault();
-    const items = JSON.parse(raw) as import("../../api/types").MenuItem[];
+    const items = JSON.parse(raw) as MenuItem[];
     // Dropping a folder onto itself is a no-op, not an error.
     const self = items.some((i) => i.kind === "folder" && `f:${i.path.join("/")}` === id);
     if (!self) {
@@ -196,10 +309,10 @@
       <input type="search" placeholder="Filter" aria-label="Filter the games in this folder" bind:value={libraryStore.filter} />
     </label>
     <div class="view-toggle" role="group" aria-label="View">
-      <button type="button" class="icon-btn" aria-pressed={libraryStore.viewMode === "grid"} aria-label="Covers" title="Covers" onclick={() => libraryStore.setViewMode("grid")}>
+      <button type="button" class="icon-btn icon-btn-sm" aria-pressed={libraryStore.viewMode === "grid"} aria-label="Covers" title="Covers" onclick={() => libraryStore.setViewMode("grid")}>
         <Icon name="grid" size={16} />
       </button>
-      <button type="button" class="icon-btn" aria-pressed={libraryStore.viewMode === "list"} aria-label="List" title="List" onclick={() => libraryStore.setViewMode("list")}>
+      <button type="button" class="icon-btn icon-btn-sm" aria-pressed={libraryStore.viewMode === "list"} aria-label="List" title="List" onclick={() => libraryStore.setViewMode("list")}>
         <Icon name="list" size={16} />
       </button>
     </div>
@@ -213,56 +326,84 @@
   </div>
 
   {#if tiles.length === 0}
-    <div class="nothing">
+    <div class="empty-note">
       {#if libraryStore.filter.trim()}
-        <p class="muted">Nothing in this folder matches “{libraryStore.filter.trim()}”.</p>
+        <p>Nothing in this folder matches “{libraryStore.filter.trim()}”.</p>
+        <button type="button" class="btn" onclick={() => (libraryStore.filter = "")}>Clear the filter</button>
       {:else}
-        <p class="muted">This folder is empty. Drag games here from another folder, or add games.</p>
+        <p>This folder is empty. Drag games here from another folder, or add some.</p>
+        <button type="button" class="btn" onclick={() => libraryStore.addGames()} disabled={libraryStore.importing}>
+          <Icon name="plus" size={16} />
+          <span>Add games…</span>
+        </button>
       {/if}
     </div>
   {:else if libraryStore.viewMode === "grid"}
-    <div class="tiles" role="listbox" tabindex="-1" aria-multiselectable="true" aria-label="Games in this folder" bind:this={grid}>
-      {#each tiles as tile (tile.id)}
+    <div
+      class="viewport focus-inset"
+      role="listbox"
+      tabindex="-1"
+      aria-multiselectable="true"
+      aria-label="Games in this folder"
+      bind:this={viewport}
+      {onscroll}
+      onkeydown={onGridKey}
+    >
+      <div class="sizer" style:height="{totalHeight}px">
         <div
-          role="option"
-          class="tile kind-{tile.kind}"
-          class:selected={selectedSet.has(tile.id)}
-          class:dropping={dropTarget === tile.id}
-          data-id={tile.id}
-          tabindex={tile.id === tabTarget ? 0 : -1}
-          aria-selected={selectedSet.has(tile.id)}
-          draggable="true"
-          onclick={(e) => onTileClick(e, tile)}
-          ondblclick={() => onTileDblClick(tile)}
-          onkeydown={onGridKey}
-          onfocus={() => (focusId = tile.id)}
-          ondragstart={(e) => ondragstart(e, tile)}
-          ondragover={(e) => (tile.kind === "folder" ? onFolderDragOver(e, tile.id) : undefined)}
-          ondragleave={() => (dropTarget = null)}
-          ondrop={(e) => (tile.kind === "folder" ? onFolderDrop(e, tile.path, tile.id) : undefined)}
+          class="window"
+          style:transform="translateY({offsetY}px)"
+          style:grid-template-columns="repeat({cols}, {tileWidth}px)"
         >
-          <div class="art">
-            {#if tile.kind === "game"}
-              <img src={tile.view.cover} alt="" loading="lazy" decoding="async" draggable="false" />
-              {#if tile.view.game.placeholder_art}
-                <span class="noart">No art yet</span>
-              {/if}
-            {:else if tile.kind === "original"}
-              <span class="builtin"><Icon name="builtIn" size={32} /></span>
-            {:else}
-              <span class="folder-art">
-                <Icon name="folder" size={40} />
-              </span>
-            {/if}
-          </div>
-          <span class="title">{title(tile)}</span>
-          <span class="sub muted">{subtitle(tile)}</span>
+          {#each visible as tile, i (tile.id)}
+            <!-- Keys are handled once, on the listbox, so they keep working when the focused
+                 tile scrolls out of the window and focus falls back to the listbox. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <div
+              role="option"
+              class="tile kind-{tile.kind} focus-inset"
+              class:selected={selectedSet.has(tile.id)}
+              class:dropping={dropTarget === tile.id}
+              data-id={tile.id}
+              tabindex={tile.id === tabTarget ? 0 : -1}
+              aria-selected={selectedSet.has(tile.id)}
+              aria-posinset={windowStart + i + 1}
+              aria-setsize={tiles.length}
+              draggable="true"
+              use:keepFocus
+              use:measure={i === 0}
+              onclick={(e) => onTileClick(e, tile)}
+              ondblclick={() => onTileDblClick(tile)}
+              onfocus={() => (focusId = tile.id)}
+              ondragstart={(e) => ondragstart(e, tile)}
+              ondragover={(e) => (tile.kind === "folder" ? onFolderDragOver(e, tile.id) : undefined)}
+              ondragleave={() => (dropTarget = null)}
+              ondrop={(e) => (tile.kind === "folder" ? onFolderDrop(e, tile.path, tile.id) : undefined)}
+            >
+              <div class="art">
+                {#if tile.kind === "game"}
+                  <img src={tile.view.cover} alt="" loading="lazy" decoding="async" draggable="false" />
+                  {#if tile.view.game.placeholder_art}
+                    <span class="noart">No art yet</span>
+                  {/if}
+                {:else if tile.kind === "original"}
+                  <span class="builtin"><Icon name="builtIn" size={32} /></span>
+                {:else}
+                  <span class="folder-art">
+                    <Icon name="folder" size={40} />
+                  </span>
+                {/if}
+              </div>
+              <span class="title">{title(tile)}</span>
+              <span class="sub muted">{subtitle(tile)}</span>
+            </div>
+          {/each}
         </div>
-      {/each}
+      </div>
     </div>
   {:else}
-    <div class="list-wrap" bind:this={grid}>
-      <table class="list" role="grid" aria-multiselectable="true" aria-label="Games in this folder">
+    <div class="list-wrap" bind:this={viewport}>
+      <table class="list" role="grid" aria-multiselectable="true" aria-label="Games in this folder" onkeydown={onGridKey}>
         <thead>
           <tr>
             <th scope="col">Name</th>
@@ -276,7 +417,9 @@
         </thead>
         <tbody>
           {#each tiles as tile (tile.id)}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
             <tr
+              class="focus-inset"
               class:selected={selectedSet.has(tile.id)}
               class:dropping={dropTarget === tile.id}
               data-id={tile.id}
@@ -285,7 +428,6 @@
               draggable="true"
               onclick={(e) => onTileClick(e, tile)}
               ondblclick={() => onTileDblClick(tile)}
-              onkeydown={onGridKey}
               onfocus={() => (focusId = tile.id)}
               ondragstart={(e) => ondragstart(e, tile)}
               ondragover={(e) => (tile.kind === "folder" ? onFolderDragOver(e, tile.id) : undefined)}
@@ -294,7 +436,7 @@
             >
               <td class="name-cell">
                 {#if tile.kind === "game"}
-                  <img class="thumb" src={tile.view.thumbnail} alt="" loading="lazy" draggable="false" />
+                  <img class="thumb" src={tile.view.thumbnail} alt="" loading="lazy" decoding="async" draggable="false" />
                 {:else}
                   <span class="thumb glyph"><Icon name={tile.kind === "folder" ? "folder" : "builtIn"} size={18} /></span>
                 {/if}
@@ -345,7 +487,8 @@
   }
 
   .crumb {
-    padding: 0.2rem 0.4rem;
+    min-height: var(--control-sm);
+    padding: 0 var(--space-1);
     border: 1px solid transparent;
     border-radius: var(--radius-s);
     background: transparent;
@@ -361,7 +504,7 @@
 
   .crumb.current {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
   }
 
   .crumb.dropping {
@@ -374,7 +517,7 @@
   }
 
   .summary {
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     white-space: nowrap;
   }
 
@@ -390,8 +533,7 @@
   }
 
   .filter input {
-    width: 9rem;
-    padding: 0.3rem 0.5rem;
+    width: 144px;
   }
 
   .view-toggle {
@@ -402,41 +544,45 @@
     border-radius: var(--radius-s);
   }
 
-  .view-toggle .icon-btn {
-    width: 1.7rem;
-    height: 1.7rem;
-  }
-
   .view-toggle .icon-btn[aria-pressed="true"] {
     background: var(--accent-soft);
     color: var(--accent-strong);
   }
 
-  .nothing {
-    padding: var(--space-6);
-    text-align: center;
-  }
-
-  .tiles {
+  .viewport {
     flex: 1;
     min-height: 0;
     overflow: auto;
+    position: relative;
+  }
+
+  .sizer {
+    position: relative;
+    width: 100%;
+  }
+
+  .window {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    top: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
-    gap: var(--space-3);
-    padding: var(--space-3);
-    align-content: start;
+    gap: 12px;
+    will-change: transform;
   }
 
   .tile {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     padding: var(--space-2);
     border: 1px solid transparent;
     border-radius: var(--radius-m);
     cursor: default;
     user-select: none;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      border-color var(--motion-fast) var(--ease-out);
   }
 
   .tile:hover {
@@ -474,14 +620,14 @@
 
   .noart {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
-    padding: 1px 6px;
+    bottom: var(--space-1);
+    right: var(--space-1);
+    padding: 1px var(--space-2);
     border-radius: 999px;
     background: var(--surface);
     border: 1px dashed var(--border-strong);
     color: var(--text-muted);
-    font-size: 0.65rem;
+    font-size: var(--text-xs);
   }
 
   .builtin,
@@ -496,8 +642,9 @@
   }
 
   .title {
-    font-size: 0.8rem;
-    line-height: 1.25;
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+    height: calc(2 * var(--text-sm) * var(--leading-tight));
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -506,7 +653,10 @@
   }
 
   .sub {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .list-wrap {
@@ -518,19 +668,20 @@
   .list {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .list th {
     position: sticky;
     top: 0;
+    z-index: 1;
     background: var(--surface);
     text-align: left;
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     color: var(--text-muted);
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }

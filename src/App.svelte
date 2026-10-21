@@ -1,9 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { cubicOut } from "svelte/easing";
+  import { fly } from "svelte/transition";
   import LogPanel from "./lib/components/LogPanel.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import StatusBar from "./lib/components/StatusBar.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
+  import { NORMAL, ms } from "./lib/motion";
   import ConsolePage from "./lib/pages/ConsolePage.svelte";
   import KernelPage from "./lib/pages/KernelPage.svelte";
   import LibraryPage from "./lib/pages/LibraryPage.svelte";
@@ -48,18 +51,22 @@
   <div class="column">
     <main>
       <header class="page-header">
-        <h2>{navigation.current.label}</h2>
+        <h2 class="caps">{navigation.current.label}</h2>
         <p class="muted">{navigation.current.hint}</p>
       </header>
-      {#if navigation.page === "console"}
-        <ConsolePage />
-      {:else if navigation.page === "kernel"}
-        <KernelPage />
-      {:else if navigation.page === "library"}
-        <LibraryPage />
-      {:else}
-        <SettingsPage />
-      {/if}
+      {#key navigation.page}
+        <div class="page" in:fly={{ y: 6, duration: ms(NORMAL), easing: cubicOut }}>
+          {#if navigation.page === "console"}
+            <ConsolePage />
+          {:else if navigation.page === "kernel"}
+            <KernelPage />
+          {:else if navigation.page === "library"}
+            <LibraryPage />
+          {:else}
+            <SettingsPage />
+          {/if}
+        </div>
+      {/key}
     </main>
     {#if preferences.logOpen}
       <LogPanel />
@@ -103,27 +110,30 @@
 
   .page-header {
     flex: none;
-  }
-
-  .page-header {
     display: flex;
     align-items: baseline;
     gap: var(--space-3);
     margin-bottom: var(--space-4);
   }
 
-  .page-header h2 {
-    font-size: 0.95rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
+  .page-header p {
+    font-size: var(--text-md);
   }
 
-  .page-header p {
-    font-size: 0.9rem;
+  .page {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .shell > :global(footer) {
     grid-area: footer;
+  }
+
+  @media (max-width: 1023px) {
+    main {
+      padding: var(--space-4) var(--space-4) var(--space-3);
+    }
   }
 </style>

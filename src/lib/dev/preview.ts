@@ -475,7 +475,7 @@ const ORIGINALS = [
 export function previewLibrary(): { view: LibraryView; menu: MenuView } {
   const name =
     typeof location !== "undefined" ? new URLSearchParams(location.search).get("library") : null;
-  const count = name === "empty" ? 0 : name === "many" ? 120 : PREVIEW_GAMES.length;
+  const count = name === "empty" ? 0 : name === "many" ? 500 : PREVIEW_GAMES.length;
   const games = Array.from({ length: count }, (_, i) => previewGame(i, 5)).sort((a, b) =>
     a.game.code.localeCompare(b.game.code),
   );

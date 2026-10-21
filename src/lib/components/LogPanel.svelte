@@ -31,6 +31,15 @@
     }
   }
 
+  function clear(): void {
+    const count = logStore.lines.length;
+    if (count === 0) {
+      return;
+    }
+    logStore.clear();
+    toasts.undoable(`Log cleared (${count} line${count === 1 ? "" : "s"}).`, () => logStore.undoClear());
+  }
+
   function close(): void {
     preferences.setLogOpen(false);
   }
@@ -38,7 +47,7 @@
 
 <section class="panel" aria-label="Activity log">
   <header>
-    <h2>Activity</h2>
+    <h2 class="caps">Activity</h2>
     <label class="debug">
       <input
         type="checkbox"
@@ -48,15 +57,16 @@
       Show details
     </label>
     <span class="spacer"></span>
-    <button type="button" class="icon-btn" onclick={copy} aria-label="Copy the log" title="Copy">
+    <button type="button" class="icon-btn" onclick={copy} aria-label="Copy the log" title="Copy" disabled={lines.length === 0}>
       <Icon name="copy" size={16} />
     </button>
     <button
       type="button"
       class="icon-btn"
-      onclick={() => logStore.clear()}
+      onclick={clear}
       aria-label="Clear the log"
       title="Clear"
+      disabled={lines.length === 0}
     >
       <Icon name="trash" size={16} />
     </button>
@@ -73,7 +83,11 @@
         <span class="message">{line.message}</span>
       </li>
     {:else}
-      <li class="empty muted">Nothing yet.</li>
+      <li class="empty muted">
+        Nothing yet. What the app does with the console appears here as it happens{preferences.showDebugLog
+          ? "."
+          : "; tick “Show details” for every command and USB event."}
+      </li>
     {/each}
   </ol>
 </section>
@@ -82,7 +96,7 @@
   .panel {
     display: flex;
     flex-direction: column;
-    height: 14rem;
+    height: 224px;
     border-top: 1px solid var(--border);
     background: var(--surface);
   }
@@ -91,13 +105,10 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding: var(--space-1) var(--space-3);
+    height: var(--control-lg);
+    padding: 0 var(--space-2) 0 var(--space-3);
     border-bottom: 1px solid var(--border);
-    font-size: 0.85rem;
-  }
-
-  h2 {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .debug {
@@ -118,13 +129,13 @@
     list-style: none;
     overflow: auto;
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     user-select: text;
   }
 
   .line {
     display: grid;
-    grid-template-columns: 5rem 3.5rem 5.5rem 1fr;
+    grid-template-columns: 80px 56px 88px 1fr;
     gap: var(--space-2);
     padding: 1px var(--space-3);
     line-height: 1.5;
@@ -141,7 +152,7 @@
 
   .level {
     text-transform: uppercase;
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.04em;
     align-self: center;
   }
@@ -175,5 +186,6 @@
 
   .empty {
     padding: var(--space-2) var(--space-3);
+    font-family: var(--font);
   }
 </style>

@@ -34,11 +34,11 @@
 
 <section class="flow-log" aria-label="Log of this run">
   <header>
-    <h3>Log</h3>
+    <h3 class="caps">Log</h3>
     <span class="spacer"></span>
     <button
       type="button"
-      class="btn btn-quiet small"
+      class="btn btn-quiet btn-sm"
       onclick={() => preferences.setLogOpen(true)}
       title="Open the full activity log (Ctrl+L)"
     >
@@ -54,7 +54,7 @@
         <span class="message">{line.message}</span>
       </li>
     {:else}
-      <li class="empty">Nothing yet.</li>
+      <li class="empty">Nothing yet. The steps report here as they run.</li>
     {/each}
   </ol>
 </section>
@@ -73,41 +73,29 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+    height: var(--control);
+    padding: 0 var(--space-1) 0 var(--space-3);
     border-bottom: 1px solid var(--border);
-  }
-
-  h3 {
-    margin: 0;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
   }
 
   .spacer {
     flex: 1;
   }
 
-  .small {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.8rem;
-  }
-
   ol {
     margin: 0;
     padding: var(--space-1) 0;
     list-style: none;
-    max-height: 12rem;
+    max-height: 192px;
     overflow: auto;
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     user-select: text;
   }
 
   .line {
     display: grid;
-    grid-template-columns: 5rem 4.5rem 1fr;
+    grid-template-columns: 80px 72px 1fr;
     gap: var(--space-2);
     padding: 1px var(--space-3);
     line-height: 1.5;
@@ -139,5 +127,6 @@
   .empty {
     padding: var(--space-2) var(--space-3);
     color: var(--text-muted);
+    font-family: var(--font);
   }
 </style>

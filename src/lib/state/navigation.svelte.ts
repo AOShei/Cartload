@@ -33,9 +33,17 @@ function initialPage(): PageId {
 
 class Navigation {
   page = $state<PageId>(initialPage());
+  /** A section of the page to scroll to and focus once it is shown, e.g. "about". */
+  section = $state<string | null>(null);
 
-  go(page: PageId): void {
+  go(page: PageId, section: string | null = null): void {
     this.page = page;
+    this.section = section;
+  }
+
+  /** The page took the requested section; forget it. */
+  tookSection(): void {
+    this.section = null;
   }
 
   /** The definition of the current page. */

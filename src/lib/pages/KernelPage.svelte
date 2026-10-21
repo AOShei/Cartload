@@ -1,6 +1,6 @@
 <script lang="ts">
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { inTauri } from "../api/tauri";
   import type { FlowKind } from "../api/types";
   import DetailsList from "../components/DetailsList.svelte";
@@ -189,9 +189,43 @@
     if (event.key === "Escape") {
       if (menuOpen) {
         menuOpen = false;
+        menu?.querySelector("summary")?.focus();
       }
       confirmUninstall = false;
     }
+  }
+
+  /** Opening the menu focuses its first item; Up and Down move between items. */
+  function menuItems(): HTMLButtonElement[] {
+    return Array.from(menu?.querySelectorAll<HTMLButtonElement>("[role='menuitem']:not(:disabled)") ?? []);
+  }
+
+  async function onmenutoggle(): Promise<void> {
+    if (menuOpen) {
+      await tick();
+      menuItems()[0]?.focus();
+    }
+  }
+
+  function onmenukeydown(event: KeyboardEvent): void {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") {
+      return;
+    }
+    const items = menuItems();
+    if (items.length === 0) {
+      return;
+    }
+    const index = items.findIndex((item) => item === document.activeElement);
+    let next = 0;
+    if (event.key === "ArrowDown") {
+      next = (index + 1) % items.length;
+    } else if (event.key === "ArrowUp") {
+      next = (index - 1 + items.length) % items.length;
+    } else if (event.key === "End") {
+      next = items.length - 1;
+    }
+    event.preventDefault();
+    items[next]?.focus();
   }
 
   async function begin(kind: FlowKind): Promise<void> {
@@ -260,12 +294,12 @@
       Four stages: put the console in FEL mode, check the kernel package, run the install, and
       confirm the result. Nothing is written until stage 3 starts.
     </p>
-    <details class="menu" bind:open={menuOpen} bind:this={menu}>
+    <details class="menu" bind:open={menuOpen} bind:this={menu} ontoggle={onmenutoggle}>
       <summary class="btn btn-quiet" aria-haspopup="menu">
         More
         <Icon name="more" size={16} />
       </summary>
-      <div class="menu-items" role="menu" aria-label="Other actions">
+      <div class="menu-items" role="menu" tabindex="-1" aria-label="Other actions" onkeydown={onmenukeydown}>
         <button type="button" role="menuitem" disabled={!canStart} onclick={() => void begin({ kind: "memboot" })}>
           <Icon name="play" size={16} />
           <span>Boot from memory only <small>Recovery shell, nothing written</small></span>
@@ -285,7 +319,7 @@
   <ol class="stages">
     <!-- Stage 1 -->
     <li class="stage" class:complete={watch.ready}>
-      <span class="number" aria-hidden="true">{watch.ready ? "✓" : "1"}</span>
+      <span class="number" aria-hidden="true">{#if watch.ready}<Icon name="check" size={16} />{:else}1{/if}</span>
       <div class="body card">
         <h2>Put the console in FEL mode</h2>
         <div class="fel">
@@ -296,8 +330,8 @@
             <li>Keep RESET held for two seconds, then release it. The screen stays black: that is FEL mode.</li>
           </ol>
         </div>
-        <p class="watch tone-{watch.tone}" role="status">
-          <span class="dot" aria-hidden="true"></span>
+        <p class="watch" role="status">
+          <span class="dot tone-{watch.tone}" aria-hidden="true"></span>
           {watch.text}
         </p>
       </div>
@@ -305,12 +339,14 @@
 
     <!-- Stage 2 -->
     <li class="stage" class:complete={pkg !== null}>
-      <span class="number" aria-hidden="true">{pkg ? "✓" : "2"}</span>
+      <span class="number" aria-hidden="true">{#if pkg}<Icon name="check" size={16} />{:else}2{/if}</span>
       <div class="body card">
         <div class="row">
           <h2>Kernel package</h2>
           <span class="spacer"></span>
-          {#if packageStore.updating}
+          {#if packageStore.loading && !packageStore.status}
+            <span class="muted"><span class="spinner" aria-hidden="true"></span> Checking the cache…</span>
+          {:else if packageStore.updating}
             <span class="muted num">
               {#if packageStore.progress?.total}
                 {formatBytes(packageStore.progress.done)} of {formatBytes(packageStore.progress.total)}
@@ -338,6 +374,9 @@
             {formatBytes(pkg.len)}{pkg.modified ? `, downloaded ${modified(pkg.modified)}` : ""}
             {pkg.source === "override" ? " (from CARTLOAD_HMOD)" : ""}
           </p>
+          {#if packageStore.error}
+            <p class="problem">The update failed: {packageStore.error} The copy on disk is still usable.</p>
+          {/if}
         {:else if packageStore.updating}
           <p class="muted">Fetching the latest hakchi.hmod…</p>
           <progress max={packageStore.progress?.total ?? 1} value={packageStore.progress?.total ? packageStore.progress.done : undefined}></progress>
@@ -346,10 +385,13 @@
           {#if packageStore.status?.problem}
             <p class="problem">The copy on disk cannot be used: {packageStore.status.problem}</p>
           {/if}
+          {#if packageStore.error}
+            <p class="problem">The download failed: {packageStore.error}</p>
+          {/if}
           <div>
             <button type="button" class="btn btn-primary" onclick={() => void packageStore.update()} disabled={busy}>
               <Icon name="download" size={16} />
-              Download package
+              {packageStore.error ? "Try the download again" : "Download package"}
             </button>
           </div>
         {/if}
@@ -358,7 +400,7 @@
 
     <!-- Stage 3 -->
     <li class="stage" class:complete={snapshot.state === "done"} class:active={running}>
-      <span class="number" aria-hidden="true">{snapshot.state === "done" ? "✓" : "3"}</span>
+      <span class="number" aria-hidden="true">{#if snapshot.state === "done"}<Icon name="check" size={16} />{:else}3{/if}</span>
       <div class="body card">
         <div class="row">
           <h2>{stageTitle}</h2>
@@ -369,12 +411,17 @@
           {#if running}
             <button type="button" class="btn btn-quiet" onclick={() => void flowStore.cancel()} disabled={flowStore.cancelling || snapshot.cancel_pending}>
               <Icon name="stop" size={16} />
-              {snapshot.cancel_pending ? "Stopping after this step…" : "Stop"}
+              {snapshot.cancel_pending ? "Stopping after this step…" : flowStore.cancelling ? "Stopping…" : "Stop"}
             </button>
           {:else if snapshot.state === "idle"}
             <button type="button" class="btn btn-primary" onclick={() => void begin({ kind: "install" })} disabled={!canStart}>
-              {watch.installed ? "Reinstall hakchi" : "Install hakchi"}
-              <Icon name="arrow" size={16} />
+              {#if flowStore.starting}
+                <span class="spinner on-accent" aria-hidden="true"></span>
+                Starting…
+              {:else}
+                {watch.installed ? "Reinstall hakchi" : "Install hakchi"}
+                <Icon name="arrow" size={16} />
+              {/if}
             </button>
           {:else if snapshot.state === "done"}
             <button type="button" class="btn btn-quiet" onclick={() => void begin({ kind: "install" })} disabled={!canStart}>
@@ -393,7 +440,7 @@
               added with hakchi will no longer appear; the console's own games are untouched.
             </p>
             <div class="confirm-actions">
-              <button type="button" class="btn danger" onclick={() => void begin({ kind: "uninstall", stock_kernel: null, force_stock_kernel: false })}>
+              <button type="button" class="btn btn-danger" onclick={() => void begin({ kind: "uninstall", stock_kernel: null, force_stock_kernel: false })}>
                 Return the console to its original system
               </button>
               <button type="button" class="btn btn-quiet" onclick={() => (confirmUninstall = false)}>Keep hakchi</button>
@@ -412,7 +459,9 @@
 
     <!-- Stage 4 -->
     <li class="stage" class:complete={snapshot.state === "done"} class:failed={snapshot.state === "failed"}>
-      <span class="number" aria-hidden="true">{snapshot.state === "done" ? "✓" : "4"}</span>
+      <span class="number" aria-hidden="true">
+        {#if snapshot.state === "done"}<Icon name="check" size={16} />{:else if snapshot.state === "failed"}<Icon name="warning" size={16} />{:else}4{/if}
+      </span>
       <div class="body">
         {#if outcome}
           <section class="card result">
@@ -468,7 +517,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    max-width: 64rem;
+    max-width: 1024px;
   }
 
   .top {
@@ -499,9 +548,9 @@
   .menu-items {
     position: absolute;
     right: 0;
-    top: calc(100% + 4px);
+    top: calc(100% + var(--space-1));
     z-index: 10;
-    min-width: 20rem;
+    min-width: 320px;
     padding: var(--space-1);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -509,6 +558,18 @@
     box-shadow: var(--shadow-float);
     display: flex;
     flex-direction: column;
+    animation: menu-in var(--motion-fast) var(--ease-out);
+  }
+
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   .menu-items button {
@@ -516,7 +577,8 @@
     align-items: center;
     gap: var(--space-3);
     width: 100%;
-    padding: 0.5rem 0.75rem;
+    min-height: var(--control-lg);
+    padding: var(--space-1) var(--space-3);
     border: 0;
     border-radius: var(--radius-s);
     background: transparent;
@@ -537,7 +599,7 @@
   .menu-items small {
     display: block;
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 
   .stages {
@@ -552,15 +614,15 @@
   .stage {
     position: relative;
     display: grid;
-    grid-template-columns: 2.25rem 1fr;
+    grid-template-columns: 36px 1fr;
     gap: var(--space-4);
   }
 
   .stage::before {
     content: "";
     position: absolute;
-    left: calc(1.125rem - 1px);
-    top: 2.5rem;
+    left: 17px;
+    top: 40px;
     bottom: calc(-1 * var(--space-4));
     width: 2px;
     background: var(--border);
@@ -574,14 +636,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: var(--surface-raised);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font-weight: 700;
+    font-weight: var(--weight-bold);
     font-variant-numeric: tabular-nums;
+    transition:
+      background-color var(--motion) var(--ease-out),
+      border-color var(--motion) var(--ease-out),
+      color var(--motion) var(--ease-out);
   }
 
   .stage.complete .number {
@@ -619,7 +685,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 2.25rem;
+    min-height: var(--control);
   }
 
   .spacer {
@@ -635,7 +701,7 @@
 
   .howto {
     margin: 0;
-    padding-left: 1.2rem;
+    padding-left: 20px;
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
@@ -646,51 +712,27 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    min-height: var(--control);
+    padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-s);
     background: var(--surface-raised);
   }
 
-  .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--text-faint);
-    flex: none;
-  }
-
-  .tone-ready .dot {
-    background: var(--ok);
-  }
-
-  .tone-busy .dot {
-    background: var(--accent);
-    animation: blink 1.4s ease-in-out infinite;
-  }
-
-  .tone-warning .dot {
-    background: var(--warn);
-  }
-
-  .tone-error .dot {
-    background: var(--danger);
-  }
-
   .version {
-    font-size: 1.1rem;
+    font-size: var(--text-lg);
   }
 
   .small {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .problem {
     color: var(--danger);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
 
   .elapsed {
-    font-size: 0.9rem;
+    font-size: var(--text-md);
   }
 
   .note {
@@ -698,29 +740,7 @@
     border-radius: var(--radius-s);
     background: var(--warn-soft);
     color: var(--text);
-    font-size: 0.9rem;
-  }
-
-  .confirm {
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--danger);
-    border-radius: var(--radius-m);
-    background: var(--danger-soft);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-
-  .confirm-actions {
-    display: flex;
-    gap: var(--space-2);
-    flex-wrap: wrap;
-  }
-
-  .danger {
-    border-color: var(--danger);
-    color: var(--danger);
-    font-weight: 600;
+    font-size: var(--text-md);
   }
 
   .result h2 {
@@ -736,31 +756,14 @@
     box-shadow: none;
   }
 
-  progress {
-    width: 100%;
-    height: 6px;
-    accent-color: var(--accent);
+  .spinner.on-accent {
+    border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
+    border-top-color: var(--on-accent);
   }
 
-  @keyframes blink {
-    0%,
-    100% {
-      opacity: 0.4;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
-
-  @media (max-width: 900px) {
+  @media (max-width: 1023px) {
     .fel {
       grid-template-columns: 1fr;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .tone-busy .dot {
-      animation: none;
     }
   }
 </style>

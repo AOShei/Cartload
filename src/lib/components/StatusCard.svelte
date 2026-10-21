@@ -6,6 +6,8 @@
   interface Action {
     label: string;
     run: () => void;
+    /** The action is under way: the button shows it and refuses a second click. */
+    busy?: boolean;
   }
 
   interface Props {
@@ -22,7 +24,7 @@
   const busy = $derived(tone === "busy" || refreshing);
 </script>
 
-<section class="card status-card tone-{tone}" aria-labelledby="status-title">
+<section class="card status-card tone-{tone}" aria-labelledby="status-title" aria-busy={busy}>
   <div class="glyph">
     <Cartridge size={56} busy={busy} />
   </div>
@@ -32,9 +34,14 @@
   </div>
   <div class="actions">
     {#if primary}
-      <button type="button" class="btn btn-primary" onclick={primary.run}>
+      <button type="button" class="btn btn-primary" onclick={primary.run} disabled={primary.busy}>
+        {#if primary.busy}
+          <span class="spinner" aria-hidden="true"></span>
+        {/if}
         {primary.label}
-        <Icon name="arrow" size={16} />
+        {#if !primary.busy}
+          <Icon name="arrow" size={16} />
+        {/if}
       </button>
     {/if}
     <button
@@ -59,6 +66,7 @@
     align-items: center;
     padding: var(--space-5) var(--space-6);
     border-left: 5px solid var(--text-faint);
+    transition: border-color var(--motion) var(--ease-out);
   }
 
   .tone-ready {
@@ -80,6 +88,7 @@
   .glyph {
     color: var(--text-faint);
     display: flex;
+    transition: color var(--motion) var(--ease-out);
   }
 
   .tone-ready .glyph {
@@ -115,9 +124,15 @@
     align-items: stretch;
   }
 
-  @media (max-width: 860px) {
+  .actions .spinner {
+    border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
+    border-top-color: var(--on-accent);
+  }
+
+  @media (max-width: 1023px) {
     .status-card {
       grid-template-columns: auto 1fr;
+      padding: var(--space-4) var(--space-5);
     }
 
     .actions {

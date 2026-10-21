@@ -42,7 +42,7 @@
     <li class="step state-{step.state}" aria-current={step.state === "running" ? "step" : undefined}>
       <span class="marker" aria-hidden="true">
         {#if step.state === "running"}
-          <span class="spinner"></span>
+          <span class="spinner spinner-sm"></span>
         {:else if step.state === "done"}
           <Icon name="check" size={14} />
         {:else if step.state === "skipped"}
@@ -50,7 +50,7 @@
         {:else if step.state === "failed"}
           <Icon name="warning" size={14} />
         {:else}
-          <span class="dot"></span>
+          <span class="pending-dot"></span>
         {/if}
       </span>
       <div class="body">
@@ -88,7 +88,7 @@
   .step {
     position: relative;
     display: grid;
-    grid-template-columns: 1.5rem 1fr;
+    grid-template-columns: 24px 1fr;
     gap: var(--space-3);
     padding: var(--space-2) 0;
   }
@@ -97,9 +97,9 @@
   .step::before {
     content: "";
     position: absolute;
-    left: calc(0.75rem - 1px);
-    top: 1.9rem;
-    bottom: -0.4rem;
+    left: 11px;
+    top: 32px;
+    bottom: -6px;
     width: 2px;
     background: var(--border);
   }
@@ -112,15 +112,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     background: var(--surface-raised);
     color: var(--text-faint);
     margin-top: 1px;
+    transition:
+      background-color var(--motion) var(--ease-out),
+      color var(--motion) var(--ease-out);
   }
 
-  .dot {
+  .pending-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -130,6 +133,7 @@
   .state-done .marker {
     background: var(--ok-soft);
     color: var(--ok);
+    animation: pop var(--motion-slow) var(--ease-out);
   }
 
   .state-skipped .marker {
@@ -139,6 +143,7 @@
   .state-failed .marker {
     background: var(--danger-soft);
     color: var(--danger);
+    animation: pop var(--motion-slow) var(--ease-out);
   }
 
   .state-running .marker {
@@ -146,13 +151,16 @@
     color: var(--accent);
   }
 
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    border: 2px solid var(--accent-soft);
-    border-top-color: var(--accent);
-    animation: spin 0.9s linear infinite;
+  @keyframes pop {
+    0% {
+      transform: scale(0.7);
+    }
+    60% {
+      transform: scale(1.15);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 
   .body {
@@ -166,12 +174,13 @@
   }
 
   .label {
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
+    transition: color var(--motion) var(--ease-out);
   }
 
   .state-pending .label {
     color: var(--text-muted);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
   }
 
   .state-running .label {
@@ -185,13 +194,13 @@
   .time {
     margin-left: auto;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
   .desc {
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .state-pending .desc {
@@ -200,7 +209,7 @@
 
   .message {
     margin-top: var(--space-1);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     color: var(--text-muted);
     font-family: var(--font-mono);
     overflow-wrap: anywhere;
@@ -215,27 +224,12 @@
     align-items: center;
     gap: var(--space-3);
     margin-top: var(--space-2);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
     color: var(--text-muted);
   }
 
-  progress {
+  .transfer progress {
     flex: 1;
-    height: 6px;
-    accent-color: var(--accent);
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .spinner {
-      animation: none;
-      border-top-color: var(--accent);
-      border-right-color: var(--accent);
-    }
+    width: auto;
   }
 </style>

@@ -11,6 +11,7 @@ class LogStore {
   lines = $state<LogLine[]>([]);
   private lastSeq = 0;
   private started = false;
+  private cleared: LogLine[] = [];
 
   /** Lines to show, honouring the debug preference. */
   get visible(): LogLine[] {
@@ -78,8 +79,19 @@ class LogStore {
     }
   }
 
+  /** Empties the panel. The lines are kept until the next clear so it can be undone. */
   clear(): void {
+    this.cleared = this.lines;
     this.lines = [];
+  }
+
+  /** Puts the last cleared lines back, before anything that arrived since. */
+  undoClear(): void {
+    if (this.cleared.length === 0) {
+      return;
+    }
+    this.lines = [...this.cleared, ...this.lines].slice(-LOG_CAP);
+    this.cleared = [];
   }
 
   /** The visible lines as text, for copying. */

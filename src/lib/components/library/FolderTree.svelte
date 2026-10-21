@@ -10,12 +10,21 @@
   const expanded = new SvelteSet<string>();
   let tree: HTMLElement | undefined = $state();
 
+  /** The folder being viewed is always visible in the tree, so it is the tree's tab stop. */
+  $effect(() => {
+    const path = libraryStore.folder;
+    for (let depth = 1; depth < path.length; depth += 1) {
+      expanded.add(pathKey(path.slice(0, depth)));
+    }
+  });
+
   /* Structure popover */
   let structureOpen = $state(false);
   let popover: HTMLDetailsElement | undefined = $state();
   let kind = $state<Structure["kind"]>("count");
   let max = $state(30);
   let originalsAtRoot = $state(true);
+  let confirmApply = $state(false);
 
   $effect(() => {
     const options = menu?.options;
@@ -28,7 +37,7 @@
 
   function describe(options: MenuOptions | undefined, custom: boolean): string {
     if (custom) {
-      return "Folders edited by hand";
+      return "Folders arranged by hand";
     }
     switch (options?.structure.kind) {
       case "flat":
@@ -42,10 +51,16 @@
     }
   }
 
+  /** Applying over hand-made folders replaces them: that asks for a confirmation first. */
   async function applyStructure(): Promise<void> {
+    if (menu?.custom && !confirmApply) {
+      confirmApply = true;
+      return;
+    }
     const structure: Structure =
       kind === "count" ? { kind, max: Math.max(1, Math.floor(max || 1)) } : { kind };
     await libraryStore.setStructure({ structure, originals_at_root: originalsAtRoot });
+    confirmApply = false;
     structureOpen = false;
   }
 
@@ -147,6 +162,11 @@
       case "F2":
         startRename();
         break;
+      case "Delete":
+        if (current) {
+          confirmingRemove = true;
+        }
+        break;
       default:
         return;
     }
@@ -161,12 +181,14 @@
   function onwindowclick(event: MouseEvent): void {
     if (structureOpen && popover && !popover.contains(event.target as Node)) {
       structureOpen = false;
+      confirmApply = false;
     }
   }
 
   function onwindowkeydown(event: KeyboardEvent): void {
     if (event.key === "Escape") {
       structureOpen = false;
+      confirmApply = false;
       creating = false;
       renaming = false;
       confirmingRemove = false;
@@ -178,9 +200,12 @@
 
 <div class="pane">
   <header>
-    <h3>Folders</h3>
+    <h3 class="caps">Folders</h3>
     <div class="tools">
-      <button type="button" class="icon-btn" aria-label="New folder" title="New folder in the selected folder" onclick={startCreate}>
+      {#if libraryStore.menuBusy}
+        <span class="spinner" aria-label="Saving the folders" role="status"></span>
+      {/if}
+      <button type="button" class="icon-btn" aria-label="New folder" title="New folder in the selected folder" onclick={startCreate} disabled={libraryStore.menuBusy}>
         <Icon name="folderPlus" size={18} />
       </button>
       <details class="popover" bind:this={popover} bind:open={structureOpen}>
@@ -189,7 +214,7 @@
         </summary>
         <div class="popover-body">
           <h4>Folder structure</h4>
-          <p class="muted">How the console groups the games. Applying replaces the folders.</p>
+          <p class="muted">How the console groups the games.</p>
           <fieldset>
             <legend class="visually-hidden">Structure</legend>
             <label><input type="radio" name="structure" value="flat" bind:group={kind} /> One list</label>
@@ -205,13 +230,23 @@
             <input type="checkbox" bind:checked={originalsAtRoot} />
             <span>Keep the console's own games in the main menu, with the library in “More games…”</span>
           </label>
-          {#if menu?.custom}
-            <p class="note">You have arranged the folders by hand. Applying a structure replaces them.</p>
+          {#if confirmApply}
+            <div class="confirm" role="group" aria-label="Confirm replacing the folders">
+              <p>This replaces the folders you arranged by hand. The games themselves stay.</p>
+              <div class="confirm-actions">
+                <button type="button" class="btn btn-danger btn-sm" onclick={applyStructure} disabled={libraryStore.menuBusy}>Replace the folders</button>
+                <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmApply = false)}>Keep them</button>
+              </div>
+            </div>
+          {:else}
+            <div class="popover-actions">
+              <button type="button" class="btn" onclick={applyStructure} disabled={libraryStore.menuBusy}>
+                {#if libraryStore.menuBusy}<span class="spinner" aria-hidden="true"></span>{/if}
+                Apply
+              </button>
+              <button type="button" class="btn btn-quiet" onclick={() => (structureOpen = false)}>Close</button>
+            </div>
           {/if}
-          <div class="popover-actions">
-            <button type="button" class="btn" onclick={applyStructure}>Apply</button>
-            <button type="button" class="btn btn-quiet" onclick={() => (structureOpen = false)}>Close</button>
-          </div>
         </div>
       </details>
     </div>
@@ -223,27 +258,29 @@
       <TreeNode path={[]} name="Console menu" entries={menu.entries} depth={0} {expanded} />
     </ul>
   {:else}
-    <p class="muted loading">Loading…</p>
+    <p class="muted loading"><span class="spinner" aria-hidden="true"></span> Loading…</p>
   {/if}
 
   <footer>
     {#if creating}
       <form class="inline" onsubmit={(e) => { e.preventDefault(); void commitCreate(); }}>
         <input type="text" placeholder="Folder name" bind:value={newName} aria-label="New folder name" use:autofocus />
-        <button type="submit" class="btn">Add</button>
+        <button type="submit" class="btn" disabled={libraryStore.menuBusy}>Add</button>
         <button type="button" class="btn btn-quiet" onclick={() => (creating = false)}>Cancel</button>
       </form>
     {:else if current}
       {#if renaming}
         <form class="inline" onsubmit={(e) => { e.preventDefault(); void commitRename(); }}>
           <input type="text" bind:value={renameValue} aria-label="Folder name" use:autofocus onblur={commitRename} />
-          <button type="submit" class="btn">Rename</button>
+          <button type="submit" class="btn" disabled={libraryStore.menuBusy}>Rename</button>
         </form>
       {:else if confirmingRemove}
-        <p class="confirm">Remove “{current.name}”? Its games move up one level.</p>
-        <div class="inline">
-          <button type="button" class="btn danger" onclick={removeFolder}>Remove folder</button>
-          <button type="button" class="btn btn-quiet" onclick={() => (confirmingRemove = false)}>Keep</button>
+        <div class="confirm" role="group" aria-label="Confirm removing the folder">
+          <p>Remove “{current.name}”? Its games move up one level.</p>
+          <div class="confirm-actions">
+            <button type="button" class="btn btn-danger btn-sm" onclick={removeFolder} disabled={libraryStore.menuBusy}>Remove folder</button>
+            <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmingRemove = false)}>Keep</button>
+          </div>
         </div>
       {:else}
         <div class="inline">
@@ -251,7 +288,7 @@
           <button type="button" class="icon-btn" aria-label="Rename folder" title="Rename (F2)" onclick={startRename}>
             <Icon name="edit" size={16} />
           </button>
-          <button type="button" class="icon-btn" aria-label="Remove folder" title="Remove folder" onclick={() => (confirmingRemove = true)}>
+          <button type="button" class="icon-btn" aria-label="Remove folder" title="Remove folder (Delete)" onclick={() => (confirmingRemove = true)}>
             <Icon name="trash" size={16} />
           </button>
         </div>
@@ -274,15 +311,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-3) var(--space-3) 0;
-  }
-
-  h3 {
-    margin: 0;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
+    padding: var(--space-2) var(--space-2) 0 var(--space-3);
   }
 
   .tools {
@@ -293,7 +322,7 @@
 
   .structure {
     padding: 0 var(--space-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
 
   .tree {
@@ -305,14 +334,17 @@
   }
 
   .loading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     padding: var(--space-3);
   }
 
   footer {
     border-top: 1px solid var(--border);
     padding: var(--space-2) var(--space-3);
-    font-size: 0.85rem;
-    min-height: 3rem;
+    font-size: var(--text-md);
+    min-height: 48px;
   }
 
   .inline {
@@ -332,20 +364,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 600;
-  }
-
-  .confirm {
-    margin-bottom: var(--space-2);
+    font-weight: var(--weight-semibold);
   }
 
   .hint {
-    font-size: 0.8rem;
-  }
-
-  .danger {
-    border-color: var(--danger);
-    color: var(--danger);
+    font-size: var(--text-sm);
   }
 
   .popover {
@@ -362,10 +385,10 @@
 
   .popover-body {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + var(--space-1));
     left: 0;
     z-index: 20;
-    width: 20rem;
+    width: 320px;
     padding: var(--space-3) var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -374,12 +397,24 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
+    animation: popover-in var(--motion-fast) var(--ease-out);
+  }
+
+  @keyframes popover-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   .popover-body h4 {
-    margin: 0;
-    font-size: 0.95rem;
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
   }
 
   fieldset {
@@ -403,15 +438,9 @@
   }
 
   .small {
-    width: 4rem;
-    padding: 0.2rem 0.4rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-s);
-    background: var(--surface);
-  }
-
-  .note {
-    color: var(--warn);
+    width: 64px;
+    min-height: var(--control-sm);
+    padding: 0 var(--space-1);
   }
 
   .popover-actions {

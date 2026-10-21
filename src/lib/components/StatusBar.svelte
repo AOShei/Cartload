@@ -16,7 +16,7 @@
   <span class="spacer"></span>
   <button
     type="button"
-    class="btn btn-quiet log-toggle"
+    class="btn btn-quiet btn-sm log-toggle"
     aria-pressed={preferences.logOpen}
     aria-label={preferences.logOpen ? "Hide the activity log" : "Show the activity log"}
     title="Activity log (Ctrl+L)"
@@ -42,34 +42,11 @@
     display: flex;
     gap: var(--space-3);
     align-items: center;
-    padding: var(--space-1) var(--space-3);
-    font-size: 0.8125rem;
+    height: var(--control-lg);
+    padding: 0 var(--space-3);
+    font-size: var(--text-sm);
     background: var(--surface-raised);
     border-top: 1px solid var(--border);
-    min-height: 2.25rem;
-  }
-
-  .dot {
-    width: 0.6rem;
-    height: 0.6rem;
-    border-radius: 50%;
-    flex: none;
-  }
-
-  .tone-neutral {
-    background: var(--text-faint);
-  }
-  .tone-ready {
-    background: var(--ok);
-  }
-  .tone-busy {
-    background: var(--accent);
-  }
-  .tone-warning {
-    background: var(--warn);
-  }
-  .tone-error {
-    background: var(--danger);
   }
 
   .title {
@@ -82,21 +59,16 @@
     flex: 1;
   }
 
-  .log-toggle {
-    padding: 0.2rem 0.5rem;
-    font-size: inherit;
-  }
-
   .log-toggle[aria-pressed="true"] {
     background: var(--surface-hover);
     color: var(--text);
   }
 
   .count {
-    padding: 0 0.35rem;
+    padding: 0 var(--space-1);
     border-radius: 999px;
     background: var(--border);
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
   }
 
   .version {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Cartridge from "./Cartridge.svelte";
   import Icon from "./Icon.svelte";
+  import Wordmark from "./Wordmark.svelte";
   import { PAGES, navigation, type PageId } from "../state";
 
   let buttons: HTMLButtonElement[] = $state([]);
@@ -38,10 +39,16 @@
 </script>
 
 <nav class="sidebar" aria-label="Pages">
-  <div class="brand" aria-label="Cartload">
+  <button
+    type="button"
+    class="brand"
+    aria-label="About Cartload"
+    title="About Cartload"
+    onclick={() => navigation.go("settings", "about")}
+  >
     <span class="glyph"><Cartridge size={28} /></span>
-    <span class="wordmark">Cartload</span>
-  </div>
+    <span class="wordmark"><Wordmark height={16} /></span>
+  </button>
   <ul role="list">
     {#each PAGES as page, i (page.id)}
       <li>
@@ -49,13 +56,14 @@
           type="button"
           class:active={page.id === navigation.page}
           aria-current={page.id === navigation.page ? "page" : undefined}
+          aria-label={page.label}
           title={`${page.label} (Ctrl+${i + 1})`}
           bind:this={buttons[i]}
           onclick={() => select(page.id)}
           onkeydown={onkeydown}
         >
           <Icon name={page.icon} />
-          <span>{page.label}</span>
+          <span class="label">{page.label}</span>
         </button>
       </li>
     {/each}
@@ -66,17 +74,29 @@
   .sidebar {
     display: flex;
     flex-direction: column;
-    width: 13rem;
+    width: 200px;
     padding: var(--space-3);
     background: var(--surface-raised);
     border-right: 1px solid var(--border);
+    transition: width var(--motion) var(--ease-out);
   }
 
   .brand {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-2) var(--space-2) var(--space-5);
+    height: var(--control-lg);
+    margin: 0 0 var(--space-4);
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .brand:hover {
+    background: var(--surface-hover);
   }
 
   .glyph {
@@ -85,9 +105,8 @@
   }
 
   .wordmark {
-    font-weight: 700;
-    font-size: 1.1rem;
-    letter-spacing: 0.01em;
+    display: inline-flex;
+    color: var(--text);
   }
 
   ul {
@@ -99,40 +118,67 @@
     list-style: none;
   }
 
-  button {
+  li button {
     position: relative;
     display: flex;
     align-items: center;
     gap: var(--space-3);
     width: 100%;
-    padding: 0.55rem 0.75rem;
+    min-height: var(--control-lg);
+    padding: 0 var(--space-3);
     border: 0;
     border-radius: var(--radius-s);
     background: transparent;
     color: var(--text-muted);
     text-align: left;
     cursor: pointer;
+    transition:
+      background-color var(--motion-fast) var(--ease-out),
+      color var(--motion-fast) var(--ease-out);
   }
 
-  button:hover {
+  li button:hover {
     background: var(--surface-hover);
     color: var(--text);
   }
 
-  button.active {
+  li button.active {
     background: var(--accent-soft);
     color: var(--accent-strong);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
   }
 
-  button.active::before {
+  li button.active::before {
     content: "";
     position: absolute;
     left: 0;
-    top: 0.5rem;
-    bottom: 0.5rem;
+    top: var(--space-2);
+    bottom: var(--space-2);
     width: 3px;
     border-radius: 2px;
     background: var(--accent);
+  }
+
+  /* Narrow windows: icons only, the labels stay as tooltips and accessible names. */
+  @media (max-width: 1023px) {
+    .sidebar {
+      width: 64px;
+      padding: var(--space-3) var(--space-2);
+    }
+
+    .brand {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .wordmark,
+    .label {
+      display: none;
+    }
+
+    li button {
+      justify-content: center;
+      padding: 0;
+    }
   }
 </style>

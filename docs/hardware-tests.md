@@ -703,3 +703,48 @@ Then the app (`WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev` on this host), 
 | Date | Console | Steps | Notes |
 | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR) | headless plan only | app sync not run (user absent) |
+
+## Window and polish (desktop app)
+
+Checks that need the real WebKitGTK window rather than the browser preview. No console is
+needed; they can run with one attached, nothing is written to it.
+
+### Prerequisites
+
+- A debug build: `pnpm tauri dev`.
+- On Wayland, nothing extra: the app sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` itself.
+
+### 1. Window state
+
+1. Resize the window to about 1200 × 800 and move it; close it with the window button.
+2. Start it again: it opens at the same size (and position on X11; Wayland compositors place
+   windows themselves).
+3. Maximise, close, start again: it opens maximised.
+4. Try to shrink the window below 900 × 600: it stops there and the Library page keeps its
+   three columns with the sidebar collapsed to icons.
+
+### 2. Motion and reduced motion
+
+1. Switch pages: the new page fades in and rises slightly; nothing jumps.
+2. Trigger a toast (Settings, store an empty key): it slides in from the top and fades out.
+3. Set the desktop to reduce motion (GNOME: Accessibility → Reduced animation) and repeat:
+   pages and toasts appear at once, the cartridge glyph and the FEL halo do not pulse.
+
+### 3. Keyboard
+
+1. Tab from the sidebar into the Library page: the folder tree takes one Tab stop (the folder
+   being viewed), the grid one more (the focused or first tile), the detail panel after.
+2. In the grid: arrows, Home, End, PageUp and PageDown move and select, Shift extends, Space
+   toggles, Ctrl+A selects all, Enter opens a folder, Backspace goes up, Delete asks to
+   remove the selected games in the detail panel, Escape clears the selection.
+3. In the tree: arrows move, Right expands, Left collapses then goes up, F2 renames, Delete
+   asks to remove the folder.
+4. Open the Kernel page's More menu with the keyboard: the first item takes focus, arrows
+   move, Escape closes and returns focus to the button.
+5. Every icon button announces a name (check with Orca or the Accessibility Inspector).
+
+### Results
+
+| Date | Build | Platform | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 2026-10-21 | 33242c5+task 11, debug | Arch, GNOME 51 Wayland, WebKitGTK | partial | Native Wayland start without `GDK_BACKEND`: no DMA-BUF protocol error, console identified in 2.5 s (the app sets the variable itself). Window state, motion and keyboard checks not driven by hand (no input tool); layout at 900 × 600 checked in the browser preview only. |

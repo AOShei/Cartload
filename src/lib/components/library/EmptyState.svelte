@@ -63,7 +63,7 @@
 
 <style>
   .empty {
-    max-width: 44rem;
+    max-width: 704px;
     margin: var(--space-5) auto;
     padding: var(--space-6);
     display: flex;
@@ -99,16 +99,20 @@
 
   .mark {
     flex: none;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: var(--surface-raised);
     border: 1px solid var(--border-strong);
-    font-weight: 600;
-    font-size: 0.85rem;
+    font-weight: var(--weight-semibold);
+    font-size: var(--text-md);
+    transition:
+      background-color var(--motion) var(--ease-out),
+      border-color var(--motion) var(--ease-out),
+      color var(--motion) var(--ease-out);
   }
 
   .done .mark {

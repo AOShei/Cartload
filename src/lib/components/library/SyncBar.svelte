@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { slide } from "svelte/transition";
   import Icon from "../Icon.svelte";
+  import { NORMAL, ms } from "../../motion";
   import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore } from "../../state";
 
   const status = $derived(consoleStore.report?.status ?? null);
@@ -68,7 +70,7 @@
 
 <footer class="sync card" aria-label="Sync">
   {#if syncStore.reviewing && plan}
-    <section class="panel" aria-label="Sync plan">
+    <section class="panel" aria-label="Sync plan" transition:slide={{ duration: ms(NORMAL) }}>
       <div class="panel-head">
         <h3>What the sync will do</h3>
         <span class="muted num">{plan.games} games, {plan.originals} built in, {plan.folders} folders · {formatBytes(plan.total_size)} on the console</span>
@@ -82,6 +84,8 @@
           <ul class="files mono">
             {#each plan.uploads as file (file.path)}
               <li><span>{file.path.replace(/^\.\//, "")}</span><span class="num">{formatBytes(file.size)}</span></li>
+            {:else}
+              <li class="muted">Nothing to upload.</li>
             {/each}
           </ul>
         </details>
@@ -90,6 +94,8 @@
           <ul class="files mono">
             {#each [...plan.deletions, ...plan.link_deletions, ...plan.empty_dirs] as path (path)}
               <li><span>{path.replace(/^\.\//, "")}</span></li>
+            {:else}
+              <li class="muted">Nothing to remove.</li>
             {/each}
           </ul>
         </details>
@@ -97,14 +103,14 @@
       <p class="muted">{plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} already on the console stay as they are. The console's menu restarts when the sync ends.</p>
       <div class="panel-actions">
         <button type="button" class="btn btn-primary" onclick={() => syncStore.run()} disabled={!canSync}>
-          <Icon name="sync" size={16} />
-          <span>Sync now</span>
+          {#if syncStore.starting}<span class="spinner on-accent" aria-hidden="true"></span>{:else}<Icon name="sync" size={16} />{/if}
+          <span>{syncStore.starting ? "Starting…" : "Sync now"}</span>
         </button>
         <button type="button" class="btn btn-quiet" onclick={() => syncStore.cancelReview()}>Cancel</button>
       </div>
     </section>
   {:else if running || snapshot.state === "done" || snapshot.state === "failed"}
-    <section class="panel progress" aria-live="polite" aria-label="Sync progress">
+    <section class="panel progress" aria-live="polite" aria-label="Sync progress" aria-busy={running} transition:slide={{ duration: ms(NORMAL) }}>
       <div class="panel-head">
         {#if running}
           <h3>Syncing games{snapshot.step ? `: step ${snapshot.step.index} of ${snapshot.step.total}, ${snapshot.step.label.toLowerCase()}` : "…"}</h3>
@@ -153,7 +159,7 @@
 
   <div class="bar-row">
     <div class="block">
-      <span class="label">Console</span>
+      <span class="caps">Console</span>
       {#if storage}
         <div class="meter" title="Used, planned, total">
           <span class="planned" style:width="{plannedPercent}%"></span>
@@ -165,12 +171,15 @@
       {/if}
     </div>
     <div class="block">
-      <span class="label">This library</span>
+      <span class="caps">This library</span>
       <span class="num muted">{formatBytes(libSize)} · {libraryStore.gameCount} game{libraryStore.gameCount === 1 ? "" : "s"}</span>
     </div>
     <div class="block pending" class:warn={plan !== null && !plan.fits}>
-      <span class="label">Changes</span>
-      <span class="muted">{pending}</span>
+      <span class="caps">Changes</span>
+      <span class="muted pending-text">
+        {#if syncStore.planning && !plan}<span class="spinner spinner-sm" aria-hidden="true"></span>{/if}
+        {pending}
+      </span>
     </div>
     <button type="button" class="btn btn-primary" onclick={() => syncStore.review()} disabled={!canSync || syncStore.reviewing}>
       <Icon name="sync" size={16} />
@@ -191,7 +200,7 @@
     align-items: center;
     gap: var(--space-5);
     padding: var(--space-2) var(--space-4);
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .block {
@@ -201,24 +210,27 @@
     min-width: 0;
   }
 
-  .label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
+  .block .caps {
+    font-size: var(--text-xs);
   }
 
   .pending {
     flex: 1;
   }
 
-  .pending.warn span:last-child {
+  .pending-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .pending.warn .pending-text {
     color: var(--warn);
   }
 
   .meter {
     position: relative;
-    width: 12rem;
+    width: 192px;
     height: 6px;
     border-radius: 999px;
     background: var(--border);
@@ -231,6 +243,7 @@
     top: 0;
     height: 100%;
     border-radius: 999px;
+    transition: width var(--motion) var(--ease-out);
   }
 
   .meter .used {
@@ -248,7 +261,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    font-size: 0.9rem;
+    font-size: var(--text-md);
     max-height: 40vh;
     overflow: auto;
   }
@@ -261,8 +274,6 @@
   }
 
   .panel h3 {
-    margin: 0;
-    font-size: 1rem;
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
@@ -292,9 +303,9 @@
     margin: var(--space-1) 0 0;
     padding: 0;
     list-style: none;
-    max-height: 9rem;
+    max-height: 144px;
     overflow: auto;
-    font-size: 0.75rem;
+    font-size: var(--text-sm);
   }
 
   .files li {
@@ -320,11 +331,11 @@
     display: block;
     height: 100%;
     background: var(--accent);
-    transition: width 150ms linear;
+    transition: width var(--motion-fast) linear;
   }
 
   .log {
-    font-size: 0.75rem;
+    font-size: var(--text-sm);
     white-space: pre-wrap;
     word-break: break-word;
   }
@@ -334,7 +345,12 @@
     white-space: pre-wrap;
     word-break: break-word;
     user-select: text;
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     color: var(--text-muted);
+  }
+
+  .spinner.on-accent {
+    border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
+    border-top-color: var(--on-accent);
   }
 </style>

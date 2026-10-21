@@ -52,6 +52,11 @@ class Preferences {
     } catch {
       // Unreadable storage: keep the defaults.
     }
+    // `?theme=light|dark` forces a theme for previews and screenshots, without storing it.
+    const forced = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("theme");
+    if (isTheme(forced) && forced !== "system") {
+      this.theme = forced;
+    }
     applyTheme(this.theme);
   }
 

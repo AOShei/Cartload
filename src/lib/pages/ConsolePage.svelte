@@ -24,7 +24,11 @@
       case "fel":
         return status.check.kind === "fel" && status.check.r16
           ? { label: "Install kernel", run: () => navigation.go("kernel") }
-          : { label: "Check FEL mode", run: () => void consoleStore.probeFel() };
+          : {
+              label: consoleStore.probing ? "Checking…" : "Check FEL mode",
+              run: () => void consoleStore.probeFel(),
+              busy: consoleStore.probing,
+            };
       default:
         return null;
     }
@@ -86,8 +90,13 @@
           spellcheck="false"
         />
         <button type="submit" class="btn" disabled={running || !command.trim()}>
-          <Icon name="play" size={16} />
-          Run
+          {#if running}
+            <span class="spinner" aria-hidden="true"></span>
+            Running…
+          {:else}
+            <Icon name="play" size={16} />
+            Run
+          {/if}
         </button>
       </form>
       {#if result}
@@ -115,13 +124,13 @@
   }
 
   .raw {
-    font-size: 0.85rem;
+    font-size: var(--text-md);
   }
 
   .raw pre {
     margin: var(--space-2) 0 0;
     padding: var(--space-3);
-    max-height: 20rem;
+    max-height: 320px;
     overflow: auto;
     background: var(--surface-raised);
     border-radius: var(--radius-s);

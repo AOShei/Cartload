@@ -154,27 +154,27 @@ pub fn make_cover(bytes: &[u8], options: &CoverOptions) -> Result<CoverSet> {
 pub fn encode_png(image: &RgbaImage, quantize: bool) -> Result<Vec<u8>> {
     let (width, height) = image.dimensions();
     let pixels = image.as_raw();
-    let opaque = pixels.chunks_exact(4).all(|p| p[3] == 0xFF);
+    let opaque = rgba(pixels).iter().all(|p| p[3] == 0xFF);
     let mut out = Vec::new();
     let mut encoder = png::Encoder::new(Cursor::new(&mut out), width, height);
     encoder.set_depth(png::BitDepth::Eight);
     let data: Vec<u8> = if quantize {
         let (palette, indices) = palette(pixels);
         encoder.set_color(png::ColorType::Indexed);
-        let rgb: Vec<u8> = palette
-            .chunks_exact(4)
+        let rgb: Vec<u8> = rgba(&palette)
+            .iter()
             .flat_map(|p| [p[0], p[1], p[2]])
             .collect();
         encoder.set_palette(rgb);
         if !opaque {
-            let alpha: Vec<u8> = palette.chunks_exact(4).map(|p| p[3]).collect();
+            let alpha: Vec<u8> = rgba(&palette).iter().map(|p| p[3]).collect();
             encoder.set_trns(alpha);
         }
         indices
     } else if opaque {
         encoder.set_color(png::ColorType::Rgb);
-        pixels
-            .chunks_exact(4)
+        rgba(pixels)
+            .iter()
             .flat_map(|p| [p[0], p[1], p[2]])
             .collect()
     } else {
@@ -191,11 +191,15 @@ pub fn encode_png(image: &RgbaImage, quantize: bool) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+/// The pixels of an RGBA buffer as 4-byte groups (a trailing partial pixel is ignored).
+fn rgba(pixels: &[u8]) -> &[[u8; 4]] {
+    pixels.as_chunks::<4>().0
+}
+
 /// A palette of at most 256 RGBA entries and one index per pixel.
 fn palette(pixels: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let mut exact: BTreeMap<[u8; 4], u8> = BTreeMap::new();
-    for pixel in pixels.chunks_exact(4) {
-        let key = [pixel[0], pixel[1], pixel[2], pixel[3]];
+    for key in rgba(pixels).iter().copied() {
         if !exact.contains_key(&key) {
             if exact.len() == 256 {
                 exact.clear();
@@ -210,16 +214,13 @@ fn palette(pixels: &[u8]) -> (Vec<u8>, Vec<u8>) {
         for (colour, index) in &exact {
             palette[usize::from(*index)] = *colour;
         }
-        let indices = pixels
-            .chunks_exact(4)
-            .map(|p| exact[&[p[0], p[1], p[2], p[3]]])
-            .collect();
+        let indices = rgba(pixels).iter().map(|p| exact[p]).collect();
         return (palette.concat(), indices);
     }
     let quantizer = color_quant::NeuQuant::new(1, 256, pixels);
     let palette = quantizer.color_map_rgba();
-    let indices = pixels
-        .chunks_exact(4)
+    let indices = rgba(pixels)
+        .iter()
         .map(|p| quantizer.index_of(p) as u8)
         .collect();
     (palette, indices)

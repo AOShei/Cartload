@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fade } from "svelte/transition";
   import EmptyState from "../components/library/EmptyState.svelte";
   import FolderTree from "../components/library/FolderTree.svelte";
   import GameDetail from "../components/library/GameDetail.svelte";
   import GameGrid from "../components/library/GameGrid.svelte";
   import ImportPanel from "../components/library/ImportPanel.svelte";
   import SyncBar from "../components/library/SyncBar.svelte";
+  import Icon from "../components/Icon.svelte";
+  import { FAST, ms } from "../motion";
   import { consoleStore, libraryStore, syncStore } from "../state";
 
   onMount(() => {
@@ -28,9 +31,26 @@
   });
 </script>
 
-{#if libraryStore.empty && !libraryStore.importing && !libraryStore.importOpen}
+{#if !libraryStore.loaded}
+  <div class="empty-note state" aria-busy="true">
+    <span class="spinner" aria-hidden="true"></span>
+    <p>Reading the library…</p>
+  </div>
+{:else if libraryStore.error && !libraryStore.view}
+  <section class="card failed" aria-labelledby="library-failed">
+    <span class="failed-icon"><Icon name="warning" size={24} /></span>
+    <div>
+      <h2 id="library-failed">The library could not be read.</h2>
+      <p class="muted">{libraryStore.error}</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick={() => void libraryStore.load()} disabled={libraryStore.loading}>
+      <Icon name="refresh" size={16} />
+      Try again
+    </button>
+  </section>
+{:else if libraryStore.empty && !libraryStore.importing && !libraryStore.importOpen}
   <EmptyState />
-{:else if libraryStore.loaded || !libraryStore.loading}
+{:else}
   <div class="library">
     <aside class="card tree"><FolderTree /></aside>
     <section class="card centre">
@@ -42,22 +62,43 @@
     <aside class="card detail"><GameDetail /></aside>
     <div class="bar"><SyncBar /></div>
   </div>
-{:else}
-  <p class="muted">Loading the library…</p>
 {/if}
 
 {#if libraryStore.dragOver}
-  <div class="drop-overlay" aria-hidden="true">
+  <div class="drop-overlay" aria-hidden="true" transition:fade={{ duration: ms(FAST) }}>
     <div class="drop-card">Drop ROM files or folders to add them</div>
   </div>
 {/if}
 
 <style>
+  .state {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .failed {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-left: 5px solid var(--danger);
+  }
+
+  .failed div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .failed-icon {
+    display: inline-flex;
+    color: var(--danger);
+  }
+
   .library {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 14rem minmax(0, 1fr) 19rem;
+    grid-template-columns: 184px minmax(0, 1fr) 256px;
     grid-template-rows: minmax(0, 1fr) auto;
     gap: var(--space-3);
   }
@@ -96,12 +137,12 @@
     border-radius: var(--radius-l);
     background: var(--surface);
     box-shadow: var(--shadow-float);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
   }
 
-  @media (max-width: 1000px) {
+  @media (max-width: 1023px) {
     .library {
-      grid-template-columns: 12rem minmax(0, 1fr) 16rem;
+      grid-template-columns: 168px minmax(0, 1fr) 240px;
     }
   }
 </style>

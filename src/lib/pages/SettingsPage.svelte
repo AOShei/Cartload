@@ -1,19 +1,39 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { tgdbKeyGet, tgdbKeySet } from "../api/commands";
   import { AppError, inTauri } from "../api/tauri";
   import type { KeyStatus } from "../api/types";
+  import AppMark from "../components/AppMark.svelte";
   import Icon from "../components/Icon.svelte";
-  import { app, libraryStore, preferences, toasts, type Theme } from "../state";
+  import Wordmark from "../components/Wordmark.svelte";
+  import { app, libraryStore, navigation, preferences, toasts, type Theme } from "../state";
 
   let keyStatus = $state<KeyStatus | null>(null);
+  let keyLoading = $state(false);
   let keyValue = $state("");
   let keyBusy = $state(false);
+  let confirmKeyRemoval = $state(false);
+  let about: HTMLElement | undefined = $state();
 
   onMount(() => {
     void libraryStore.start();
     if (inTauri) {
-      void tgdbKeyGet().then((status) => (keyStatus = status)).catch(() => {});
+      keyLoading = true;
+      void tgdbKeyGet()
+        .then((status) => (keyStatus = status))
+        .catch((error: unknown) => toasts.error(`Could not read the key status: ${AppError.from(error).message}`))
+        .finally(() => (keyLoading = false));
+    }
+  });
+
+  /** The sidebar brand opens the About panel. */
+  $effect(() => {
+    if (navigation.section === "about" && about) {
+      navigation.tookSection();
+      void tick().then(() => {
+        about?.scrollIntoView({ block: "start" });
+        about?.focus({ preventScroll: true });
+      });
     }
   });
 
@@ -23,6 +43,7 @@
       return;
     }
     keyBusy = true;
+    confirmKeyRemoval = false;
     try {
       keyStatus = await tgdbKeySet(clear ? null : keyValue);
       keyValue = "";
@@ -39,6 +60,12 @@
     { id: "system", label: "Follow the system", hint: "Light or dark, as the desktop is set." },
     { id: "light", label: "Light", hint: "" },
     { id: "dark", label: "Dark", hint: "" },
+  ];
+
+  const credits: { name: string; by: string; url: string; what: string }[] = [
+    { name: "hakchi", by: "madmonkey", url: "github.com/madmonkey1907/hakchi", what: "the kernel and the device-side tools Cartload installs and talks to (GPL-3)." },
+    { name: "hakchi2 CE", by: "TeamShinkansen", url: "github.com/TeamShinkansen/Hakchi2-CE", what: "the reference for the console protocol, the FEL sequence and the sync (GPL-3)." },
+    { name: "TheGamesDB", by: "the TheGamesDB community", url: "thegamesdb.net", what: "cover art and game metadata, fetched with your own API key." },
   ];
 </script>
 
@@ -85,11 +112,15 @@
 
   <section class="card" aria-labelledby="library-heading">
     <h2 id="library-heading">Library</h2>
-    <p class="muted">Games are kept in <span class="mono">{libraryStore.view?.root ?? "the user data directory"}</span>.</p>
+    <p class="muted">
+      Games are kept in <span class="mono path">{libraryStore.view?.root ?? "the user data directory"}</span>.
+    </p>
     <h3>TheGamesDB key</h3>
     <p class="muted">
       Cover art and metadata come from TheGamesDB, which needs a free API key from thegamesdb.net.
-      {#if keyStatus?.environment}
+      {#if keyLoading}
+        Checking the stored key…
+      {:else if keyStatus?.environment}
         The CARTLOAD_TGDB_KEY variable is set and is used.
       {:else if keyStatus?.stored}
         A key is stored.
@@ -97,31 +128,86 @@
         No key yet.
       {/if}
       {#if keyStatus?.remaining !== null && keyStatus?.remaining !== undefined}
-        {keyStatus.remaining} requests left this month.
+        <span class="num">{keyStatus.remaining}</span> requests left this month.
       {/if}
     </p>
     <form class="key" onsubmit={(e) => { e.preventDefault(); void saveKey(false); }}>
-      <input type="password" bind:value={keyValue} placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"} aria-label="TheGamesDB API key" autocomplete="off" />
-      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>Store</button>
-      {#if keyStatus?.stored}
-        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => saveKey(true)}>Remove</button>
+      <input
+        type="password"
+        bind:value={keyValue}
+        placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"}
+        aria-label="TheGamesDB API key"
+        autocomplete="off"
+        disabled={keyBusy}
+      />
+      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>
+        {#if keyBusy}<span class="spinner" aria-hidden="true"></span>{/if}
+        Store
+      </button>
+      {#if keyStatus?.stored && !confirmKeyRemoval}
+        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => (confirmKeyRemoval = true)}>
+          Remove…
+        </button>
       {/if}
     </form>
+    {#if confirmKeyRemoval}
+      <div class="confirm" role="group" aria-label="Confirm removing the key">
+        <p>Remove the stored key? Fetching art stops working until a key is stored again.</p>
+        <div class="confirm-actions">
+          <button type="button" class="btn btn-danger" disabled={keyBusy} onclick={() => saveKey(true)}>Remove key</button>
+          <button type="button" class="btn btn-quiet" onclick={() => (confirmKeyRemoval = false)}>Keep it</button>
+        </div>
+      </div>
+    {/if}
   </section>
 
-  <section class="card" aria-labelledby="about-heading">
-    <h2 id="about-heading">About</h2>
+  <section class="card about" aria-labelledby="about-heading" bind:this={about} tabindex="-1">
+    <div class="identity">
+      <AppMark size={64} />
+      <div class="identity-text">
+        <h2 id="about-heading" class="visually-hidden">About Cartload</h2>
+        <span class="wordmark"><Wordmark height={22} label="Cartload" /></span>
+        <p class="muted">
+          {#if app.version}
+            Version <span class="num">{app.version.app}</span>{app.version.debug ? ", debug build" : ""}
+          {:else if app.versionError}
+            Version unknown ({app.versionError})
+          {:else}
+            Reading the version…
+          {/if}
+        </p>
+      </div>
+    </div>
+    <p>
+      Installs the hakchi kernel on NES, SNES and Mega Drive Classic Mini consoles and keeps a
+      games library in sync with them.
+    </p>
+    <p class="muted">
+      Free software under the GNU General Public License, version 3 or later. Source at
+      <span class="mono">github.com/AOShei/Cartload</span>.
+    </p>
+    <h3>Built on</h3>
+    <ul class="credits">
+      {#each credits as credit (credit.name)}
+        <li>
+          <strong>{credit.name}</strong> by {credit.by}: {credit.what}
+          <span class="mono muted">{credit.url}</span>
+        </li>
+      {/each}
+    </ul>
+    <p class="muted">
+      Made with Tauri, Rust and Svelte. Cartload is a from-scratch implementation and shares no code with hakchi2 CE.
+    </p>
     {#if app.version}
-      <p>Cartload {app.version.app}{app.version.debug ? " (debug build)" : ""}</p>
-      <ul class="crates muted">
-        {#each app.version.crates as crate (crate)}
-          <li class="num">{crate}</li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="muted">Version information is only available inside the desktop app.</p>
+      <details class="crates">
+        <summary>Linked crates</summary>
+        <ul class="muted">
+          {#each app.version.crates as crate (crate)}
+            <li class="num">{crate}</li>
+          {/each}
+        </ul>
+      </details>
     {/if}
-    <p class="muted">GPL-3.0-or-later. Built on hakchi by madmonkey and hakchi2 CE by TeamShinkansen.</p>
   </section>
 </div>
 
@@ -130,7 +216,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-    max-width: 48rem;
+    max-width: 768px;
   }
 
   .card {
@@ -161,15 +247,13 @@
     color: var(--text-muted);
   }
 
-  .crates {
-    margin: 0;
-    padding-left: 1.2rem;
-    font-size: 0.85rem;
+  .path {
+    user-select: text;
+    overflow-wrap: anywhere;
   }
 
   h3 {
     margin-top: var(--space-2);
-    font-size: 0.95rem;
   }
 
   .key {
@@ -179,9 +263,47 @@
 
   .key input {
     flex: 1;
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-s);
-    background: var(--surface);
+  }
+
+  .about:focus-visible {
+    outline-offset: 0;
+  }
+
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .identity-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .wordmark {
+    display: inline-flex;
+    color: var(--text);
+  }
+
+  .credits {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .credits .mono {
+    user-select: text;
+  }
+
+  .crates {
+    font-size: var(--text-md);
+  }
+
+  .crates ul {
+    margin: var(--space-1) 0 0;
+    padding-left: 20px;
   }
 </style>

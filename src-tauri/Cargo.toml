@@ -24,6 +24,8 @@ tauri-build = { version = "2.7", features = [] }
 tauri = { version = "2.12", features = [] }
 # Native open / save dialogs (the stock kernel dump, a kernel file for uninstall).
 tauri-plugin-dialog = "2"
+# Remembers the window size, position and maximised state between runs.
+tauri-plugin-window-state = "2"
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
