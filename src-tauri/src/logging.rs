@@ -221,7 +221,8 @@ impl<S: Subscriber> Layer<S> for UiLayer {
 /// What reaches the UI: everything at `info` and above, plus `debug` from the app and the
 /// cartload crates (each command sent to the console, USB details).
 pub const UI_FILTER: &str = "info,cartload_app_lib=debug,cartload_console=debug,\
-                             cartload_fel=debug,cartload_hmod=debug,cartload_library=debug";
+                             cartload_fel=debug,cartload_hmod=debug,cartload_library=debug,\
+                             cartload_flow=debug";
 
 /// Installs the process-wide tracing subscriber: readable output on stderr (level from
 /// `RUST_LOG`, default `info`) and the UI feed. Returns the ring buffer and the receiving end

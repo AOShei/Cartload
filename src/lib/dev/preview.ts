@@ -1,7 +1,7 @@
 /** Fixtures for `pnpm dev` in a plain browser, where no backend exists: `?preview=<state>`
  *  shows one of the states. The wording mirrors `src-tauri/src/status.rs`. */
 
-import type { StatusReport } from "../api/types";
+import type { FlowFailure, FlowSnapshot, PackageStatus, StatusReport, StepSnapshot } from "../api/types";
 
 const NOTHING = "Nothing found. Connect the console with USB and turn it on.";
 
@@ -131,5 +131,212 @@ export function previewReport(): StatusReport {
   const name =
     typeof location !== "undefined" ? new URLSearchParams(location.search).get("preview") : null;
   const make = (name && fixtures[name]) || fixtures["disconnected"]!;
+  return make();
+}
+
+const INSTALL_STEPS: [string, string, string][] = [
+  ["memboot", "Boot from memory", "Boot the hakchi kernel from RAM: through FEL, or with kexec from a running hakchi kernel"],
+  ["wait-console", "Wait for the console", "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"],
+  ["detect", "Identify the console", "Run the identification sequence and check that the console is in the memboot shell"],
+  ["check-md", "Mega Drive check", "Refuse to install over Project Lunar on a Mega Drive Mini"],
+  ["grow", "Grow the data partition", "Merge the unused UDISK partition into the data partition (sunxi-part grow)"],
+  ["reboot-grown", "Reboot into the grown partition", "Boot the kernel again with kexec so it sees the grown partition"],
+  ["wait-console", "Wait for the console", "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"],
+  ["detect", "Identify the console", "Run the identification sequence and check that the console is in the memboot shell"],
+  ["prepare", "Prepare the install", "Set the install flags and create the transfer directory"],
+  ["upload", "Upload the package", "Upload hakchi.hmod to /hakchi/transfer and check its MD5"],
+  ["install", "Run the installer", "Run the device-side installer (boot): back up the stock kernel, flash u-boot and the hakchi kernel, install the rootfs, reboot"],
+  ["wait-console", "Wait for the console", "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"],
+  ["verify", "Verify the install", "Reconnect and check the installed versions against the package"],
+];
+
+function pendingSteps(): StepSnapshot[] {
+  return INSTALL_STEPS.map(([name, label, description], index) => ({
+    index,
+    name,
+    label,
+    description,
+    state: "pending",
+    started_at: null,
+    elapsed_ms: null,
+    message: null,
+    transfer: null,
+  }));
+}
+
+const FEL_FAILURE: FlowFailure = {
+  step_index: 0,
+  step_name: "memboot",
+  kind: "timeout",
+  title: "The console did not show up in FEL mode within 120 s.",
+  cause: "It is not in FEL mode, or the USB link is not working.",
+  next: "Power the console off, hold Reset, switch Power on, keep Reset held for two seconds and release it; check the USB cable and, on Linux, the udev rule for 1f3a:efe8.",
+  detail:
+    "step 1 (memboot) failed: a console in FEL mode (USB 1f3a:efe8) appearing did not happen within 120 s; power the console off, hold Reset, switch Power on, keep Reset held for two seconds and release it; check the USB cable and, on Linux, the udev rule for 1f3a:efe8",
+  wants_stock_kernel: false,
+  wants_force: false,
+};
+
+const flowFixtures: Record<string, () => FlowSnapshot> = {
+  idle: () => ({
+    seq: 0,
+    kind: null,
+    state: "idle",
+    steps: pendingSteps(),
+    current: null,
+    message: null,
+    failure: null,
+    cancel_pending: false,
+    started_at: null,
+    finished_at: null,
+  }),
+  running: () => {
+    const now = Date.now();
+    const steps = pendingSteps();
+    const finished: [number, StepSnapshot["state"], number, string | null][] = [
+      [0, "done", 4200, null],
+      [1, "done", 11300, null],
+      [2, "done", 900, null],
+      [3, "skipped", 300, "not a Mega Drive partition layout"],
+      [4, "done", 2600, null],
+      [5, "done", 6100, null],
+      [6, "done", 14800, null],
+      [7, "done", 800, null],
+      [8, "done", 400, null],
+    ];
+    for (const [index, state, elapsed, message] of finished) {
+      const step = steps[index]!;
+      step.state = state;
+      step.elapsed_ms = elapsed;
+      step.started_at = now - 60_000;
+      step.message = message;
+    }
+    const upload = steps[9]!;
+    upload.state = "running";
+    upload.started_at = now - 2_300;
+    upload.message = "uploading hakchi.hmod (9340382 bytes, hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey))";
+    upload.transfer = { label: "hakchi.hmod", done: 5_242_880, total: 9_340_382 };
+    return {
+      seq: 41,
+      kind: { kind: "install" },
+      state: "running",
+      steps,
+      current: 9,
+      message: upload.message,
+      failure: null,
+      cancel_pending: false,
+      started_at: now - 44_000,
+      finished_at: null,
+    };
+  },
+  failed: () => {
+    const now = Date.now();
+    const steps = pendingSteps();
+    const first = steps[0]!;
+    first.state = "failed";
+    first.started_at = now - 121_000;
+    first.elapsed_ms = 120_040;
+    first.message = FEL_FAILURE.detail;
+    return {
+      seq: 7,
+      kind: { kind: "install" },
+      state: "failed",
+      steps,
+      current: 0,
+      message: FEL_FAILURE.detail,
+      failure: FEL_FAILURE,
+      cancel_pending: false,
+      started_at: now - 121_000,
+      finished_at: now - 1_000,
+    };
+  },
+  done: () => {
+    const now = Date.now();
+    const steps = pendingSteps();
+    const timings = [4200, 11300, 900, 300, 2600, 6100, 14800, 800, 400, 3900, 184_000, 42_000, 1_900];
+    steps.forEach((step, index) => {
+      step.state = index === 3 ? "skipped" : "done";
+      step.message = index === 3 ? "not a Mega Drive partition layout" : null;
+      step.elapsed_ms = timings[index] ?? 1000;
+      step.started_at = now - 300_000;
+    });
+    return {
+      seq: 90,
+      kind: { kind: "install" },
+      state: "done",
+      steps,
+      current: null,
+      message: "installed: hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey) installed on SNES Classic Mini (EUR)",
+      failure: null,
+      cancel_pending: false,
+      started_at: now - 300_000,
+      finished_at: now - 20_000,
+    };
+  },
+  cancelled: () => {
+    const now = Date.now();
+    const steps = pendingSteps();
+    const first = steps[0]!;
+    first.message = "Stopped before it finished.";
+    return {
+      seq: 3,
+      kind: { kind: "memboot" },
+      state: "cancelled",
+      steps: steps.slice(0, 3),
+      current: null,
+      message: "Stopped.",
+      failure: null,
+      cancel_pending: false,
+      started_at: now - 9_000,
+      finished_at: now - 2_000,
+    };
+  },
+};
+
+/** The flow fixture named by `?flow=`, or none. */
+export function previewFlow(): FlowSnapshot | null {
+  const name =
+    typeof location !== "undefined" ? new URLSearchParams(location.search).get("flow") : null;
+  const make = name ? flowFixtures[name] : undefined;
+  return make ? make() : flowFixtures["idle"]!();
+}
+
+const packageFixtures: Record<string, () => PackageStatus> = {
+  cached: () => ({
+    package: {
+      path: "/home/user/.cache/cartload/hakchi.hmod",
+      source: "cached",
+      version: "v1.0.4-126",
+      boot: "1.0.3",
+      kernel: "3.4.113.29-madmonkey",
+      len: 9_340_382,
+      modified: Date.now() - 3 * 86_400_000,
+    },
+    cache_path: "/home/user/.cache/cartload/hakchi.hmod",
+    sources: [
+      "https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod",
+      "https://hakchi.net/hakchi/hmods/hakchi-latest.hmod",
+    ],
+    problem: null,
+  }),
+  none: () => ({
+    package: null,
+    cache_path: "/home/user/.cache/cartload/hakchi.hmod",
+    sources: ["https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod"],
+    problem: null,
+  }),
+  problem: () => ({
+    package: null,
+    cache_path: "/home/user/.cache/cartload/hakchi.hmod",
+    sources: [],
+    problem: "hakchi.hmod: /home/user/.cache/cartload/hakchi.hmod is not a readable gzip tar archive: invalid gzip header",
+  }),
+};
+
+/** The package fixture named by `?package=`, or the cached one. */
+export function previewPackage(): PackageStatus {
+  const name =
+    typeof location !== "undefined" ? new URLSearchParams(location.search).get("package") : null;
+  const make = (name && packageFixtures[name]) || packageFixtures["cached"]!;
   return make();
 }

@@ -1,5 +1,15 @@
 import { call } from "./tauri";
-import type { AppVersion, ExecResult, FelProbe, LogLine, StatusReport } from "./types";
+import type {
+  AppVersion,
+  ExecResult,
+  FelProbe,
+  FlowKind,
+  FlowSnapshot,
+  LogLine,
+  PackageStatus,
+  StatusReport,
+  StepSnapshot,
+} from "./types";
 
 /** Version of the Rust side and the crates linked into it. */
 export function fetchAppVersion(): Promise<AppVersion> {
@@ -29,4 +39,34 @@ export function logRecent(): Promise<LogLine[]> {
 /** Runs a shell line on the console. Only in builds with the `dev-exec` feature. */
 export function consoleExec(command: string): Promise<ExecResult> {
   return call<ExecResult>("console_exec", { command });
+}
+
+/** Starts a flow; progress follows as `flow-progress` events. */
+export function flowStart(kind: FlowKind): Promise<FlowSnapshot> {
+  return call<FlowSnapshot>("flow_start", { kind });
+}
+
+/** Asks the running flow to stop (after the current step when it writes to flash). */
+export function flowCancel(): Promise<FlowSnapshot> {
+  return call<FlowSnapshot>("flow_cancel");
+}
+
+/** The latest flow snapshot. */
+export function flowStatus(): Promise<FlowSnapshot> {
+  return call<FlowSnapshot>("flow_status");
+}
+
+/** The steps a flow would run, all pending. */
+export function flowSteps(kind: FlowKind): Promise<StepSnapshot[]> {
+  return call<StepSnapshot[]>("flow_steps", { kind });
+}
+
+/** The kernel package that would be installed. */
+export function packageInfo(): Promise<PackageStatus> {
+  return call<PackageStatus>("package_info");
+}
+
+/** Downloads the latest kernel package; progress follows as `package-download` events. */
+export function packageUpdate(): Promise<PackageStatus> {
+  return call<PackageStatus>("package_update");
 }

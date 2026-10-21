@@ -1,13 +1,17 @@
-//! The commands the frontend invokes. Thin: they read the shared state or ask the watcher.
+//! The commands the frontend invokes. Thin: they read the shared state, ask the watcher, or
+//! hand a flow to the runner.
 
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::{
+    PACKAGE_EVENT,
     error::CommandError,
+    flow::{FlowKind, FlowRunner, FlowSnapshot, StepSnapshot},
     logging::LogLine,
+    package::{self, DownloadProgress, PackageStatus},
     state::AppState,
     status::StatusReport,
     watcher::{FelProbe, Watcher},
@@ -35,6 +39,7 @@ pub fn version() -> AppVersion {
             cartload_console::version().to_owned(),
             cartload_hmod::version().to_owned(),
             cartload_library::version().to_owned(),
+            cartload_flow::version().to_owned(),
         ],
         features: features(),
         debug: cfg!(debug_assertions),
@@ -80,6 +85,82 @@ pub async fn log_recent(state: State<'_, Arc<AppState>>) -> Result<Vec<LogLine>,
     Ok(state.log.recent())
 }
 
+/// Starts a flow. The kernel package is attached when one is usable; flows that need it are
+/// refused without it. Progress arrives as `flow-progress` events; the returned snapshot is
+/// the first of them.
+#[tauri::command]
+pub async fn flow_start(
+    runner: State<'_, Arc<FlowRunner>>,
+    kind: FlowKind,
+) -> Result<FlowSnapshot, CommandError> {
+    if runner.is_running() {
+        return Err(CommandError::new(
+            "A flow is already running. Wait for it to finish, or stop it first.",
+        ));
+    }
+    let package = package::load_for_flow().await;
+    tracing::info!(
+        kind = kind.name(),
+        package = package.is_some(),
+        "flow_start"
+    );
+    runner.start(kind, package)
+}
+
+/// Asks the running flow to stop. Steps that write to the console's flash finish first.
+#[tauri::command]
+pub async fn flow_cancel(runner: State<'_, Arc<FlowRunner>>) -> Result<FlowSnapshot, CommandError> {
+    tracing::info!("flow_cancel");
+    runner.cancel()
+}
+
+/// The latest flow snapshot (idle when no flow has run).
+#[tauri::command]
+pub async fn flow_status(runner: State<'_, Arc<FlowRunner>>) -> Result<FlowSnapshot, CommandError> {
+    Ok(runner.snapshot())
+}
+
+/// The steps a flow would run, all pending, so the page can list them before starting.
+#[tauri::command]
+pub fn flow_steps(kind: FlowKind) -> Vec<StepSnapshot> {
+    FlowSnapshot::starting(&kind, &kind.steps(), 0).steps
+}
+
+/// The kernel package that would be installed, and where a download would go.
+#[tauri::command]
+pub async fn package_info() -> Result<PackageStatus, CommandError> {
+    Ok(package::status().await)
+}
+
+/// Downloads the latest kernel package into the cache, with `package-download` progress
+/// events, and returns the new status.
+#[tauri::command]
+pub async fn package_update(
+    app: AppHandle,
+    runner: State<'_, Arc<FlowRunner>>,
+) -> Result<PackageStatus, CommandError> {
+    if runner.is_running() {
+        return Err(CommandError::new(
+            "Wait for the current flow to finish before updating the package.",
+        ));
+    }
+    tracing::info!("package_update");
+    let mut last_reported = 0u64;
+    package::update(move |progress| {
+        let finished = progress.total.is_some_and(|total| progress.done >= total);
+        if progress.done == 0
+            || finished
+            || progress.done.saturating_sub(last_reported) >= 256 * 1024
+        {
+            last_reported = progress.done;
+            if let Err(error) = app.emit(PACKAGE_EVENT, DownloadProgress::from(progress)) {
+                tracing::warn!(%error, "could not emit {PACKAGE_EVENT}");
+            }
+        }
+    })
+    .await
+}
+
 /// What a shell line on the console produced.
 #[cfg(feature = "dev-exec")]
 #[derive(Debug, Clone, Serialize)]
@@ -120,11 +201,24 @@ mod tests {
     fn version_lists_all_crates() {
         let v = version();
         assert_eq!(v.app, env!("CARGO_PKG_VERSION"));
-        assert_eq!(v.crates.len(), 4);
+        assert_eq!(v.crates.len(), 5);
         assert!(v.crates.iter().any(|c| c.starts_with("cartload-fel")));
+        assert!(v.crates.iter().any(|c| c.starts_with("cartload-flow")));
         assert_eq!(
             v.features.contains(&"dev-exec".to_string()),
             cfg!(feature = "dev-exec")
+        );
+    }
+
+    #[test]
+    fn flow_steps_lists_pending_steps_with_labels() {
+        let steps = flow_steps(FlowKind::Install);
+        assert_eq!(steps.len(), 13);
+        assert_eq!(steps[0].label, "Boot from memory");
+        assert!(
+            steps
+                .iter()
+                .all(|s| s.state == crate::flow::StepState::Pending)
         );
     }
 }

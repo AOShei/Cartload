@@ -19,6 +19,13 @@ export const ICONS = {
   sun: "M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
   moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
   arrow: "M5 12h14M13 6l6 6-6 6",
+  stop: "M7 7h10v10H7z",
+  download: "M12 4v11M7 10l5 5 5-5M5 19h14",
+  more: "M6 12h.01M12 12h.01M18 12h.01",
+  save: "M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6",
+  circle: "M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0",
+  dash: "M7 12h10",
+  undo: "M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3",
 } as const;
 
 export type IconName = keyof typeof ICONS;

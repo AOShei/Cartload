@@ -555,3 +555,106 @@ a toast.
 | Date | Console | Host | 1 | 2 | 3 | 4 | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | Linux 6.18.57, Wayland, hakchi0 169.254.68.74 | not run (console attached all day) | OK: connected card and details in 2.4 s, both in the app and the `watch` example | not run | not run | native Wayland needed `WEBKIT_DISABLE_DMABUF_RENDERER=1`; GDK_BACKEND=x11 also works |
+
+## Kernel page (desktop app)
+
+Crate: `src-tauri`, binary `cartload-app`. The Kernel page runs the flows of "Install kernel"
+above through the app's `FlowRunner`: the same `cartload-flow` steps, the same time limits,
+observed as a step list with timing, the log of the run beneath, and a failure card with the
+likely cause and the next action. While a flow runs the console watcher is paused and the
+status bar reads "Installing hakchi: step n of 13, …". Everything in "Install kernel" about
+what is written to NAND applies. The headless equivalent of each section is the
+`cartload-flow` command named there; the app adds nothing to the device-side sequence.
+
+### Prerequisites
+
+- Everything from "Console page" (udev rule, link-local profile, the Wayland variable).
+- No `~/.cache/cartload/hakchi.hmod` for section 1 (move it aside); the package from
+  "Install kernel" for the others, either downloaded in section 1 or pointed at with
+  `CARTLOAD_HMOD=/path/to/hakchi.hmod` when the host is offline.
+- Console connected over USB, powered off, stock firmware, for section 2; the states named in
+  the other sections.
+
+### 1. Package download (no console needed)
+
+Open the Kernel page. Expected: stage 1 "Waiting for the console… Nothing found on USB yet.",
+stage 2 "No kernel package yet. It is a 9 MB download from the hakchi project's servers." with
+the accent "Download package" button, stage 3 "Install hakchi" disabled with "Waiting for the
+console (stage 1)." and the 13 pending steps, stage 4 a dashed "Result" placeholder. Click
+"Download package": the button turns into "x MB of 8.9 MB", the log (Ctrl+L) shows
+`downloaded kernel package` with the GitHub URL, a toast "Kernel package v1.0.4-126 is ready."
+appears and stage 2 shows "hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey)",
+"8.9 MB, downloaded <today>" and a quiet "Update package" button. The file is at
+`~/.cache/cartload/hakchi.hmod` (md5 `2e163a25c98b4c05bed274817abb38da`). Pull the network
+cable and click "Update package": an error toast "The package could not be downloaded: …"
+with the detail under its disclosure; the cached copy stays.
+
+### 2. Install from stock firmware
+
+Hold Reset and switch the console on. Expected: stage 1 turns green "Console in FEL mode.
+Ready." (the status bar agrees), "Install hakchi" becomes enabled. Click it. Expected, in
+order: the header shows the running time, the status bar reads "Installing hakchi: step 1 of
+13, boot from memory…" (blue dot), the Console page's card says the same with "Leave the
+console and the USB cable alone until it finishes.", and the step list follows the sequence
+of "Install kernel" section 2: "Boot from memory" (spinner, its last log line beneath, the
+boot image's progress bar), "Wait for the console", "Identify the console", "Mega Drive
+check" marked skipped with "not a Mega Drive partition layout", "Grow the data partition",
+"Reboot into the grown partition", the wait and identify again, "Prepare the install",
+"Upload the package" with the 8.9 MB progress bar, "Run the installer" (a few minutes; the
+installer's lines appear when it ends), "Wait for the console", "Verify the install". Each
+finished step shows its time on the right. The log beneath the list shows only this run's
+lines. At the end stage 3 turns green with the total time and "Install again" (quiet), stage 4
+reads "hakchi is installed." over the green console card "SNES Classic Mini, EUR, hakchi
+v1.0.4-126, N MB free" and the details list, exactly as on the Console page, with "Open
+Library" as the only accent button. The status bar is back to the connected sentence.
+
+Click "Install again" with the console now running hakchi: stage 1 reads "hakchi v1.0.4-126 is
+installed. Installing again updates or repairs it from the running kernel; no Reset needed.",
+the first step logs the kexec instead of FEL, "Grow the data partition" is skipped ("no UDISK partition left; the data partition is already
+grown"), the rest runs as above.
+
+### 3. Stop
+
+Start "Install hakchi" with the console switched off. "Boot from memory" waits (its line reads
+"waiting up to 120 s for a console in FEL mode…"). Click "Stop": within a second stage 3 shows
+"Boot from memory" pending again with "Stopped before it finished.", stage 4 "Stopped. Nothing
+more was changed." with "Continue", the status bar goes back to "Nothing found". "Continue"
+starts the same flow again. Clicking "Stop" during "Run the installer" instead shows "Stopping
+after this step…" and the amber note; the flow stops once the installer has finished.
+
+### 4. Failure
+
+Start "Install hakchi" with the console switched off and wait 120 s. Expected: "Boot from
+memory" turns red with the raw error beneath, stage 4 shows the red card "The console did not
+show up in FEL mode within 120 s.", "Failed at: Boot from memory", "Likely cause: It is not in
+FEL mode, or the USB link is not working.", "What to do: Power the console off, hold Reset,
+switch Power on, keep Reset held for two seconds and release it; check the USB cable and, on
+Linux, the udev rule for 1f3a:efe8.", the raw error under "Raw error", and "Try again". Put
+the console in FEL mode and click "Try again": the steps reset and the install runs.
+
+### 5. More menu: memboot, save the stock kernel, return to the original system
+
+With an installed console running hakchi, open "More" (closes on Escape or a click elsewhere):
+
+- "Boot from memory only": three steps; ends with stage 4 "The console runs hakchi from memory.
+  Nothing was written to it." and the green card "Console running the hakchi recovery kernel
+  from memory." Power-cycle
+  the console afterwards.
+- "Save the stock kernel…": the native save dialog ("Save the stock kernel", `kernel.img`).
+  Cancelling it starts nothing. Saving runs the six steps of "Dump stock kernel"; stage 4 reads
+  "The stock kernel was saved." with the path, and the file's md5 matches the one the log
+  prints. Running it again onto the same file skips "Save the stock kernel" as already done.
+- "Return to the original system…": nothing starts until the red confirmation "Return the
+  console to its original system" is clicked ("Keep hakchi" or Escape cancels). Then the eight
+  steps of "Uninstall"; stage 4 "The console is back on its original system." and the amber
+  Console card "Console attached over USB, but not in FEL mode." once the stock firmware has
+  booted. On a console without a backup the failure card reads "The console has no backup of
+  its original kernel." with "Choose a kernel dump…", which opens the native open dialog and
+  retries with the chosen file; a file with an unknown md5 gives "The chosen kernel file is
+  not a known stock kernel." with "Flash it anyway".
+
+### Results
+
+| Date | Console | Host | 1 | 2 | 3 | 4 | 5 | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | not yet run on hardware (a console running hakchi was attached during the task; no flow was started) |

@@ -55,6 +55,19 @@ pub enum ConsoleStatus {
         /// Everything the connect sequence reported.
         info: Box<ConsoleInfo>,
     },
+    /// A kernel flow owns the console; the watcher is paused until it ends.
+    Working {
+        /// The flow's name (`install`, `memboot`, `uninstall`, `dump-kernel`).
+        flow: String,
+        /// What the flow does (`Installing hakchi`).
+        title: String,
+        /// Label of the running step, once one has started.
+        step: Option<String>,
+        /// Zero-based index of the running step.
+        index: Option<usize>,
+        /// Number of steps.
+        total: usize,
+    },
 }
 
 /// Why nothing is connected.
@@ -291,6 +304,13 @@ impl ConsoleStatus {
                 info,
                 ..
             } => describe_connected(address, link, info),
+            Self::Working {
+                title,
+                step,
+                index,
+                total,
+                ..
+            } => describe_working(title, step.as_deref(), *index, *total),
         };
         StatusReport {
             status: self.clone(),
@@ -489,6 +509,43 @@ fn describe_booting(phase: BootPhase, address: Option<&str>, elapsed: u64) -> De
             waiting,
         ),
     }
+}
+
+/// `Installing hakchi: step 5 of 13, grow the data partition…`, or just the title with an
+/// ellipsis before the first step starts.
+pub fn working_sentence(
+    title: &str,
+    step: Option<&str>,
+    index: Option<usize>,
+    total: usize,
+) -> String {
+    match (step, index) {
+        (Some(step), Some(index)) => {
+            let mut chars = step.chars();
+            let step = match chars.next() {
+                Some(first) => first.to_lowercase().chain(chars).collect::<String>(),
+                None => String::new(),
+            };
+            format!("{title}: step {} of {total}, {step}…", index + 1)
+        }
+        _ => format!("{title}…"),
+    }
+}
+
+fn describe_working(
+    title: &str,
+    step: Option<&str>,
+    index: Option<usize>,
+    total: usize,
+) -> Description {
+    (
+        Tone::Busy,
+        working_sentence(title, step, index, total),
+        "Leave the console and the USB cable alone until it finishes. The Kernel page shows \
+         every step."
+            .into(),
+        vec![],
+    )
 }
 
 fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Description {
@@ -862,5 +919,37 @@ mod tests {
             back.info().map(|i| i.hwid.as_str()),
             Some("0461872a872802079d2818c76c118000")
         );
+    }
+
+    #[test]
+    fn working_reads_as_one_busy_sentence() {
+        let report = ConsoleStatus::Working {
+            flow: "install".into(),
+            title: "Installing hakchi".into(),
+            step: Some("Grow the data partition".into()),
+            index: Some(4),
+            total: 13,
+        }
+        .describe(7);
+        assert_eq!(report.tone, Tone::Busy);
+        assert_eq!(
+            report.title,
+            "Installing hakchi: step 5 of 13, grow the data partition…"
+        );
+        assert!(report.next.contains("Leave the console"));
+        assert!(!report.status.is_connected());
+        assert_eq!(report.status.state_name(), "working");
+        let report = ConsoleStatus::Working {
+            flow: "memboot".into(),
+            title: "Booting hakchi from memory".into(),
+            step: None,
+            index: None,
+            total: 3,
+        }
+        .describe(8);
+        assert_eq!(report.title, "Booting hakchi from memory…");
+        let json = serde_json::to_value(&report.status).expect("json");
+        assert_eq!(json["state"], "working");
+        assert_eq!(json["total"], 3);
     }
 }

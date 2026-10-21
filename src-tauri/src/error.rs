@@ -27,6 +27,12 @@ impl CommandError {
         self
     }
 
+    /// Replaces the message, keeping the detail.
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.message = message.into();
+        self
+    }
+
     /// Builds from any error: the message is its `Display`, the detail its source chain.
     pub fn from_error(error: &(dyn std::error::Error + 'static)) -> Self {
         let mut chain = Vec::new();

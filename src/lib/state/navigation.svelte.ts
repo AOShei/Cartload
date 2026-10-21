@@ -18,8 +18,21 @@ export const PAGES: readonly PageDef[] = [
   { id: "settings", label: "Settings", icon: "settings", hint: "Theme and advanced options." },
 ];
 
+function isPageId(value: string | null): value is PageId {
+  return PAGES.some((p) => p.id === value);
+}
+
+/** `?page=kernel` opens a page directly (browser previews and screenshots). */
+function initialPage(): PageId {
+  if (typeof location === "undefined") {
+    return "console";
+  }
+  const wanted = new URLSearchParams(location.search).get("page");
+  return isPageId(wanted) ? wanted : "console";
+}
+
 class Navigation {
-  page = $state<PageId>("console");
+  page = $state<PageId>(initialPage());
 
   go(page: PageId): void {
     this.page = page;

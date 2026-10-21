@@ -88,7 +88,15 @@ export type ConsoleStatus =
   | { state: "disconnected"; hint: Hint }
   | { state: "fel"; device: UsbDevice; check: FelCheck }
   | { state: "booting"; phase: BootPhase; address: string | null; since: number }
-  | { state: "connected"; address: string; link: Link; since: number; info: ConsoleInfo };
+  | { state: "connected"; address: string; link: Link; since: number; info: ConsoleInfo }
+  | {
+      state: "working";
+      flow: string;
+      title: string;
+      step: string | null;
+      index: number | null;
+      total: number;
+    };
 
 /** Payload of the `console-status` event and of `console_status` / `console_info`. */
 export interface StatusReport {
@@ -127,4 +135,98 @@ export interface ExecResult {
   exit_code: number | null;
   stdout: string;
   stderr: string;
+}
+
+/** `FlowKind` in flow.rs: which flow to run and its inputs. */
+export type FlowKind =
+  | { kind: "install" }
+  | { kind: "memboot" }
+  | { kind: "uninstall"; stock_kernel?: string | null; force_stock_kernel?: boolean }
+  | { kind: "dump_kernel"; path: string };
+
+export type StepState = "pending" | "running" | "done" | "failed" | "skipped";
+
+export interface Transfer {
+  label: string;
+  done: number;
+  total: number;
+}
+
+/** One step of a flow as the Kernel page shows it. */
+export interface StepSnapshot {
+  index: number;
+  name: string;
+  label: string;
+  description: string;
+  state: StepState;
+  started_at: number | null;
+  elapsed_ms: number | null;
+  message: string | null;
+  transfer: Transfer | null;
+}
+
+export type FlowState = "idle" | "running" | "done" | "failed" | "cancelled";
+
+export type FailureKind =
+  | "timeout"
+  | "wrong_state"
+  | "precondition"
+  | "device"
+  | "usb"
+  | "connection"
+  | "package"
+  | "file"
+  | "internal";
+
+/** A failed flow, explained (failure.rs). */
+export interface FlowFailure {
+  step_index: number | null;
+  step_name: string | null;
+  kind: FailureKind;
+  title: string;
+  cause: string;
+  next: string;
+  detail: string;
+  wants_stock_kernel: boolean;
+  wants_force: boolean;
+}
+
+/** Payload of the `flow-progress` event and of `flow_status` / `flow_start`. */
+export interface FlowSnapshot {
+  seq: number;
+  kind: FlowKind | null;
+  state: FlowState;
+  steps: StepSnapshot[];
+  current: number | null;
+  message: string | null;
+  failure: FlowFailure | null;
+  cancel_pending: boolean;
+  started_at: number | null;
+  finished_at: number | null;
+}
+
+export type PackageSource = "override" | "cached";
+
+export interface PackageInfo {
+  path: string;
+  source: PackageSource;
+  version: string;
+  boot: string | null;
+  kernel: string | null;
+  len: number;
+  modified: number | null;
+}
+
+/** What the Kernel page shows in step 2 (package.rs). */
+export interface PackageStatus {
+  package: PackageInfo | null;
+  cache_path: string | null;
+  sources: string[];
+  problem: string | null;
+}
+
+/** Payload of the `package-download` event. */
+export interface DownloadProgress {
+  done: number;
+  total: number | null;
 }

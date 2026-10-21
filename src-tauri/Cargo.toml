@@ -22,6 +22,8 @@ tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
 tauri = { version = "2.12", features = [] }
+# Native open / save dialogs (the stock kernel dump, a kernel file for uninstall).
+tauri-plugin-dialog = "2"
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
@@ -29,11 +31,19 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "std"] }
 tokio = { workspace = true, features = ["sync", "time", "macros", "rt-multi-thread", "signal"] }
 nusb = "0.2"
+dirs = "7"
 # The device crates without their CLIs; hmod and library keep their HTTP fetchers.
 cartload-fel.workspace = true
 cartload-console.workspace = true
 cartload-hmod = { workspace = true, features = ["fetch"] }
 cartload-library = { workspace = true, features = ["fetch"] }
+cartload-flow.workspace = true
+
+[dev-dependencies]
+async-trait = "0.1"
+flate2 = "1"
+tar = "0.4"
+tempfile = "3"
 
 [lints]
 workspace = true

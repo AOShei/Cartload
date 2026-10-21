@@ -355,6 +355,10 @@ impl Watcher {
     /// One look at the world, followed by whatever it calls for. With `force_identify` an
     /// open session is re-identified (the "refresh" command).
     pub async fn tick(&self, force_identify: bool) -> StatusReport {
+        if self.state.is_paused() {
+            debug!("watcher paused: a flow owns the console");
+            return self.state.report();
+        }
         let _serialised = self.state.tick_lock.lock().await;
         let prev = self.state.report().status;
         let obs = self.observe(&prev).await;
@@ -395,6 +399,11 @@ impl Watcher {
     /// Opens the first device with the FEL ids and asks for its version block, whatever the
     /// watcher thinks. The next tick shows the result.
     pub async fn fel_probe(&self) -> Result<FelProbe, CommandError> {
+        if self.state.is_paused() {
+            return Err(CommandError::new(
+                "A kernel flow is using the console. Try again when it has finished.",
+            ));
+        }
         let (device, check) = {
             let _serialised = self.state.tick_lock.lock().await;
             let scan = usb::scan().await?;
@@ -623,6 +632,7 @@ impl ConsoleStatus {
             Self::Fel { .. } => "fel",
             Self::Booting { .. } => "booting",
             Self::Connected { .. } => "connected",
+            Self::Working { .. } => "working",
         }
     }
 }
@@ -1029,5 +1039,28 @@ mod tests {
             1000,
         );
         assert!(matches!(action, Action::Connect { .. }));
+    }
+
+    #[tokio::test]
+    async fn a_paused_watcher_does_not_look() {
+        struct Count(std::sync::atomic::AtomicUsize);
+        impl StatusSink for Count {
+            fn status_changed(&self, _: &StatusReport) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+        let state = Arc::new(AppState::new(Arc::new(crate::logging::LogBuffer::new(8))));
+        let sink = Arc::new(Count(std::sync::atomic::AtomicUsize::new(0)));
+        let watcher = Watcher::new(Arc::clone(&state), sink.clone(), WatcherOptions::default());
+        let before = state.report();
+        let guard = state.pause();
+        let report = watcher.tick(true).await;
+        assert!(
+            report.same_as(&before),
+            "the stored report comes back untouched"
+        );
+        assert_eq!(sink.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert!(watcher.fel_probe().await.is_err());
+        drop(guard);
     }
 }
