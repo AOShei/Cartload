@@ -1,0 +1,6 @@
+{
+    "code": 401,
+    "status": "This route requires and API key and no API key was provided.",
+    "remaining_monthly_allowance": 0,
+    "allowance_refresh_timer": 0
+}

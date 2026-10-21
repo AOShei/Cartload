@@ -1,0 +1,108 @@
+{
+    "code": 200,
+    "status": "Success",
+    "data": {
+        "count": 3,
+        "games": [
+            {
+                "id": 90210,
+                "game_title": "Chrono Trigger: Crimson Echoes",
+                "release_date": "2009-05-01",
+                "platform": 6,
+                "players": 1,
+                "overview": "An unofficial sequel built on the original game.",
+                "coop": "No",
+                "developers": [],
+                "publishers": [],
+                "alternates": null
+            },
+            {
+                "id": 1255,
+                "game_title": "Chrono Trigger",
+                "release_date": "1995-03-11",
+                "platform": 6,
+                "players": 1,
+                "overview": "Crono and his friends travel through time to stop Lavos, a creature that destroys the world in the year 1999.",
+                "coop": "No",
+                "developers": [1428],
+                "publishers": [4365],
+                "alternates": ["Chrono Trigger (JP)"]
+            },
+            {
+                "id": 1256,
+                "game_title": "Chrono Trigger (Beta)",
+                "release_date": null,
+                "platform": 6,
+                "players": 0,
+                "overview": null,
+                "coop": "No",
+                "developers": null,
+                "publishers": null,
+                "alternates": null
+            }
+        ]
+    },
+    "include": {
+        "boxart": {
+            "base_url": {
+                "original": "https://cdn.thegamesdb.net/images/original/",
+                "small": "https://cdn.thegamesdb.net/images/small/",
+                "thumb": "https://cdn.thegamesdb.net/images/thumb/",
+                "cropped_center_thumb": "https://cdn.thegamesdb.net/images/cropped_center_thumb/",
+                "medium": "https://cdn.thegamesdb.net/images/medium/",
+                "large": "https://cdn.thegamesdb.net/images/large/"
+            },
+            "data": {
+                "1255": [
+                    {
+                        "id": 12550,
+                        "type": "boxart",
+                        "side": "front",
+                        "filename": "boxart/front/1255-1.jpg",
+                        "resolution": "2100x1533"
+                    },
+                    {
+                        "id": 12551,
+                        "type": "boxart",
+                        "side": "back",
+                        "filename": "boxart/back/1255-1.jpg",
+                        "resolution": "2100x1533"
+                    },
+                    {
+                        "id": 12552,
+                        "type": "boxart",
+                        "side": "front",
+                        "filename": "boxart/front/1255-2.jpg",
+                        "resolution": "1536x1080"
+                    }
+                ],
+                "1256": [
+                    {
+                        "id": 12560,
+                        "type": "boxart",
+                        "side": "back",
+                        "filename": "boxart/back/1256-1.jpg",
+                        "resolution": null
+                    }
+                ]
+            }
+        },
+        "platform": {
+            "data": {
+                "6": {
+                    "id": 6,
+                    "name": "Super Nintendo (SNES)",
+                    "alias": "super-nintendo-snes"
+                }
+            }
+        }
+    },
+    "pages": {
+        "previous": null,
+        "current": "https://api.thegamesdb.net/v1/Games/ByGameName?apikey=test-key&name=Chrono+Trigger&fields=players%2Cpublishers%2Coverview%2Cplatform%2Ccoop%2Calternates&include=boxart%2Cplatform&filter%5Bplatform%5D=6&page=1",
+        "next": null
+    },
+    "remaining_monthly_allowance": 2951,
+    "extra_allowance": 0,
+    "allowance_refresh_timer": 2591000
+}

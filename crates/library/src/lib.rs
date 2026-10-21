@@ -12,10 +12,13 @@
 //!   as pure functions; [`menu::export`] assigns the `CLV-S-XXXXX` codes.
 //! - [`sync`](mod@sync): the file set for the console, the pure diff against the console's listing,
 //!   and the sync itself in the verified order.
+//! - [`art`]: cover art and metadata from TheGamesDB, with the hash → id index and the
+//!   allowance limiter; [`images`] makes the console's 228×204 cover and 40×40 thumbnail.
 //!
 //! The device-side formats follow hakchi2 CE (`NesApplication`, `SnesGame`, `DesktopFile`,
 //! `NesMenuCollection`, `SyncTask`) and were checked against a console CE had synced.
 
+pub mod art;
 pub mod codes;
 pub mod desktop;
 mod error;
@@ -27,6 +30,7 @@ pub mod menu;
 pub mod rom;
 pub mod sync;
 
+pub use art::{ApiKey, ArtOptions, ArtReport, fetch_art};
 pub use error::{Error, Result};
 pub use game::Game;
 pub use hashdb::HashDb;

@@ -45,6 +45,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 anyhow = { workspace = true, optional = true }
 clap = { version = "4", features = ["derive"], optional = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp"] }
+color_quant = "1"
 
 [dev-dependencies]
 tempfile = "3"

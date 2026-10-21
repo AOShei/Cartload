@@ -123,6 +123,57 @@ pub enum Error {
     #[error("the console type is not known; connect a console or pass --console")]
     UnknownConsole,
 
+    /// An image could not be decoded or encoded.
+    #[error("image: {0}")]
+    Image(String),
+
+    /// No TheGamesDB API key is available.
+    #[error(
+        "no TheGamesDB API key: set the {} environment variable or store one with \
+         `cartload-library key --set <KEY>`",
+        crate::art::KEY_ENV
+    )]
+    NoApiKey,
+
+    /// TheGamesDB rejected the API key.
+    #[error("TheGamesDB rejected the API key (HTTP {status}: {message})")]
+    InvalidApiKey {
+        /// HTTP status (401 or 403).
+        status: u16,
+        /// The API's status text.
+        message: String,
+    },
+
+    /// The monthly request allowance of the API key is used up.
+    #[error("TheGamesDB monthly allowance used up{}", match refresh_in_secs {
+        Some(secs) => format!("; it refreshes in {}", crate::art::human_duration(*secs)),
+        None => String::new(),
+    })]
+    AllowanceExhausted {
+        /// Seconds until the allowance refreshes, when the API said.
+        refresh_in_secs: Option<u64>,
+    },
+
+    /// TheGamesDB answered with an error or something unexpected.
+    #[error("TheGamesDB {endpoint}: HTTP {status}: {message}")]
+    Api {
+        /// The route (never the key).
+        endpoint: String,
+        /// The HTTP status.
+        status: u16,
+        /// The API's status text or what was wrong with the body.
+        message: String,
+    },
+
+    /// A request failed before an answer came back.
+    #[error("{url}: {message}")]
+    Transport {
+        /// The URL without the key.
+        url: String,
+        /// What went wrong.
+        message: String,
+    },
+
     /// Something in the menu or library is inconsistent.
     #[error("{0}")]
     Invalid(String),

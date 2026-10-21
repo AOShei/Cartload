@@ -1,0 +1,20 @@
+{
+    "code": 200,
+    "status": "Success",
+    "data": {
+        "count": 2,
+        "developers": {
+            "1428": {
+                "id": 1428,
+                "name": "Square"
+            },
+            "6037": {
+                "id": 6037,
+                "name": "Nintendo EAD"
+            }
+        }
+    },
+    "remaining_monthly_allowance": 2945,
+    "extra_allowance": 0,
+    "allowance_refresh_timer": 2590400
+}

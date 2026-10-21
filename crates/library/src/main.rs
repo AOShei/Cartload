@@ -13,7 +13,9 @@ use cartload_console::{
 };
 use cartload_library::{
     DevicePaths, HashDb, Library, LibraryConfig, Menu, MenuOptions, Structure, SyncEvent, SyncPlan,
+    art::{self, ApiKey, ArtEvent, ArtOptions, ArtSize, Client, CoverStatus, HttpTransport},
     hashdb,
+    images::CoverOptions,
     menu::{self, Entry, GameRef},
     sync::{self, commands, parse_link_listing, parse_listing},
 };
@@ -145,6 +147,83 @@ enum Command {
         #[arg(long, value_name = "FILE")]
         dest: Option<PathBuf>,
     },
+    /// Fetch cover art and metadata from TheGamesDB (key from CARTLOAD_TGDB_KEY, --key or
+    /// the stored one).
+    Art(ArtArgs),
+    /// Show, store or clear the TheGamesDB API key kept in library.json.
+    Key {
+        /// Store this key.
+        #[arg(long, value_name = "KEY", conflicts_with = "clear")]
+        set: Option<String>,
+
+        /// Remove the stored key.
+        #[arg(long)]
+        clear: bool,
+    },
+}
+
+/// `art` options.
+#[derive(Args, Clone)]
+struct ArtArgs {
+    /// Game codes (CLV-U-XXXXX).
+    #[arg(value_name = "CODE", required_unless_present = "all")]
+    codes: Vec<String>,
+
+    /// Every game that still has placeholder art (every game with --force).
+    #[arg(long, conflicts_with = "codes")]
+    all: bool,
+
+    /// API key for this run.
+    #[arg(long, value_name = "KEY")]
+    key: Option<String>,
+
+    /// Fetch again even when art is there and downloads are cached.
+    #[arg(long)]
+    force: bool,
+
+    /// Search again instead of reusing earlier search results.
+    #[arg(long)]
+    research: bool,
+
+    /// Search with this term instead of the title (one game).
+    #[arg(long, value_name = "NAME")]
+    search: Option<String>,
+
+    /// Use this TheGamesDB game id (one game).
+    #[arg(long, value_name = "ID")]
+    id: Option<u32>,
+
+    /// Use a local image file as the cover instead of TheGamesDB (one game, no network).
+    #[arg(long, value_name = "FILE")]
+    image: Option<PathBuf>,
+
+    /// Box art size to download: original, small, thumb, cropped_center_thumb, medium, large.
+    #[arg(long, value_name = "SIZE", default_value = "medium")]
+    size: String,
+
+    /// Do not touch publisher, release date, players or description.
+    #[arg(long)]
+    no_metadata: bool,
+
+    /// Replace metadata that was edited (by default only import defaults are filled).
+    #[arg(long)]
+    overwrite: bool,
+
+    /// Do not download clear logos.
+    #[arg(long)]
+    no_logo: bool,
+
+    /// Pad thumbnails to 40 pixels high with the image centred.
+    #[arg(long)]
+    center_thumbnail: bool,
+
+    /// Write true-colour PNGs instead of 8-bit palette ones.
+    #[arg(long)]
+    no_quantize: bool,
+
+    /// Print the report as JSON.
+    #[arg(long)]
+    json: bool,
 }
 
 #[tokio::main]
@@ -186,6 +265,8 @@ async fn main() -> Result<()> {
         } => run_plan(&library, &connect, &menu, json).await,
         Command::Sync { connect, menu, yes } => run_sync(&library, &connect, &menu, yes).await,
         Command::FetchDb { dest } => run_fetch_db(dest).await,
+        Command::Art(args) => run_art(&library, &args).await,
+        Command::Key { set, clear } => run_key(&library, set, clear),
     }
 }
 
@@ -269,7 +350,7 @@ fn run_list(library: &Library, json: bool) -> Result<()> {
     }
     for game in &games {
         println!(
-            "{}  {:<40}  {:<6}  {}  crc32 {:08X}  {}",
+            "{}  {:<40}  {:<6}  {}  crc32 {:08X}  {}{}",
             game.code,
             game.name,
             match game.system {
@@ -279,11 +360,12 @@ fn run_list(library: &Library, json: bool) -> Result<()> {
             },
             game.rom_file,
             game.crc32,
-            if game.tgdb_ids.is_empty() {
-                String::new()
-            } else {
-                format!("tgdb {:?}", game.tgdb_ids)
-            }
+            match (game.tgdb_id, game.tgdb_ids.is_empty()) {
+                (Some(id), _) => format!("tgdb {id}"),
+                (None, false) => format!("tgdb {:?}", game.tgdb_ids),
+                (None, true) => String::new(),
+            },
+            if game.placeholder_art { "  no art" } else { "" }
         );
     }
     Ok(())
@@ -651,5 +733,192 @@ async fn run_fetch_db(dest: Option<PathBuf>) -> Result<()> {
     let len = hashdb::fetch(&dest).await?;
     let db = HashDb::load(&dest)?;
     println!("{}: {len} bytes, {} records", dest.display(), db.len());
+    Ok(())
+}
+
+fn run_key(library: &Library, set: Option<String>, clear: bool) -> Result<()> {
+    let mut config = library.config()?;
+    if let Some(key) = set {
+        let key = ApiKey::new(&key).context("the key is empty")?;
+        config.tgdb_key = Some(key.as_str().to_string());
+        library.save_config(&config)?;
+        println!(
+            "key stored in {}",
+            library.root().join("library.json").display()
+        );
+    } else if clear {
+        config.tgdb_key = None;
+        library.save_config(&config)?;
+        println!("stored key removed");
+    }
+    let source = if std::env::var_os(art::KEY_ENV).is_some_and(|v| !v.is_empty()) {
+        format!("the {} environment variable", art::KEY_ENV)
+    } else if config.tgdb_key.is_some() {
+        "library.json".to_string()
+    } else {
+        format!(
+            "nowhere: set {} or run `cartload-library key --set <KEY>` (keys come from https://thegamesdb.net/)",
+            art::KEY_ENV
+        )
+    };
+    println!("TheGamesDB key comes from {source}");
+    if let Ok(store) = library.art_store() {
+        let allowance = store.allowance()?;
+        if allowance.remaining.is_some() {
+            println!("{allowance}");
+        }
+    }
+    Ok(())
+}
+
+async fn run_art(library: &Library, args: &ArtArgs) -> Result<()> {
+    let single = args.codes.len() == 1 && !args.all;
+    if (args.search.is_some() || args.id.is_some() || args.image.is_some()) && !single {
+        bail!("--search, --id and --image apply to one game code");
+    }
+    let cover = CoverOptions {
+        center_thumbnail: args.center_thumbnail,
+        quantize: !args.no_quantize,
+    };
+    if let Some(image) = &args.image {
+        let code = &args.codes[0];
+        let set = art::set_cover_from_file(library, code, image, &cover)?;
+        println!(
+            "{code}: cover {}x{} and thumbnail {}x{} from {} ({}x{})",
+            set.cover_size.0,
+            set.cover_size.1,
+            set.thumbnail_size.0,
+            set.thumbnail_size.1,
+            image.display(),
+            set.source_size.0,
+            set.source_size.1
+        );
+        return Ok(());
+    }
+
+    let config = library.config()?;
+    let key = ApiKey::resolve(args.key.as_deref(), config.tgdb_key.as_deref())
+        .ok_or(cartload_library::Error::NoApiKey)?;
+    let client = Client::new(HttpTransport::new()?, key);
+
+    let mut options = ArtOptions {
+        size: args.size.parse::<ArtSize>()?,
+        cover,
+        force: args.force,
+        research: args.research,
+        query: args.search.clone(),
+        metadata: !args.no_metadata,
+        overwrite: args.overwrite,
+        logo: !args.no_logo,
+    };
+    if let Some(id) = args.id {
+        art::set_match(library, &args.codes[0], id)?;
+        options.force = true;
+    }
+    let codes: Vec<String> = if args.all {
+        library
+            .games()?
+            .into_iter()
+            .filter(|g| args.force || g.placeholder_art || g.tgdb_id.is_none())
+            .map(|g| g.code)
+            .collect()
+    } else {
+        args.codes.clone()
+    };
+    if codes.is_empty() {
+        println!("every game has art already; use --force to fetch again");
+        return Ok(());
+    }
+    info!(games = codes.len(), size = %options.size, "fetching art");
+
+    let json = args.json;
+    let result = cartload_library::fetch_art(library, &client, &codes, &options, |event| {
+        if json {
+            return;
+        }
+        match event {
+            ArtEvent::Searching { code, query } => {
+                println!("{code}: searching TheGamesDB for {query:?}")
+            }
+            ArtEvent::Matched {
+                code,
+                id,
+                title,
+                source,
+            } => println!(
+                "{code}: TheGamesDB {id}{} ({})",
+                if title.is_empty() {
+                    String::new()
+                } else {
+                    format!(" {title:?}")
+                },
+                match source {
+                    art::MatchSource::HashDb => "hash database",
+                    art::MatchSource::Search => "search",
+                    art::MatchSource::Manual => "chosen",
+                }
+            ),
+            ArtEvent::NoMatch { code, queries } => {
+                println!("{code}: nothing found for {queries:?}")
+            }
+            ArtEvent::Fetching { code, what } => match code {
+                Some(code) => println!("{code}: fetching {what}"),
+                None => println!("fetching {what}"),
+            },
+            ArtEvent::Done { code, outcome } => {
+                let mut parts = Vec::new();
+                if let (Some(id), Some(title)) = (outcome.id, &outcome.title) {
+                    parts.push(format!("TheGamesDB {id} {title:?}"));
+                }
+                match outcome.cover {
+                    CoverStatus::Written => parts.push(format!(
+                        "cover {}x{}, thumbnail {}x{}{}",
+                        outcome.cover_size.map_or(0, |s| s.0),
+                        outcome.cover_size.map_or(0, |s| s.1),
+                        outcome.thumbnail_size.map_or(0, |s| s.0),
+                        outcome.thumbnail_size.map_or(0, |s| s.1),
+                        if outcome.from_cache { " (cached)" } else { "" }
+                    )),
+                    CoverStatus::Unchanged => parts.push("art unchanged".to_string()),
+                    CoverStatus::NoBoxArt => {
+                        parts.push("no box art on TheGamesDB, placeholder kept".to_string())
+                    }
+                    CoverStatus::NoMatch => parts.push("no match, placeholder kept".to_string()),
+                }
+                if outcome.logo == art::LogoState::Present {
+                    parts.push("clear logo".to_string());
+                }
+                if !outcome.metadata.is_empty() {
+                    parts.push(format!("metadata: {}", outcome.metadata.join(", ")));
+                }
+                println!("{code}: {}", parts.join("; "));
+            }
+            ArtEvent::Failed { code, error } => eprintln!("{code}: {error}"),
+        }
+    })
+    .await;
+    let report = match result {
+        Ok(report) => report,
+        Err(error) => {
+            if let Ok(store) = library.art_store()
+                && let Ok(allowance) = store.allowance()
+                && allowance.remaining.is_some()
+            {
+                eprintln!("{allowance}");
+            }
+            return Err(error.into());
+        }
+    };
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("{}", report.summary());
+        if report.allowance.remaining.is_some() {
+            println!("{}", report.allowance);
+        }
+    }
+    if report.failed() > 0 {
+        bail!("{} game(s) failed", report.failed());
+    }
     Ok(())
 }

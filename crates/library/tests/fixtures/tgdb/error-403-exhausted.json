@@ -1,0 +1,6 @@
+{
+    "code": 403,
+    "status": "Invalid API key was provided.",
+    "remaining_monthly_allowance": 0,
+    "allowance_refresh_timer": 1234567
+}

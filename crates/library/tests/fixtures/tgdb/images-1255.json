@@ -1,0 +1,48 @@
+{
+    "code": 200,
+    "status": "Success",
+    "data": {
+        "count": 1,
+        "base_url": {
+            "original": "https://cdn.thegamesdb.net/images/original/",
+            "small": "https://cdn.thegamesdb.net/images/small/",
+            "thumb": "https://cdn.thegamesdb.net/images/thumb/",
+            "cropped_center_thumb": "https://cdn.thegamesdb.net/images/cropped_center_thumb/",
+            "medium": "https://cdn.thegamesdb.net/images/medium/",
+            "large": "https://cdn.thegamesdb.net/images/large/"
+        },
+        "images": {
+            "1255": [
+                {
+                    "id": 12550,
+                    "type": "boxart",
+                    "side": "front",
+                    "filename": "boxart/front/1255-1.jpg",
+                    "resolution": "2100x1533"
+                },
+                {
+                    "id": 12551,
+                    "type": "boxart",
+                    "side": "back",
+                    "filename": "boxart/back/1255-1.jpg",
+                    "resolution": "2100x1533"
+                },
+                {
+                    "id": 31255,
+                    "type": "clearlogo",
+                    "side": null,
+                    "filename": "clearlogo/1255.png",
+                    "resolution": "400x141"
+                }
+            ]
+        }
+    },
+    "pages": {
+        "previous": null,
+        "current": "https://api.thegamesdb.net/v1/Games/Images?apikey=test-key&games_id=1255&filter%5Btype%5D=boxart%2Cclearlogo&page=1",
+        "next": null
+    },
+    "remaining_monthly_allowance": 2947,
+    "extra_allowance": 0,
+    "allowance_refresh_timer": 2590600
+}

@@ -1,0 +1,51 @@
+{
+    "code": 200,
+    "status": "Success",
+    "data": {
+        "count": 1,
+        "games": [
+            {
+                "id": 1256,
+                "game_title": "Chrono Trigger (Beta)",
+                "release_date": null,
+                "platform": 6,
+                "players": 0,
+                "overview": null,
+                "coop": "No",
+                "developers": null,
+                "publishers": null,
+                "alternates": null
+            }
+        ]
+    },
+    "include": {
+        "boxart": {
+            "base_url": {
+                "original": "https://cdn.thegamesdb.net/images/original/",
+                "small": "https://cdn.thegamesdb.net/images/small/",
+                "thumb": "https://cdn.thegamesdb.net/images/thumb/",
+                "cropped_center_thumb": "https://cdn.thegamesdb.net/images/cropped_center_thumb/",
+                "medium": "https://cdn.thegamesdb.net/images/medium/",
+                "large": "https://cdn.thegamesdb.net/images/large/"
+            },
+            "data": []
+        },
+        "platform": {
+            "data": {
+                "6": {
+                    "id": 6,
+                    "name": "Super Nintendo (SNES)",
+                    "alias": "super-nintendo-snes"
+                }
+            }
+        }
+    },
+    "pages": {
+        "previous": "https://api.thegamesdb.net/v1/Games/ByGameID?apikey=test-key&id=1255&fields=players%2Cpublishers%2Coverview%2Cplatform%2Ccoop%2Calternates&include=boxart%2Cplatform&page=1",
+        "current": "https://api.thegamesdb.net/v1/Games/ByGameID?apikey=test-key&id=1255&fields=players%2Cpublishers%2Coverview%2Cplatform%2Ccoop%2Calternates&include=boxart%2Cplatform&page=2",
+        "next": null
+    },
+    "remaining_monthly_allowance": 2948,
+    "extra_allowance": 0,
+    "allowance_refresh_timer": 2590700
+}

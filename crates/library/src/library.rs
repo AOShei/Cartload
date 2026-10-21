@@ -38,6 +38,9 @@ pub struct LibraryConfig {
     /// System code of the console last synced or planned against (`snes-eur`).
     #[serde(default)]
     pub last_console: Option<String>,
+    /// TheGamesDB API key, when stored here rather than in the environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tgdb_key: Option<String>,
 }
 
 /// The result of importing one ROM.
@@ -267,6 +270,8 @@ impl Library {
             application: prepared.system.application().to_string(),
             args: prepared.system.default_args().to_string(),
             tgdb_ids: record.map(|r| r.tgdb_ids.clone()).unwrap_or_default(),
+            tgdb_id: None,
+            description: String::new(),
             db_name: record.map(|r| r.name.clone()),
             snes: prepared.snes.clone(),
             nes: prepared.nes.clone(),
@@ -308,6 +313,49 @@ impl Library {
         std::fs::write(&thumbnail, images::thumbnail_placeholder(game.system)?)
             .map_err(|e| io_error("write", &thumbnail, e))?;
         Ok(replaced)
+    }
+
+    /// Replaces the cover and the thumbnail of a game with ones made from `image` (PNG, JPEG,
+    /// GIF or BMP), marks the art as real and saves the game.
+    pub fn set_cover(
+        &self,
+        game: &mut Game,
+        image: &[u8],
+        options: &images::CoverOptions,
+    ) -> Result<images::CoverSet> {
+        let dir = self.game_dir(&game.code);
+        if !dir.is_dir() {
+            return Err(Error::NoSuchGame(game.code.clone()));
+        }
+        let set = images::make_cover(image, options)?;
+        let cover = dir.join(game.cover_file());
+        std::fs::write(&cover, &set.cover).map_err(|e| io_error("write", &cover, e))?;
+        let thumbnail = dir.join(game.thumbnail_file());
+        std::fs::write(&thumbnail, &set.thumbnail).map_err(|e| io_error("write", &thumbnail, e))?;
+        game.placeholder_art = false;
+        self.save(game)?;
+        Ok(set)
+    }
+
+    /// Restores the placeholder cover and thumbnail of a game and saves it.
+    pub fn clear_cover(&self, game: &mut Game) -> Result<()> {
+        let dir = self.game_dir(&game.code);
+        if !dir.is_dir() {
+            return Err(Error::NoSuchGame(game.code.clone()));
+        }
+        let cover = dir.join(game.cover_file());
+        std::fs::write(&cover, images::cover_placeholder(game.system)?)
+            .map_err(|e| io_error("write", &cover, e))?;
+        let thumbnail = dir.join(game.thumbnail_file());
+        std::fs::write(&thumbnail, images::thumbnail_placeholder(game.system)?)
+            .map_err(|e| io_error("write", &thumbnail, e))?;
+        game.placeholder_art = true;
+        self.save(game)
+    }
+
+    /// The art index and cache of this library (`<root>/art`).
+    pub fn art_store(&self) -> Result<crate::art::ArtStore> {
+        crate::art::ArtStore::open(self.root.join(crate::art::ART_DIR))
     }
 
     /// The files of a game that go to the console's storage: everything in the directory
@@ -408,7 +456,8 @@ pub fn unix_seconds(time: SystemTime) -> i64 {
         .unwrap_or(0)
 }
 
-fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+/// Reads a JSON file.
+pub(crate) fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
     let text = std::fs::read_to_string(path).map_err(|e| io_error("read", path, e))?;
     serde_json::from_str(&text).map_err(|source| Error::Json {
         path: path.to_path_buf(),
@@ -416,12 +465,18 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
     })
 }
 
-fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
+/// Writes a JSON file through a temporary file in the same directory, so a crash leaves the
+/// old file intact.
+pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     let text = serde_json::to_string_pretty(value).map_err(|source| Error::Json {
         path: path.to_path_buf(),
         source,
     })?;
-    std::fs::write(path, text + "\n").map_err(|e| io_error("write", path, e))
+    let mut temp = path.as_os_str().to_owned();
+    temp.push(".tmp");
+    let temp = PathBuf::from(temp);
+    std::fs::write(&temp, text + "\n").map_err(|e| io_error("write", &temp, e))?;
+    std::fs::rename(&temp, path).map_err(|e| io_error("rename", &temp, e))
 }
 
 #[cfg(test)]
@@ -576,6 +631,7 @@ mod tests {
                 originals_at_root: false,
             },
             last_console: Some("snes-eur".into()),
+            tgdb_key: None,
         };
         library.save_config(&config).unwrap();
         assert_eq!(library.config().unwrap(), config);

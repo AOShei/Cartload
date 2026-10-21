@@ -61,6 +61,12 @@ pub struct Game {
     /// TheGamesDB ids from the hash database, best match first.
     #[serde(default)]
     pub tgdb_ids: Vec<u32>,
+    /// TheGamesDB id the art and metadata were taken from.
+    #[serde(default)]
+    pub tgdb_id: Option<u32>,
+    /// Description shown by the console (`[Description]` of the launch entry).
+    #[serde(default)]
+    pub description: String,
     /// Name the hash database gave the ROM file, when it was found.
     #[serde(default)]
     pub db_name: Option<String>,
@@ -140,13 +146,14 @@ impl Game {
             sort_title: self.sort_title(),
             publisher: self.publisher.clone(),
             copyright: self.copyright.clone(),
+            description: self.description.clone(),
             ..DesktopEntry::new()
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::desktop::Format;
 
@@ -169,6 +176,8 @@ mod tests {
             application: System::Snes.application().into(),
             args: System::Snes.default_args().into(),
             tgdb_ids: vec![1255],
+            tgdb_id: None,
+            description: String::new(),
             db_name: Some("Chrono Trigger (USA).sfc".into()),
             snes: None,
             nes: None,

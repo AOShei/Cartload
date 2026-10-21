@@ -1,0 +1,28 @@
+{
+    "code": 200,
+    "status": "Success",
+    "data": {
+        "count": 4,
+        "publishers": {
+            "3": {
+                "id": 3,
+                "name": "Nintendo"
+            },
+            "2374": {
+                "id": 2374,
+                "name": ".GEARS Studios"
+            },
+            "4365": {
+                "id": 4365,
+                "name": "Square"
+            },
+            "6107": {
+                "id": 6107,
+                "name": "Square Enix"
+            }
+        }
+    },
+    "remaining_monthly_allowance": 2946,
+    "extra_allowance": 0,
+    "allowance_refresh_timer": 2590500
+}

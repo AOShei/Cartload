@@ -1,0 +1,16 @@
+{
+    "code": 200,
+    "status": "Success",
+    "data": {
+        "count": 0,
+        "games": []
+    },
+    "pages": {
+        "previous": null,
+        "current": "https://api.thegamesdb.net/v1/Games/ByGameName?apikey=test-key&name=Nothing&fields=players%2Cpublishers%2Coverview%2Cplatform%2Ccoop%2Calternates&include=boxart%2Cplatform&page=1",
+        "next": null
+    },
+    "remaining_monthly_allowance": 2950,
+    "extra_allowance": 0,
+    "allowance_refresh_timer": 2590990
+}
