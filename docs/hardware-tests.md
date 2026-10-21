@@ -443,7 +443,7 @@ console booted into its installed hakchi kernel`.
 
 | Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Base mods | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | | | | | | | | | not yet run on hardware; base mods: downloads and dry run verified 2026-10-21, the console already had tiny7zx (checked read-only), the flow was not run |
+| 2026-10-21 | SNES Classic Mini EUR, hakchi v1.0.4-126 already installed | EndeavourOS, Linux 6.18 | ok (FEL) | | | kexec from running kernel: console hung, LED off, power-cycle recovered it (uses the console's own kexec; CE uploads kexec.static) | | | | first run panicked opening the FEL device (nusb needed its tokio feature, fixed 16fffd4); second run through FEL ran all 13 steps, installer printed "invalid image on nand at sector: 68" which the flow wrongly took as fatal (fixed 77e83e5); the console came back installed and `cartload-console info` verified it. grow/reboot-grown were skipped (partition already grown), so kexec from the memboot shell is still untested. haveBackup2 and isOriginalBoot2 both fail on this console: no stock kernel backup at sector 68 |
 
 ## Sync one game
 
