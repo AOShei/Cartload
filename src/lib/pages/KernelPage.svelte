@@ -576,6 +576,9 @@
   }
 
   .tools-list .btn {
+    flex: none;
+    width: 104px;
+    justify-content: center;
     min-height: var(--control-sm, 28px);
     padding-top: 2px;
     padding-bottom: 2px;
