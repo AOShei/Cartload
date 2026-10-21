@@ -80,12 +80,11 @@ pub mod commands {
     /// The device-side installer (`/hakchi/shell/boot`): continues the boot with the
     /// transfer directory present, which installs hakchi, then reboots.
     pub const BOOT: &str = "boot";
-    /// Lines in the installer output that mean it failed.
-    pub const FAILURE_MARKERS: [&str; 3] = [
-        "flash md5 mismatch!",
-        "invalid image",
-        "flash boot0 failed!",
-    ];
+    /// Lines in the installer output that mean it failed (`flashBoot` / `flashBoot0` in
+    /// hakchi's `b0050_boot`). hakchi2 CE checks only the first. `invalid image on nand at
+    /// sector: 68` is NOT a failure: `haveBackup2` prints it on stderr while deciding whether
+    /// the stock kernel still needs backing up (seen on a real install, 2026-10-21).
+    pub const FAILURE_MARKERS: [&str; 2] = ["flash md5 mismatch!", "flash boot0 failed!"];
 
     /// Lists the NAND partition table.
     pub const SUNXI_PART: &str = "sunxi-part";

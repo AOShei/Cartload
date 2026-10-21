@@ -322,7 +322,8 @@ Classic Mini (`-v` adds the debug lines, among them the `sunxi-part` output):
     connection drops when the console reboots`, then `console: ...` lines echoing the
     installer (`installing hakchi...`, `package hakchi installed`, ...). The console shows
     hakchi's default image during the install and then reboots into the normal menu. Any
-    `flash md5 mismatch!`, `invalid image` or `flash boot0 failed!` line stops the flow.
+    `flash md5 mismatch!` or `flash boot0 failed!` line stops the flow. `invalid image on nand at
+    sector: 68` on stderr is normal: the installer checking for an existing stock kernel backup.
 12. `wait-console`: offline, then back within 180 s.
 13. `verify`: `console: hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey) installed
     on SNES Classic Mini (EUR) (hwid ...)`, `installed: ...`, `games storage
