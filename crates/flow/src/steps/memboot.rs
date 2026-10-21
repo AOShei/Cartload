@@ -40,7 +40,7 @@ impl Step<Context> for Memboot {
     }
 
     fn description(&self) -> &str {
-        "Boot the hakchi kernel from RAM: through FEL, or with kexec from a running hakchi kernel"
+        "Boot the hakchi kernel from RAM, through FEL or kexec"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {

@@ -26,7 +26,7 @@ impl Step<Context> for GrowPartition {
     }
 
     fn description(&self) -> &str {
-        "Merge the unused UDISK partition into the data partition (sunxi-part grow)"
+        "Merge the unused UDISK partition into the data partition"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -109,8 +109,7 @@ impl Step<Context> for RebootAfterGrow {
     }
 
     fn description(&self) -> &str {
-        "Reboot into the memboot shell (kexec with hakchi2 CE's detached-fallback) so the \
-         kernel sees the new partition table"
+        "Reboot into the memboot shell with the new partition table"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {

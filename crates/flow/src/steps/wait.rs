@@ -21,7 +21,7 @@ impl Step<Context> for WaitForConsole {
     }
 
     fn description(&self) -> &str {
-        "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"
+        "Wait for the console on the USB network"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {

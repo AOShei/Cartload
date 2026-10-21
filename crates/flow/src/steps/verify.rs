@@ -16,7 +16,7 @@ impl Step<Context> for VerifyInstall {
     }
 
     fn description(&self) -> &str {
-        "Reconnect and check that the installed kernel reports the package's versions"
+        "Check the installed kernel reports the package's versions"
     }
 
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {

@@ -1,4 +1,4 @@
-//! Identify the console and the state of its hakchi install.
+//! Identify the console and its hakchi install.
 
 use async_trait::async_trait;
 
@@ -54,13 +54,9 @@ impl Step<Context> for DetectState {
 
     fn description(&self) -> &str {
         match self.expect {
-            Expect::Any => "Identify the console and the state of its hakchi install",
-            Expect::MembootShell => {
-                "Identify the console and check that it is in the memboot shell"
-            }
-            Expect::Installed => {
-                "Identify the console and check that it runs its installed hakchi kernel"
-            }
+            Expect::Any => "Identify the console and its hakchi install",
+            Expect::MembootShell => "Check the console is in the memboot shell",
+            Expect::Installed => "Check the console runs its installed hakchi",
         }
     }
 

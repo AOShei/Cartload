@@ -57,7 +57,7 @@
   const watch = $derived.by((): Watch => {
     const waiting: Watch = {
       tone: "neutral",
-      text: "Waiting for the console… Nothing found on USB yet.",
+      text: "Waiting for the console on USB…",
       ready: false,
       installed: false,
     };
@@ -79,7 +79,7 @@
           case "not_fel":
             return {
               tone: "warning",
-              text: "Console attached, but in normal boot. Switch it off and do the Reset trick above.",
+              text: "Console booted normally. Switch it off and follow the steps.",
               ready: false,
               installed: false,
             };
@@ -92,14 +92,14 @@
         if (status.info.minimal_memboot) {
           return {
             tone: "ready",
-            text: "Console running hakchi from memory. Ready; no Reset needed.",
+            text: "Console running hakchi from memory. Ready.",
             ready: true,
             installed: false,
           };
         }
         return {
           tone: "ready",
-          text: `hakchi ${status.info.versions?.script ?? ""} is installed. Installing again updates or repairs it from the running kernel; no Reset needed.`,
+          text: "Console connected and running hakchi. Ready, no Reset needed.",
           ready: true,
           installed: true,
         };
@@ -247,7 +247,7 @@
       <div class="body card">
         <h2>Put the console in FEL mode</h2>
         <div class="fel">
-          <ConsoleTopView model={consoleModel} width={320} />
+          <ConsoleTopView model={consoleModel} width={250} />
           <ol class="howto">
             <li>Connect the console to this computer with its USB cable and switch POWER off.</li>
             <li>Hold RESET down and switch POWER on.</li>
@@ -419,9 +419,7 @@
     <section class="card progress" aria-labelledby="steps-heading">
       <div class="progress-head">
         <h2 id="steps-heading">Install steps</h2>
-        {#if snapshot.state === "idle"}
-          <span class="muted">What happens when you press Install, in order.</span>
-        {:else if flowElapsed}
+        {#if snapshot.state !== "idle" && flowElapsed}
           <span class="muted num">{flowElapsed}</span>
         {/if}
       </div>
@@ -439,7 +437,7 @@
         <li>
           <div class="tool-text">
             <strong>Boot from memory only</strong>
-            <span class="muted">Starts hakchi's recovery shell from RAM. Nothing is written.</span>
+            <span class="muted">Nothing is written.</span>
           </div>
           <button type="button" class="btn" disabled={!canStart} onclick={() => void begin({ kind: "memboot" })}>
             <Icon name="play" size={16} />
@@ -449,7 +447,7 @@
         <li>
           <div class="tool-text">
             <strong>Save the stock kernel</strong>
-            <span class="muted">Copies the console's original kernel to a file, for safe keeping.</span>
+            <span class="muted">Backup to a file.</span>
           </div>
           <button type="button" class="btn" disabled={!canStart} onclick={() => void dumpKernel()}>
             <Icon name="save" size={16} />
@@ -459,7 +457,7 @@
         <li>
           <div class="tool-text">
             <strong>Return to the original system</strong>
-            <span class="muted">Removes hakchi and flashes the original kernel back.</span>
+            <span class="muted">Removes hakchi.</span>
           </div>
           <button type="button" class="btn" disabled={!canStart} onclick={() => (confirmUninstall = true)}>
             <Icon name="undo" size={16} />
@@ -537,11 +535,12 @@
 
   .tools {
     flex: none;
-    padding: var(--space-4) var(--space-5);
+    padding: var(--space-3) var(--space-5);
   }
 
   .tools h2 {
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
+    font-size: var(--text-md);
   }
 
   .tools-list {
@@ -555,8 +554,8 @@
   .tools-list li {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-2) 0;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
     border-top: 1px solid var(--border);
   }
 
@@ -564,9 +563,22 @@
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: var(--text-md);
+    gap: var(--space-2);
+    align-items: baseline;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .tool-text .muted {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tools-list .btn {
+    min-height: var(--control-sm, 28px);
+    padding-top: 2px;
+    padding-bottom: 2px;
   }
 
   .tools-list .btn {
@@ -581,7 +593,7 @@
   @media (min-width: 1100px) {
     .columns {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+      grid-template-columns: minmax(0, 1fr) minmax(380px, 500px);
       grid-template-rows: minmax(0, 1fr);
       align-items: start;
       gap: var(--space-5);
@@ -590,8 +602,18 @@
     }
 
     .left {
-      max-height: 100%;
+      height: 100%;
       overflow: auto;
+    }
+
+    /* The last stage grows so the left column ends where the right one does. */
+    .left > .stage:last-child {
+      flex: 1;
+    }
+
+    .left > .stage:last-child .body,
+    .left > .stage:last-child .result {
+      flex: 1;
     }
 
     .right {
@@ -735,7 +757,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    max-width: 48ch;
   }
 
   .watch {

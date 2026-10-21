@@ -10,6 +10,21 @@
   }
 
   let { steps, now }: Props = $props();
+  let list: HTMLOListElement | undefined = $state();
+
+  /* While a flow runs, the running step and the one after it stay in view. */
+  const runningIndex = $derived(steps.findIndex((s) => s.state === "running"));
+  $effect(() => {
+    const index = runningIndex;
+    if (index < 0 || !list) {
+      return;
+    }
+    const items = list.querySelectorAll<HTMLElement>("li");
+    const next = items[Math.min(index + 1, items.length - 1)];
+    const current = items[index];
+    next?.scrollIntoView({ block: "nearest" });
+    current?.scrollIntoView({ block: "nearest" });
+  });
 
   function timing(step: StepSnapshot): string {
     if (step.state === "running" && step.started_at !== null) {
@@ -37,7 +52,7 @@
   }
 </script>
 
-<ol class="steps" aria-label="Steps">
+<ol class="steps" aria-label="Steps" bind:this={list}>
   {#each steps as step (step.index)}
     <li class="step state-{step.state}" aria-current={step.state === "running" ? "step" : undefined}>
       <span class="marker" aria-hidden="true">

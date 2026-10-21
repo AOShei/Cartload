@@ -18,7 +18,7 @@ impl Step<Context> for Reboot {
     }
 
     fn description(&self) -> &str {
-        "Reboot the console (sync; umount -ar; reboot -f)"
+        "Reboot the console"
     }
 
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {

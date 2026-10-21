@@ -81,8 +81,7 @@ impl Step<Context> for InstallBaseMods {
     }
 
     fn description(&self) -> &str {
-        "Upload hakchi2 CE's base mods (tiny7zx for compressed games), install them with \
-         hakchi packs_install and reboot"
+        "Upload and install hakchi2 CE's base mods, then reboot"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -196,8 +195,7 @@ impl Step<Context> for VerifyBaseMods {
     }
 
     fn description(&self) -> &str {
-        "Check that the base mods are installed and their binaries (tiny7zx) are on the \
-         console's PATH"
+        "Check the base mods are installed"
     }
 
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {

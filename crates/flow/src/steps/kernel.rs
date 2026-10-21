@@ -34,7 +34,7 @@ impl Step<Context> for ReadStockKernel {
     }
 
     fn description(&self) -> &str {
-        "Read the stock kernel backup from NAND (hakchi getBackup2), or take --stock-kernel"
+        "Read the stock kernel backup, or take the given file"
     }
 
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {
@@ -89,7 +89,7 @@ impl Step<Context> for FlashStockKernel {
     }
 
     fn description(&self) -> &str {
-        "Write the stock kernel back to NAND (sntool check, hakchi flashBoot2)"
+        "Write the stock kernel back to NAND"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -156,8 +156,7 @@ impl Step<Context> for RemoveInstall {
     }
 
     fn description(&self) -> &str {
-        "Remove the hakchi files, restore the stock u-boot and shrink the data partition \
-         (hakchi mod_uninstall)"
+        "Remove hakchi's files and restore the stock u-boot"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -216,7 +215,7 @@ impl Step<Context> for DumpStockKernel {
     }
 
     fn description(&self) -> &str {
-        "Read the stock kernel backup (hakchi getBackup2) and write it to the output file"
+        "Save the stock kernel backup to the file"
     }
 
     async fn already_done(&self, _ctx: &mut Context) -> Result<Option<String>> {

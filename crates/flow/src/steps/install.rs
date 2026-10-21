@@ -22,7 +22,7 @@ impl Step<Context> for PrepareInstall {
     }
 
     fn description(&self) -> &str {
-        "Flag the install in /hakchi/config and create /hakchi/transfer"
+        "Flag the install and make the transfer directory"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -56,7 +56,7 @@ impl Step<Context> for UploadHmod {
     }
 
     fn description(&self) -> &str {
-        "Copy hakchi.hmod to /hakchi/transfer on the console"
+        "Copy hakchi.hmod to the console"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -100,8 +100,7 @@ impl Step<Context> for RunInstaller {
     }
 
     fn description(&self) -> &str {
-        "Run the device-side installer (boot): back up the stock kernel, flash u-boot and the \
-         hakchi kernel, install the rootfs, reboot"
+        "Run the installer: back up, flash, install, reboot"
     }
 
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {

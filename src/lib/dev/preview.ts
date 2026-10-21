@@ -135,19 +135,19 @@ export function previewReport(): StatusReport {
 }
 
 const INSTALL_STEPS: [string, string, string][] = [
-  ["memboot", "Boot from memory", "Boot the hakchi kernel from RAM: through FEL, or with kexec from a running hakchi kernel"],
-  ["wait-console", "Wait for the console", "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"],
-  ["detect", "Identify the console", "Run the identification sequence and check that the console is in the memboot shell"],
-  ["check-md", "Mega Drive check", "Refuse to install over Project Lunar on a Mega Drive Mini"],
-  ["grow", "Grow the data partition", "Merge the unused UDISK partition into the data partition (sunxi-part grow)"],
-  ["reboot-grown", "Reboot into the grown partition", "Boot the kernel again with kexec so it sees the grown partition"],
-  ["wait-console", "Wait for the console", "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"],
-  ["detect", "Identify the console", "Run the identification sequence and check that the console is in the memboot shell"],
-  ["prepare", "Prepare the install", "Set the install flags and create the transfer directory"],
-  ["upload", "Upload the package", "Upload hakchi.hmod to /hakchi/transfer and check its MD5"],
-  ["install", "Run the installer", "Run the device-side installer (boot): back up the stock kernel, flash u-boot and the hakchi kernel, install the rootfs, reboot"],
-  ["wait-console", "Wait for the console", "Wait for the console to come up on the USB network (169.254.13.37) and accept SSH"],
-  ["verify", "Verify the install", "Reconnect and check the installed versions against the package"],
+  ["memboot", "Boot from memory", "Boot the hakchi kernel from RAM, through FEL or kexec"],
+  ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
+  ["detect", "Identify the console", "Check the console is in the memboot shell"],
+  ["check-md", "Mega Drive check", "Refuse to install over Project Lunar on a Mega Drive"],
+  ["grow", "Grow the data partition", "Merge the unused UDISK partition into the data partition"],
+  ["reboot-grown", "Reboot into the grown partition", "Reboot into the memboot shell with the new partition table"],
+  ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
+  ["detect", "Identify the console", "Check the console is in the memboot shell"],
+  ["prepare", "Prepare the install", "Flag the install and make the transfer directory"],
+  ["upload", "Upload the package", "Copy hakchi.hmod to the console"],
+  ["install", "Run the installer", "Run the installer: back up, flash, install, reboot"],
+  ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
+  ["verify", "Verify the install", "Check the installed kernel reports the package's versions"],
 ];
 
 function pendingSteps(): StepSnapshot[] {
