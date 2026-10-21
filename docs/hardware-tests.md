@@ -829,8 +829,39 @@ needed; they can run with one attached, nothing is written to it.
    move, Escape closes and returns focus to the button.
 5. Every icon button announces a name (check with Orca or the Accessibility Inspector).
 
+### 4. Layout: panels scroll, the page never does
+
+Do each step at 900 × 600, at about 1280 × 800 and with the window filling the screen, with
+the activity log (Ctrl+L) closed and then open. The sidebar, the page header, the status bar
+and the log never move; the log shrinks the page area; nothing is cut off, and the only
+scrollbars are the ones listed.
+
+1. Console: on a wide window the status card and the Detected table are on the left (that
+   column scrolls when the table is long) and "Everything detected, as data" is a panel on
+   the right that scrolls inside itself. Under about 1100 px wide they stack in one scrolling
+   column and the data sits in a 320 px box.
+2. Kernel: on a wide window the three stage cards are on the left and the step list, the run
+   log and the result on the right; start a memboot and watch the step list and the log scroll
+   inside their column while the page stays put. Under about 1100 px they stack in one
+   scrolling column. After a run the result card shows the outcome, the console's one-line
+   summary with the elapsed time, and Open Console / Open Library.
+3. Library: the folder tree, the grid and the detail panel are full height and only their
+   lists scroll. The tree is at least 240 px wide ("Console menu" and "More games..." are not
+   cut), the detail panel at least 340 px. Select a game: the description shows three
+   read-only lines; click it (or press Enter on it) to open the editor; type, press Escape:
+   the dialog closes, nothing is saved and focus is back on the preview. Open it again, Tab:
+   focus stays inside the dialog. Save stores the text. "Advanced…" opens the launch command,
+   arguments, compression and the facts in the same kind of dialog.
+4. Library sync bar: the Changes block explains the count ("7 changes: 3 files to upload
+   (6.0 MB), 2 files to remove, 1 link to reset, 1 empty folder to remove"); "Show changes"
+   lists the paths in a dialog; when files are to be removed the bar says that a console
+   synced by hakchi2 CE has its files replaced.
+5. Settings: on a wide window the settings cards are on the left and the About card on the
+   right, each column scrolling on its own; the About card is never cut off.
+
 ### Results
 
 | Date | Build | Platform | Result | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-10-21 | 33242c5+task 11, debug | Arch, GNOME 51 Wayland, WebKitGTK | partial | Native Wayland start without `GDK_BACKEND`: no DMA-BUF protocol error, console identified in 2.5 s (the app sets the variable itself). Window state, motion and keyboard checks not driven by hand (no input tool); layout at 900 × 600 checked in the browser preview only. |
+| 2026-10-22 | 11acb49+task 14, preview | Arch, headless Chrome on the preview fixtures | partial | Section 4 checked in the browser preview: every page at 900 × 600, 1280 × 800 and 1990 × 1017, log open and closed (24 combinations measured: the document and the page area never overflow; the only scrolling elements are the listed lists, columns and panels), light and dark. Dialog focus path checked by script: focus lands in the editor, the page behind is inert, cancel closes and returns focus to the preview. Real WebKitGTK window (XWayland capture, 2560 × 1051, SNES Classic Mini attached, read only): the Console page's two columns render, the data panel scrolls inside itself. Not driven in the window: the other pages, the keyboard paths and the live step list and log during a run. |

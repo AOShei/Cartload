@@ -75,7 +75,7 @@ pass is checked in CI-like conditions. Headless Chrome captures them:
 
 ```sh
 pnpm dev --port 1420 &
-google-chrome --headless=new --window-size=1024,700 --hide-scrollbars \
+google-chrome --headless=new --window-size=1280,800 --hide-scrollbars \
   --screenshot=docs/screenshots/library-light.png \
   "http://localhost:1420/?page=library&library=many&sync=plan&theme=light"
 ```
@@ -83,8 +83,12 @@ google-chrome --headless=new --window-size=1024,700 --hide-scrollbars \
 Fixtures: `?preview=disconnected|fel|booting|connected|stock` (Console), `?page=kernel&flow=
 idle|running|failed|done|cancelled&package=cached|none|problem`, `?page=library&library=some|
 empty|many&sync=none|plan|review|running|done|failed`, `?page=settings`. `&theme=light|dark`
-forces a theme. These are the preview fixtures, not the WebKitGTK window: fonts and form
-controls can differ slightly from the desktop app.
+forces a theme, `&log=open|closed` the activity log panel; on the Library page `&folder=4/1`
+opens a folder of the fixture (index path), `&select=N` selects its first N games (the detail
+panel) and `&dialog=description|advanced|changes` opens one of the editors. These are the
+preview fixtures, not the WebKitGTK window: fonts and form controls can differ slightly from
+the desktop app. Vite can keep serving a component's old CSS after an edit: restart `pnpm dev`
+before capturing.
 
 ## What to capture
 
