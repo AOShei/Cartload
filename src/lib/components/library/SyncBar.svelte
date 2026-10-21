@@ -41,25 +41,23 @@
     if (plan.noop) {
       return "The console is up to date.";
     }
-    // Explains the N of "Sync N changes": every change is one of these four.
+    // Explains the N of "Sync N changes" in a few words; the details sit behind "Show changes".
     const parts: string[] = [];
     if (plan.uploads.length > 0) {
-      parts.push(`${plan.uploads.length} file${plan.uploads.length === 1 ? "" : "s"} to upload (${formatBytes(plan.upload_size)})`);
+      parts.push(`${plan.uploads.length} to upload`);
     }
     if (plan.deletions.length > 0) {
-      parts.push(`${plan.deletions.length} file${plan.deletions.length === 1 ? "" : "s"} to remove`);
+      parts.push(`${plan.deletions.length} to remove`);
     }
     if (plan.link_deletions.length > 0) {
-      parts.push(`${plan.link_deletions.length} link${plan.link_deletions.length === 1 ? "" : "s"} to reset`);
+      parts.push(`${plan.link_deletions.length} link${plan.link_deletions.length === 1 ? "" : "s"}`);
     }
     if (plan.empty_dirs.length > 0) {
-      parts.push(`${plan.empty_dirs.length} empty folder${plan.empty_dirs.length === 1 ? "" : "s"} to remove`);
+      parts.push(`${plan.empty_dirs.length} empty folder${plan.empty_dirs.length === 1 ? "" : "s"}`);
     }
-    return `${plan.changes} change${plan.changes === 1 ? "" : "s"}: ${parts.join(", ")}.`;
+    return parts.join(" · ");
   });
 
-  /** Files on the console that this library does not have: typically hakchi2 CE's copies. */
-  const replacesOthers = $derived(plan !== null && plan.deletions.length + plan.link_deletions.length > 0);
   let changesOpen = $state(false);
 
   onMount(() => {
@@ -210,16 +208,21 @@
     </div>
     <div class="block pending" class:warn={plan !== null && !plan.fits}>
       <span class="caps">Changes</span>
-      <span class="muted pending-text">
+      <span class="pending-text">
         {#if syncStore.planning && !plan}<span class="spinner spinner-sm" aria-hidden="true"></span>{/if}
-        <span>{pending}</span>
-        {#if plan && !plan.noop && plan.fits && !running}
-          <button type="button" class="btn btn-quiet btn-sm" onclick={() => (changesOpen = true)}>Show changes</button>
+        {#if plan && !plan.noop && plan.fits}
+          <strong class="num">{plan.changes} change{plan.changes === 1 ? "" : "s"}</strong>
+          <span class="muted">{pending}</span>
+          {#if !running}
+            <button type="button" class="btn btn-sm" onclick={() => (changesOpen = true)}>
+              <Icon name="list" size={14} />
+              Show changes
+            </button>
+          {/if}
+        {:else}
+          <span class="muted">{pending}</span>
         {/if}
       </span>
-      {#if replacesOthers && !running}
-        <span class="muted note">If hakchi2 CE synced this console, the first Cartload sync replaces its files with this library.</span>
-      {/if}
     </div>
     <button type="button" class="btn btn-primary" onclick={() => syncStore.review()} disabled={!canSync || syncStore.reviewing}>
       <Icon name="sync" size={16} />
@@ -284,10 +287,6 @@
     align-items: center;
     flex-wrap: wrap;
     gap: var(--space-1) var(--space-2);
-  }
-
-  .note {
-    font-size: var(--text-sm);
   }
 
   .pending.warn .pending-text {

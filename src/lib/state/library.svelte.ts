@@ -38,7 +38,7 @@ export type ViewMode = "grid" | "list";
 export type Tile =
   | { kind: "game"; id: string; view: GameView }
   | { kind: "original"; id: string; code: string; name: string; cover: string | null; thumbnail: string | null }
-  | { kind: "folder"; id: string; path: MenuPath; folder: MenuFolder; games: number };
+  | { kind: "folder"; id: string; path: MenuPath; folder: MenuFolder; games: number; cover: string | null };
 
 export const IMPORT_EXTENSIONS = ["sfc", "smc", "fig", "swc", "nes", "zip"];
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "bmp"];
@@ -206,6 +206,7 @@ class LibraryStore {
           path,
           folder: entry,
           games: countGames(entry.entries),
+          cover: this.folderCover(entry),
         };
         (isLeft(entry) ? left : right).push(tile);
       }
@@ -538,6 +539,42 @@ class LibraryStore {
     } finally {
       this.artBusy = false;
       this.artProgress = null;
+    }
+  }
+
+  /** The picture chosen for a folder, when it has one and the tree knows its URL. */
+  folderCover(folder: MenuFolder): string | null {
+    const image = folder.image;
+    if (typeof image === "object" && "custom" in image) {
+      return this.menu?.folder_art[image.custom]?.cover ?? null;
+    }
+    return null;
+  }
+
+  /** Native open dialog for a folder picture; the console shows it on the folder's tile. */
+  async chooseFolderImage(path: MenuPath): Promise<void> {
+    if (!inTauri) {
+      toasts.info("Choosing an image works inside the desktop app only.");
+      return;
+    }
+    const picked = await open({
+      multiple: false,
+      title: "Choose a folder picture",
+      filters: [{ name: "Images", extensions: IMAGE_EXTENSIONS }],
+    });
+    const file = Array.isArray(picked) ? picked[0] : picked;
+    if (!file) {
+      return;
+    }
+    if (await this.edit({ op: "set_folder_image", path, file })) {
+      toasts.success("Folder picture set.");
+    }
+  }
+
+  /** Back to the plain folder icon. */
+  async clearFolderImage(path: MenuPath): Promise<void> {
+    if (await this.edit({ op: "set_folder_image", path, file: null })) {
+      toasts.success("Folder picture removed.");
     }
   }
 

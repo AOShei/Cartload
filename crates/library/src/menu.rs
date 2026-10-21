@@ -48,8 +48,8 @@ impl Position {
     }
 }
 
-/// Which built-in picture a folder shows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// Which picture a folder shows.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FolderImage {
     /// Plain folder.
@@ -63,6 +63,9 @@ pub enum FolderImage {
     Number,
     /// One letter.
     Letter(char),
+    /// A picture the user chose, kept in the library's `folders` directory under this stem
+    /// (`<stem>.png` and `<stem>_small.png`), the same sizes as a game's cover.
+    Custom(String),
 }
 
 /// A folder with its own sub-menu.
@@ -544,7 +547,7 @@ pub fn export(menu: &Menu) -> Vec<ExportedMenu> {
                         code: codes::folder_code(target),
                         name: folder.name.clone(),
                         position: folder.position,
-                        image: folder.image,
+                        image: folder.image.clone(),
                         target,
                     }));
                     children.push((target, folder));
@@ -558,7 +561,7 @@ pub fn export(menu: &Menu) -> Vec<ExportedMenu> {
                         code: codes::folder_code(target),
                         name: link.name.clone(),
                         position: link.position,
-                        image: link.image,
+                        image: link.image.clone(),
                         target,
                     }));
                 }
@@ -804,6 +807,27 @@ impl Menu {
                 Ok(())
             }
             _ => Err(no_folder(path)),
+        }
+    }
+
+    /// Gives the folder at `path` a picture.
+    pub fn set_folder_image(&mut self, path: &[usize], image: FolderImage) -> Result<()> {
+        let (last, parent) = path.split_last().ok_or_else(|| no_folder(path))?;
+        match self.entries_at_mut(parent).and_then(|e| e.get_mut(*last)) {
+            Some(Entry::Folder(folder)) => {
+                folder.image = image;
+                Ok(())
+            }
+            _ => Err(no_folder(path)),
+        }
+    }
+
+    /// The picture of the folder at `path`.
+    pub fn folder_image(&self, path: &[usize]) -> Option<&FolderImage> {
+        let (last, parent) = path.split_last()?;
+        match self.entries_at(parent)?.get(*last) {
+            Some(Entry::Folder(folder)) => Some(&folder.image),
+            _ => None,
         }
     }
 

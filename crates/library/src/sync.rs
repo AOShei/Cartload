@@ -28,6 +28,7 @@ use cartload_console::{
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
+use crate::menu::FolderImage;
 use crate::{
     Error, Result,
     desktop::{DesktopEntry, Format},
@@ -357,13 +358,30 @@ pub fn collect(
                         format!("./{dir}/{code}/{code}.desktop"),
                         text.into_bytes(),
                     ));
+                    let custom = match &folder.image {
+                        FolderImage::Custom(stem) => {
+                            let (cover, thumbnail) = library.folder_image_files(stem);
+                            match (std::fs::read(&cover), std::fs::read(&thumbnail)) {
+                                (Ok(cover), Ok(thumbnail)) => Some((cover, thumbnail)),
+                                _ => None,
+                            }
+                        }
+                        _ => None,
+                    };
+                    let (icon, thumbnail) = match custom {
+                        Some(files) => files,
+                        None => (
+                            images::folder_icon(&folder.image)?,
+                            images::folder_thumbnail(&folder.image)?,
+                        ),
+                    };
                     collection.files.push(LocalFile::generated(
                         format!("./{dir}/{code}/{code}.png"),
-                        images::folder_icon(folder.image)?,
+                        icon,
                     ));
                     collection.files.push(LocalFile::generated(
                         format!("./{dir}/{code}/{code}_small.png"),
-                        images::folder_thumbnail(folder.image)?,
+                        thumbnail,
                     ));
                     collection.folders += 1;
                 }

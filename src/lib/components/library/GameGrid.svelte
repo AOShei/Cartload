@@ -383,8 +383,22 @@
               <div class="art">
                 {#if tile.kind === "game"}
                   <img src={tile.view.cover} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
-                  {#if tile.view.game.placeholder_art}
+                  {#if tile.view.game.placeholder_art && !selectedSet.has(tile.id)}
                     <span class="noart">No art yet</span>
+                  {/if}
+                  {#if selectedSet.has(tile.id)}
+                    <button
+                      type="button"
+                      class="tile-remove"
+                      aria-label="Remove {tile.view.game.name} from the library"
+                      title="Remove from the library (Delete)"
+                      tabindex="-1"
+                      onclick={(e) => { e.stopPropagation(); libraryStore.removePrompt = true; }}
+                      ondblclick={(e) => e.stopPropagation()}
+                      onpointerdown={(e) => e.stopPropagation()}
+                    >
+                      <Icon name="trash" size={14} />
+                    </button>
                   {/if}
                 {:else if tile.kind === "original"}
                   {#if tile.cover}
@@ -392,6 +406,8 @@
                   {:else}
                     <span class="builtin"><Icon name="builtIn" size={32} /></span>
                   {/if}
+                {:else if tile.cover}
+                  <img src={tile.cover} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
                 {:else}
                   <span class="folder-art">
                     <Icon name="folder" size={40} />
@@ -634,6 +650,30 @@
     border: 1px dashed var(--border-strong);
     color: var(--text-muted);
     font-size: var(--text-xs);
+  }
+
+  .tile-remove {
+    position: absolute;
+    right: var(--space-1);
+    bottom: var(--space-1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    box-shadow: var(--shadow-float);
+  }
+
+  .tile-remove:hover,
+  .tile-remove:focus-visible {
+    background: var(--danger-soft);
+    border-color: var(--danger);
+    color: var(--danger);
   }
 
   .builtin,

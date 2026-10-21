@@ -272,24 +272,25 @@ fn tile(width: u32, height: u32, fill: Rgb, border: Rgb, tab: bool) -> Result<Ve
     })
 }
 
-fn folder_colours(image: FolderImage) -> (Rgb, Rgb) {
+fn folder_colours(image: &FolderImage) -> (Rgb, Rgb) {
     match image {
         FolderImage::Folder => (Rgb(0x3b, 0x5b, 0x8c), Rgb(0xd7, 0xe0, 0xf0)),
         FolderImage::Back => (Rgb(0x5a, 0x5a, 0x5a), Rgb(0xe6, 0xe6, 0xe6)),
         FolderImage::Home => (Rgb(0x2f, 0x6b, 0x4f), Rgb(0xd5, 0xee, 0xdf)),
         FolderImage::Number => (Rgb(0x7a, 0x4e, 0x8a), Rgb(0xec, 0xdc, 0xf2)),
         FolderImage::Letter(_) => (Rgb(0x8a, 0x5a, 0x2b), Rgb(0xf2, 0xe4, 0xd2)),
+        FolderImage::Custom(_) => (Rgb(0x4e, 0x5a, 0x7a), Rgb(0xdc, 0xe2, 0xf2)),
     }
 }
 
 /// The 228×204 icon of a folder.
-pub fn folder_icon(image: FolderImage) -> Result<Vec<u8>> {
+pub fn folder_icon(image: &FolderImage) -> Result<Vec<u8>> {
     let (fill, border) = folder_colours(image);
     tile(COVER_WIDTH, COVER_HEIGHT, fill, border, true)
 }
 
 /// The 40×40 thumbnail of a folder.
-pub fn folder_thumbnail(image: FolderImage) -> Result<Vec<u8>> {
+pub fn folder_thumbnail(image: &FolderImage) -> Result<Vec<u8>> {
     let (fill, border) = folder_colours(image);
     tile(THUMB_SIZE, THUMB_SIZE, fill, border, true)
 }
@@ -345,9 +346,9 @@ pub(crate) mod tests {
 
     #[test]
     fn images_have_the_console_sizes() {
-        let icon = folder_icon(FolderImage::Folder).unwrap();
+        let icon = folder_icon(&FolderImage::Folder).unwrap();
         assert_eq!(png_dimensions(&icon), Some((228, 204)));
-        let thumb = folder_thumbnail(FolderImage::Letter('A')).unwrap();
+        let thumb = folder_thumbnail(&FolderImage::Letter('A')).unwrap();
         assert_eq!(png_dimensions(&thumb), Some((40, 40)));
         assert_eq!(
             png_dimensions(&cover_placeholder(System::Nes).unwrap()),
@@ -363,12 +364,12 @@ pub(crate) mod tests {
     #[test]
     fn images_are_deterministic() {
         assert_eq!(
-            folder_icon(FolderImage::Back).unwrap(),
-            folder_icon(FolderImage::Back).unwrap()
+            folder_icon(&FolderImage::Back).unwrap(),
+            folder_icon(&FolderImage::Back).unwrap()
         );
         assert_ne!(
-            folder_icon(FolderImage::Back).unwrap(),
-            folder_icon(FolderImage::Folder).unwrap()
+            folder_icon(&FolderImage::Back).unwrap(),
+            folder_icon(&FolderImage::Folder).unwrap()
         );
     }
 

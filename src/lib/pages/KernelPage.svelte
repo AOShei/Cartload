@@ -1,8 +1,9 @@
 <script lang="ts">
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import { onMount, tick } from "svelte";
+  import { onMount } from "svelte";
   import { inTauri } from "../api/tauri";
   import type { FlowKind } from "../api/types";
+  import Dialog from "../components/Dialog.svelte";
   import FailureCard from "../components/FailureCard.svelte";
   import FelIllustration from "../components/FelIllustration.svelte";
   import FlowLog from "../components/FlowLog.svelte";
@@ -167,62 +168,9 @@
     snapshot.state === "done" && snapshot.kind?.kind === "install" && status?.state === "connected",
   );
 
-  let menuOpen = $state(false);
-  let menu: HTMLDetailsElement | undefined = $state();
   let confirmUninstall = $state(false);
 
-  /** The More menu closes on a click elsewhere or on Escape, like a native menu. */
-  function onwindowclick(event: MouseEvent): void {
-    if (menuOpen && menu && !menu.contains(event.target as Node)) {
-      menuOpen = false;
-    }
-  }
-
-  function onwindowkeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape") {
-      if (menuOpen) {
-        menuOpen = false;
-        menu?.querySelector("summary")?.focus();
-      }
-      confirmUninstall = false;
-    }
-  }
-
-  /** Opening the menu focuses its first item; Up and Down move between items. */
-  function menuItems(): HTMLButtonElement[] {
-    return Array.from(menu?.querySelectorAll<HTMLButtonElement>("[role='menuitem']:not(:disabled)") ?? []);
-  }
-
-  async function onmenutoggle(): Promise<void> {
-    if (menuOpen) {
-      await tick();
-      menuItems()[0]?.focus();
-    }
-  }
-
-  function onmenukeydown(event: KeyboardEvent): void {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") {
-      return;
-    }
-    const items = menuItems();
-    if (items.length === 0) {
-      return;
-    }
-    const index = items.findIndex((item) => item === document.activeElement);
-    let next = 0;
-    if (event.key === "ArrowDown") {
-      next = (index + 1) % items.length;
-    } else if (event.key === "ArrowUp") {
-      next = (index - 1 + items.length) % items.length;
-    } else if (event.key === "End") {
-      next = items.length - 1;
-    }
-    event.preventDefault();
-    items[next]?.focus();
-  }
-
   async function begin(kind: FlowKind): Promise<void> {
-    menuOpen = false;
     confirmUninstall = false;
     await flowStore.begin(kind);
   }
@@ -233,7 +181,6 @@
   }
 
   async function dumpKernel(): Promise<void> {
-    menuOpen = false;
     if (!inTauri) {
       toasts.info("The save dialog needs the desktop app.");
       return;
@@ -279,36 +226,7 @@
   }
 </script>
 
-<svelte:window onclick={onwindowclick} onkeydown={onwindowkeydown} />
-
 <div class="page">
-  <header class="top">
-    <p class="lede">
-      Four stages: put the console in FEL mode, check the kernel package, run the install, and
-      confirm the result. Nothing is written until stage 3 starts.
-    </p>
-    <details class="menu" bind:open={menuOpen} bind:this={menu} ontoggle={onmenutoggle}>
-      <summary class="btn btn-quiet" aria-haspopup="menu">
-        More
-        <Icon name="more" size={16} />
-      </summary>
-      <div class="menu-items" role="menu" tabindex="-1" aria-label="Other actions" onkeydown={onmenukeydown}>
-        <button type="button" role="menuitem" disabled={!canStart} onclick={() => void begin({ kind: "memboot" })}>
-          <Icon name="play" size={16} />
-          <span>Boot from memory only <small>Recovery shell, nothing written</small></span>
-        </button>
-        <button type="button" role="menuitem" disabled={!canStart} onclick={() => { menuOpen = false; confirmUninstall = true; }}>
-          <Icon name="undo" size={16} />
-          <span>Return to the original system… <small>Removes hakchi</small></span>
-        </button>
-        <button type="button" role="menuitem" disabled={!canStart} onclick={() => void dumpKernel()}>
-          <Icon name="save" size={16} />
-          <span>Save the stock kernel… <small>Backup to a file</small></span>
-        </button>
-      </div>
-    </details>
-  </header>
-
   <div class="columns">
   <ol class="stages left">
     <!-- Stage 1 -->
@@ -427,38 +345,12 @@
         {#if blocker && snapshot.state === "idle"}
           <p class="muted small">{blocker}</p>
         {/if}
-        {#if confirmUninstall}
-          <div class="confirm" role="group" aria-label="Confirm returning to the original system">
-            <p>
-              This flashes the original kernel back and removes hakchi from the console. Games
-              added with hakchi will no longer appear; the console's own games are untouched.
-            </p>
-            <div class="confirm-actions">
-              <button type="button" class="btn btn-danger" onclick={() => void begin({ kind: "uninstall", stock_kernel: null, force_stock_kernel: false })}>
-                Return the console to its original system
-              </button>
-              <button type="button" class="btn btn-quiet" onclick={() => (confirmUninstall = false)}>Keep hakchi</button>
-            </div>
-          </div>
-        {/if}
         {#if snapshot.cancel_pending}
           <p class="note">The current step writes to the console's flash, so it finishes first. Do not unplug the console.</p>
         {/if}
       </div>
     </li>
-  </ol>
 
-  <div class="right">
-    <section class="card progress" aria-label="Steps and log of the run">
-      <div class="steps-scroll">
-        <StepList steps={flowStore.steps} now={flowStore.now} />
-      </div>
-      {#if snapshot.state !== "idle"}
-        <FlowLog since={snapshot.started_at} grow />
-      {/if}
-    </section>
-
-  <ol class="stages">
     <!-- Stage 4 -->
     <li class="stage" class:complete={snapshot.state === "done"} class:failed={snapshot.state === "failed"}>
       <span class="number" aria-hidden="true">
@@ -510,9 +402,76 @@
       </div>
     </li>
   </ol>
+
+  <div class="right">
+    <section class="card progress" aria-labelledby="steps-heading">
+      <div class="progress-head">
+        <h2 id="steps-heading">Install steps</h2>
+        {#if snapshot.state === "idle"}
+          <span class="muted">What happens when you press Install, in order.</span>
+        {:else if flowElapsed}
+          <span class="muted num">{flowElapsed}</span>
+        {/if}
+      </div>
+      <div class="steps-scroll">
+        <StepList steps={flowStore.steps} now={flowStore.now} />
+      </div>
+      {#if snapshot.state !== "idle"}
+        <FlowLog since={snapshot.started_at} grow />
+      {/if}
+    </section>
+
+    <section class="card tools" aria-labelledby="tools-heading">
+      <h2 id="tools-heading">Other actions</h2>
+      <ul class="tools-list">
+        <li>
+          <div class="tool-text">
+            <strong>Boot from memory only</strong>
+            <span class="muted">Starts hakchi's recovery shell from RAM. Nothing is written.</span>
+          </div>
+          <button type="button" class="btn" disabled={!canStart} onclick={() => void begin({ kind: "memboot" })}>
+            <Icon name="play" size={16} />
+            Boot
+          </button>
+        </li>
+        <li>
+          <div class="tool-text">
+            <strong>Save the stock kernel</strong>
+            <span class="muted">Copies the console's original kernel to a file, for safe keeping.</span>
+          </div>
+          <button type="button" class="btn" disabled={!canStart} onclick={() => void dumpKernel()}>
+            <Icon name="save" size={16} />
+            Save…
+          </button>
+        </li>
+        <li>
+          <div class="tool-text">
+            <strong>Return to the original system</strong>
+            <span class="muted">Removes hakchi and flashes the original kernel back.</span>
+          </div>
+          <button type="button" class="btn" disabled={!canStart} onclick={() => (confirmUninstall = true)}>
+            <Icon name="undo" size={16} />
+            Return…
+          </button>
+        </li>
+      </ul>
+    </section>
   </div>
   </div>
 </div>
+
+<Dialog open={confirmUninstall} title="Return the console to its original system" width="520px" onclose={() => (confirmUninstall = false)}>
+  <p>
+    This flashes the original kernel back and removes hakchi from the console. Games added
+    with hakchi will no longer appear; the console's own games are untouched.
+  </p>
+  {#snippet actions()}
+    <button type="button" class="btn btn-danger" onclick={() => void begin({ kind: "uninstall", stock_kernel: null, force_stock_kernel: false })}>
+      Return the console to its original system
+    </button>
+    <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (confirmUninstall = false)}>Keep hakchi</button>
+  {/snippet}
+</Dialog>
 
 <style>
   .page {
@@ -522,13 +481,6 @@
     flex-direction: column;
     gap: var(--space-4);
     overflow: hidden;
-  }
-
-  .top {
-    flex: none;
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-4);
   }
 
   /* Narrow: the stages and the progress stack in one scrolling column. Wide (1100 px and
@@ -556,6 +508,57 @@
     flex-direction: column;
     gap: var(--space-3);
     padding: var(--space-4) var(--space-5);
+  }
+
+  .progress-head {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .progress-head .muted {
+    font-size: var(--text-md);
+  }
+
+  .tools {
+    flex: none;
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .tools h2 {
+    margin-bottom: var(--space-2);
+  }
+
+  .tools-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tools-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .tool-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--text-md);
+  }
+
+  .tools-list .btn {
+    flex: none;
   }
 
   .steps-scroll {
@@ -593,85 +596,6 @@
       flex: 0 1 auto;
     }
 
-    .right > .stages {
-      flex: none;
-    }
-  }
-
-  .lede {
-    color: var(--text-muted);
-    max-width: 60ch;
-  }
-
-  .menu {
-    position: relative;
-    margin-left: auto;
-    flex: none;
-  }
-
-  .menu > summary {
-    list-style: none;
-  }
-
-  .menu > summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .menu-items {
-    position: absolute;
-    right: 0;
-    top: calc(100% + var(--space-1));
-    z-index: 10;
-    min-width: 320px;
-    padding: var(--space-1);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-m);
-    box-shadow: var(--shadow-float);
-    display: flex;
-    flex-direction: column;
-    animation: menu-in var(--motion-fast) var(--ease-out);
-  }
-
-  @keyframes menu-in {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  .menu-items button {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    min-height: var(--control-lg);
-    padding: var(--space-1) var(--space-3);
-    border: 0;
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .menu-items button:hover:not(:disabled) {
-    background: var(--surface-hover);
-  }
-
-  .menu-items button:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-
-  .menu-items small {
-    display: block;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
   }
 
   .stages {

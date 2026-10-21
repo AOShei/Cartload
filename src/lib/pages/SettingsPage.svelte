@@ -238,7 +238,7 @@
   @media (min-width: 1100px) {
     .page {
       display: grid;
-      grid-template-columns: minmax(0, 640px) minmax(360px, 520px);
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
       grid-template-rows: minmax(0, 1fr);
       gap: var(--space-5);
       max-width: none;
@@ -248,6 +248,14 @@
     .column {
       max-height: 100%;
       overflow: auto;
+    }
+
+    .column > :last-child {
+      flex: 1 0 auto;
+    }
+
+    .about > :last-child {
+      margin-top: auto;
     }
   }
 

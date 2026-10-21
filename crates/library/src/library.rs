@@ -130,6 +130,50 @@ impl Library {
         self.root.join(code)
     }
 
+    /// Directory of the pictures chosen for folders.
+    pub fn folders_dir(&self) -> PathBuf {
+        self.root.join("folders")
+    }
+
+    /// The cover and the thumbnail of a folder picture, by stem.
+    pub fn folder_image_files(&self, stem: &str) -> (PathBuf, PathBuf) {
+        let dir = self.folders_dir();
+        (
+            dir.join(format!("{stem}.png")),
+            dir.join(format!("{stem}_small.png")),
+        )
+    }
+
+    /// Makes a folder picture from any supported image and stores it under a new stem, the
+    /// same sizes as a game's cover. Returns the stem.
+    pub fn store_folder_image(
+        &self,
+        image: &[u8],
+        options: &images::CoverOptions,
+    ) -> Result<String> {
+        let set = images::make_cover(image, options)?;
+        let dir = self.folders_dir();
+        std::fs::create_dir_all(&dir).map_err(|e| io_error("create", &dir, e))?;
+        let stem = format!(
+            "f{:x}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or_default()
+        );
+        let (cover, thumbnail) = self.folder_image_files(&stem);
+        std::fs::write(&cover, &set.cover).map_err(|e| io_error("write", &cover, e))?;
+        std::fs::write(&thumbnail, &set.thumbnail).map_err(|e| io_error("write", &thumbnail, e))?;
+        Ok(stem)
+    }
+
+    /// Deletes a stored folder picture; a missing one is fine.
+    pub fn remove_folder_image(&self, stem: &str) {
+        let (cover, thumbnail) = self.folder_image_files(stem);
+        let _ = std::fs::remove_file(cover);
+        let _ = std::fs::remove_file(thumbnail);
+    }
+
     /// The settings.
     pub fn config(&self) -> Result<LibraryConfig> {
         let path = self.root.join(LIBRARY_JSON);

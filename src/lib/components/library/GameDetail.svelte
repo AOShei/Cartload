@@ -301,25 +301,6 @@
         {/snippet}
       </Dialog>
 
-      <div class="remove">
-        {#if libraryStore.removePrompt}
-          <div class="confirm" role="group" aria-label="Confirm removing the game">
-            <p>Remove “{game.game.name}” from the library? It leaves the console at the next sync.</p>
-            <div class="confirm-actions">
-              <button type="button" class="btn btn-danger btn-sm" onclick={removeSelected} disabled={libraryStore.removing}>
-                {#if libraryStore.removing}<span class="spinner" aria-hidden="true"></span>{/if}
-                {libraryStore.removing ? "Removing…" : "Remove 1 game"}
-              </button>
-              <button type="button" class="btn btn-quiet btn-sm" onclick={() => (libraryStore.removePrompt = false)}>Keep</button>
-            </div>
-          </div>
-        {:else}
-          <button type="button" class="btn btn-quiet" onclick={() => (libraryStore.removePrompt = true)} title="Remove (Delete)">
-            <Icon name="trash" size={16} />
-            <span>Remove from the library…</span>
-          </button>
-        {/if}
-      </div>
     </div>
   {:else if single?.kind === "original"}
     <div class="scroll">
@@ -337,9 +318,24 @@
   {:else if folderTile(single)}
     {@const tile = folderTile(single)!}
     <div class="scroll">
-      <div class="cover plain folder"><Icon name="folder" size={48} /></div>
+      {#if tile.cover}
+        <div class="cover"><img src={tile.cover} alt="Picture of the folder {tile.folder.name}" decoding="async" crossorigin="anonymous" /></div>
+      {:else}
+        <div class="cover plain folder"><Icon name="folder" size={48} /></div>
+      {/if}
+      <div class="art-actions">
+        <button type="button" class="btn" onclick={() => void libraryStore.chooseFolderImage(tile.path)} disabled={libraryStore.menuBusy}>
+          <Icon name="image" size={16} />
+          <span>{tile.cover ? "Change picture…" : "Choose picture…"}</span>
+        </button>
+        {#if tile.cover}
+          <button type="button" class="btn btn-quiet" onclick={() => void libraryStore.clearFolderImage(tile.path)} disabled={libraryStore.menuBusy}>
+            Plain icon
+          </button>
+        {/if}
+      </div>
       <h3>{tile.folder.name}</h3>
-      <p class="muted">{tile.games} game{tile.games === 1 ? "" : "s"} inside. Double-click it, or press Enter, to open it. Rename or remove it from the folder tree.</p>
+      <p class="muted">{tile.games} game{tile.games === 1 ? "" : "s"} inside. The picture shows on the console's menu, like a game's cover. Double-click the folder, or press Enter, to open it.</p>
       <button type="button" class="btn" onclick={() => libraryStore.openFolder(tile.path)}>Open folder</button>
     </div>
   {:else if count > 1}
@@ -362,23 +358,10 @@
           </select>
         </label>
         {#if selectedGames.length > 0}
-          {#if libraryStore.removePrompt}
-            <div class="confirm" role="group" aria-label="Confirm removing the games">
-              <p>Remove {selectedGames.length} games from the library? They leave the console at the next sync.</p>
-              <div class="confirm-actions">
-                <button type="button" class="btn btn-danger btn-sm" onclick={removeSelected} disabled={libraryStore.removing}>
-                  {#if libraryStore.removing}<span class="spinner" aria-hidden="true"></span>{/if}
-                  {libraryStore.removing ? "Removing…" : `Remove ${selectedGames.length} games`}
-                </button>
-                <button type="button" class="btn btn-quiet btn-sm" onclick={() => (libraryStore.removePrompt = false)}>Keep</button>
-              </div>
-            </div>
-          {:else}
-            <button type="button" class="btn btn-quiet" onclick={() => (libraryStore.removePrompt = true)} title="Remove (Delete)">
-              <Icon name="trash" size={16} />
-              <span>Remove {selectedGames.length} games…</span>
-            </button>
-          {/if}
+          <button type="button" class="btn btn-quiet" onclick={() => (libraryStore.removePrompt = true)} title="Remove (Delete)">
+            <Icon name="trash" size={16} />
+            <span>Remove {selectedGames.length} games…</span>
+          </button>
         {/if}
       </div>
     </div>
@@ -389,6 +372,26 @@
     </div>
   {/if}
 </div>
+
+<Dialog
+  open={libraryStore.removePrompt && selectedGames.length > 0}
+  title={selectedGames.length === 1 ? "Remove this game?" : `Remove ${selectedGames.length} games?`}
+  width="460px"
+  onclose={() => (libraryStore.removePrompt = false)}
+>
+  {#if selectedGames.length === 1}
+    <p>“{selectedGames[0]?.game.name}” leaves the library now and the console at the next sync. The ROM file you imported is not touched.</p>
+  {:else}
+    <p>They leave the library now and the console at the next sync. The ROM files you imported are not touched.</p>
+  {/if}
+  {#snippet actions()}
+    <button type="button" class="btn btn-danger" onclick={removeSelected} disabled={libraryStore.removing}>
+      {#if libraryStore.removing}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="trash" size={16} />{/if}
+      {libraryStore.removing ? "Removing…" : selectedGames.length === 1 ? "Remove game" : `Remove ${selectedGames.length} games`}
+    </button>
+    <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (libraryStore.removePrompt = false)}>Keep</button>
+  {/snippet}
+</Dialog>
 
 <style>
   .pane {
@@ -617,11 +620,6 @@
     user-select: text;
   }
 
-  .remove {
-    margin-top: auto;
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--border);
-  }
 
   .bulk {
     display: flex;

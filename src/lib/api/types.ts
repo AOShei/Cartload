@@ -280,7 +280,7 @@ export interface LibraryView {
 
 export type Position = "left-back" | "leftmost" | "left" | "right" | "rightmost" | "back";
 
-export type FolderImage = "folder" | "back" | "home" | "number" | { letter: string };
+export type FolderImage = "folder" | "back" | "home" | "number" | { letter: string } | { custom: string };
 
 export interface MenuFolder {
   kind: "folder";
@@ -318,6 +318,8 @@ export interface MenuView {
   custom: boolean;
   system_code: string | null;
   originals: OriginalView[];
+  /** The pictures chosen for folders, by stem. */
+  folder_art: Record<string, { cover: string; thumbnail: string }>;
 }
 
 /** A path of entry indices from the root menu; `[]` is the root itself. */
@@ -328,7 +330,8 @@ export type MenuItem = { kind: "game"; code: string } | { kind: "folder"; path: 
 export type MenuEdit =
   | { op: "add_folder"; parent: MenuPath; name: string }
   | { op: "rename_folder"; path: MenuPath; name: string }
-  | { op: "remove_folder"; path: MenuPath };
+  | { op: "remove_folder"; path: MenuPath }
+  | { op: "set_folder_image"; path: MenuPath; file: string | null };
 
 export interface ImportedGame {
   code: string;

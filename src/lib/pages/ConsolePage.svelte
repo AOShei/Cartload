@@ -104,7 +104,8 @@
 
   {#if status}
     <section class="card raw" aria-labelledby="raw-heading">
-      <h2 id="raw-heading" class="caps">Everything detected, as data</h2>
+      <h2 id="raw-heading" class="caps">Technical details</h2>
+      <p class="muted raw-lede">Everything the console reported, for support and bug reports.</p>
       <pre>{JSON.stringify(status, null, 2)}</pre>
     </section>
   {/if}
@@ -134,6 +135,12 @@
     padding: var(--space-4) var(--space-5);
   }
 
+  .raw-lede {
+    flex: none;
+    padding: 0 var(--space-4) var(--space-3);
+    font-size: var(--text-md);
+  }
+
   .details h2 {
     margin-bottom: var(--space-3);
   }
@@ -148,8 +155,11 @@
 
   .raw h2 {
     flex: none;
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--border);
+    padding: var(--space-3) var(--space-4) var(--space-1);
+  }
+
+  .raw pre {
+    border-top: 1px solid var(--border);
   }
 
   .raw pre {
@@ -173,6 +183,10 @@
     .main {
       max-height: 100%;
       overflow: auto;
+    }
+
+    .details {
+      flex: 1 0 auto;
     }
 
     .raw {

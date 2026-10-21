@@ -7,6 +7,7 @@
 //! progress.
 
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, PoisonError},
 };
@@ -17,7 +18,7 @@ use cartload_library::{
     art::{self, ApiKey, ArtEvent, ArtOptions, ArtReport, Client, HttpTransport},
     codes, hashdb,
     images::CoverOptions,
-    menu::{self, Entry, GameRef, MenuItem, MenuPath},
+    menu::{self, Entry, FolderImage, GameRef, MenuItem, MenuPath},
     rom,
 };
 use serde::{Deserialize, Serialize};
@@ -88,6 +89,17 @@ pub struct MenuView {
     pub system_code: Option<String>,
     /// The firmware games of that console, when cached.
     pub originals: Vec<OriginalView>,
+    /// The pictures chosen for folders, by stem.
+    pub folder_art: BTreeMap<String, FolderArtView>,
+}
+
+/// Where the webview loads a folder's chosen picture from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct FolderArtView {
+    /// 228 × 204.
+    pub cover: String,
+    /// 40 × 40.
+    pub thumbnail: String,
 }
 
 /// One game that an import produced.
@@ -267,6 +279,13 @@ pub enum MenuEdit {
     RemoveFolder {
         /// The folder.
         path: MenuPath,
+    },
+    /// A picture for a folder: an image file to make it from, or none for the plain icon.
+    SetFolderImage {
+        /// The folder.
+        path: MenuPath,
+        /// The image file, any supported format.
+        file: Option<String>,
     },
 }
 
@@ -536,12 +555,14 @@ impl LibraryState {
                 .collect(),
             None => Vec::new(),
         };
+        let folder_art = self.folder_art(&menu.entries);
         Ok(MenuView {
             entries: menu.entries,
             options,
             custom,
             system_code,
             originals,
+            folder_art,
         })
     }
 
@@ -593,11 +614,65 @@ impl LibraryState {
         status: &ConsoleStatus,
         edit: &MenuEdit,
     ) -> Result<(), CommandError> {
+        // The image file is read here, outside the tree edit, so a missing file is a plain
+        // command error and the tree stays untouched.
+        let picture = match edit {
+            MenuEdit::SetFolderImage {
+                file: Some(file), ..
+            } => Some(std::fs::read(file).map_err(|e| {
+                CommandError::new(format!("The image could not be read: {file}"))
+                    .with_detail(e.to_string())
+            })?),
+            _ => None,
+        };
         self.edit_menu(status, |menu| match edit {
             MenuEdit::AddFolder { parent, name } => menu.add_folder(parent, name).map(|_| ()),
             MenuEdit::RenameFolder { path, name } => menu.rename_folder(path, name),
             MenuEdit::RemoveFolder { path } => menu.remove_folder(path),
+            MenuEdit::SetFolderImage { path, file } => {
+                let previous = match menu.folder_image(path) {
+                    Some(FolderImage::Custom(stem)) => Some(stem.clone()),
+                    _ => None,
+                };
+                let image = match (file, &picture) {
+                    (Some(_), Some(bytes)) => FolderImage::Custom(
+                        self.library
+                            .store_folder_image(bytes, &CoverOptions::default())?,
+                    ),
+                    _ => FolderImage::Folder,
+                };
+                menu.set_folder_image(path, image)?;
+                if let Some(stem) = previous {
+                    self.library.remove_folder_image(&stem);
+                }
+                Ok(())
+            }
         })
+    }
+
+    /// The URLs of every custom folder picture in the tree.
+    fn folder_art(&self, entries: &[Entry]) -> BTreeMap<String, FolderArtView> {
+        let mut out = BTreeMap::new();
+        for entry in entries {
+            if let Entry::Folder(folder) = entry {
+                if let FolderImage::Custom(stem) = &folder.image {
+                    let (cover, thumbnail) = self.library.folder_image_files(stem);
+                    out.insert(
+                        stem.clone(),
+                        FolderArtView {
+                            cover: folder_art_url(stem, &format!("{stem}.png"), file_size(&cover)),
+                            thumbnail: folder_art_url(
+                                stem,
+                                &format!("{stem}_small.png"),
+                                file_size(&thumbnail),
+                            ),
+                        },
+                    );
+                }
+                out.extend(self.folder_art(&folder.entries));
+            }
+        }
+        out
     }
 
     /// Brings the edited tree in line with the library, when there is one. With `into`, the
@@ -930,6 +1005,13 @@ impl LibraryState {
                 }
                 std::fs::read(self.library.game_dir(code).join(file)).ok()
             }
+            // `/folders/<stem>/<file>`: a picture chosen for a folder.
+            ["folders", stem, file] => {
+                if !is_folder_stem(stem) || !is_art_file(stem, file) {
+                    return None;
+                }
+                std::fs::read(self.library.folders_dir().join(file)).ok()
+            }
             // `/<system>/<code>/<file>`: the firmware's art of a stock game, cached per console.
             [system, code, file] => {
                 if !codes::is_original(code) || !is_art_file(code, file) {
@@ -940,6 +1022,13 @@ impl LibraryState {
             _ => None,
         }
     }
+}
+
+/// Whether `stem` names a stored folder picture (`f` and hex digits, as the library makes
+/// them): nothing else reaches the file system.
+fn is_folder_stem(stem: &str) -> bool {
+    let mut chars = stem.chars();
+    chars.next() == Some('f') && stem.len() > 1 && chars.all(|c| c.is_ascii_hexdigit())
 }
 
 /// Whether `file` is the cover (`<code>.png`) or the thumbnail (`<code>_small.png`) of `code`.
@@ -972,6 +1061,17 @@ pub fn cover_url(code: &str, file: &str, version: u64) -> String {
     } else {
         format!("{COVER_SCHEME}://localhost/{code}/{file}?v={version}")
     }
+}
+
+/// Size of a file, 0 when it is missing: enough of a version for a picture stored under a
+/// fresh stem each time.
+fn file_size(path: &Path) -> u64 {
+    std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
+
+/// The URL the webview loads a folder's chosen picture from (`/folders/<stem>/<file>`).
+pub fn folder_art_url(stem: &str, file: &str, version: u64) -> String {
+    cover_url(&format!("folders/{stem}"), file, version)
 }
 
 /// The URL the webview loads a stock game's firmware art from (`/<system>/<code>/<file>`).

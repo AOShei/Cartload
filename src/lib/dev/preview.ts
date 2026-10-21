@@ -498,6 +498,7 @@ export function previewLibrary(): { view: LibraryView; menu: MenuView } {
     menu: {
       entries: count === 0 ? [] : lettersMenu(byName, originals),
       options: { structure: { kind: "letters" }, originals_at_root: true },
+      folder_art: {},
       custom: name === "many",
       system_code: connected ? "snes-eur" : null,
       originals,
