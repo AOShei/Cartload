@@ -32,8 +32,11 @@ jobs:
             patchelf
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          # Pinned: clippy adds lints every release and the workspace denies warnings.
+          # Bump this together with the local toolchain.
+          toolchain: "1.95.0"
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
