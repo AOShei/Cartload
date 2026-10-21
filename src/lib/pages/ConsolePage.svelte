@@ -56,26 +56,20 @@
 </script>
 
 <div class="page">
-  <StatusCard
-    {report}
-    refreshing={consoleStore.refreshing}
-    {primary}
-    onrefresh={() => void consoleStore.refresh()}
-  />
+  <div class="main">
+    <StatusCard
+      {report}
+      refreshing={consoleStore.refreshing}
+      {primary}
+      onrefresh={() => void consoleStore.refresh()}
+    />
 
-  {#if report && report.details.length > 0}
-    <section class="card details" aria-label="Detected details">
-      <h2>Detected</h2>
-      <DetailsList details={report.details} />
-    </section>
-  {/if}
-
-  {#if status}
-    <details class="raw">
-      <summary>Everything detected, as data</summary>
-      <pre>{JSON.stringify(status, null, 2)}</pre>
-    </details>
-  {/if}
+    {#if report && report.details.length > 0}
+      <section class="card details" aria-label="Detected details">
+        <h2>Detected</h2>
+        <DetailsList details={report.details} />
+      </section>
+    {/if}
 
   {#if app.devExec && status?.state === "connected"}
     <section class="card dev" aria-label="Run a command on the console">
@@ -106,9 +100,20 @@
       {/if}
     </section>
   {/if}
+  </div>
+
+  {#if status}
+    <section class="card raw" aria-labelledby="raw-heading">
+      <h2 id="raw-heading" class="caps">Everything detected, as data</h2>
+      <pre>{JSON.stringify(status, null, 2)}</pre>
+    </section>
+  {/if}
 </div>
 
 <style>
+  /* Narrow: one scrolling column, the data in a fixed-height box. Wide (1100 px and up):
+     the status card and the table on the left, the data in a panel on the right that
+     scrolls inside its column. */
   .page {
     flex: 1;
     min-height: 0;
@@ -116,6 +121,13 @@
     flex-direction: column;
     gap: var(--space-4);
     overflow: auto;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
   }
 
   .details {
@@ -127,17 +139,51 @@
   }
 
   .raw {
-    font-size: var(--text-md);
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .raw h2 {
+    flex: none;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
   }
 
   .raw pre {
-    margin: var(--space-2) 0 0;
-    padding: var(--space-3);
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
     max-height: 320px;
     overflow: auto;
-    background: var(--surface-raised);
-    border-radius: var(--radius-s);
+    font-size: var(--text-sm);
     user-select: text;
+  }
+
+  @media (min-width: 1100px) {
+    .page {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(340px, 34%);
+      grid-template-rows: minmax(0, 1fr);
+      gap: var(--space-5);
+      overflow: hidden;
+    }
+
+    .main {
+      max-height: 100%;
+      overflow: auto;
+    }
+
+    .raw {
+      max-height: 100%;
+    }
+
+    .raw pre {
+      flex: 1;
+      min-height: 0;
+      max-height: none;
+    }
   }
 
   .dev {
