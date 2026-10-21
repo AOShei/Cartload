@@ -70,6 +70,7 @@
 </script>
 
 <div class="page">
+  <div class="column">
   <section class="card" aria-labelledby="theme-heading">
     <h2 id="theme-heading">Appearance</h2>
     <fieldset>
@@ -160,7 +161,9 @@
       </div>
     {/if}
   </section>
+  </div>
 
+  <div class="column">
   <section class="card about" aria-labelledby="about-heading" bind:this={about} tabindex="-1">
     <div class="identity">
       <AppMark size={64} />
@@ -209,9 +212,12 @@
       </details>
     {/if}
   </section>
+  </div>
 </div>
 
 <style>
+  /* Narrow: one scrolling column. Wide (1100 px and up): the settings on the left and the
+     About card on the right, each column scrolling on its own. */
   .page {
     flex: 1;
     min-height: 0;
@@ -220,6 +226,29 @@
     gap: var(--space-4);
     max-width: 768px;
     overflow: auto;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  @media (min-width: 1100px) {
+    .page {
+      display: grid;
+      grid-template-columns: minmax(0, 640px) minmax(360px, 520px);
+      grid-template-rows: minmax(0, 1fr);
+      gap: var(--space-5);
+      max-width: none;
+      overflow: hidden;
+    }
+
+    .column {
+      max-height: 100%;
+      overflow: auto;
+    }
   }
 
   .card {
