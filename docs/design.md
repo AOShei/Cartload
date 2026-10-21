@@ -19,6 +19,8 @@ has to explain itself every time.
 2. The console's state is always visible (status bar) and always explained in one plain sentence
    with the next action.
 3. Progress is shown in place, never in modal dialogs. Long tasks show steps, timing and a log.
+   Editors are the one exception: a long text or a rarely used group of fields may open in a
+   dialog (`Dialog.svelte`) with Save and Cancel, so the panel it belongs to keeps its shape.
 4. Errors name the likely cause and what to do, in words a non-engineer understands. The raw
    detail is available under a disclosure.
 5. Nothing destructive without a way back: undo where possible, an explicit confirmation

@@ -607,3 +607,8 @@ export function previewSync(): { plan: SyncPlanView | null; snapshot: SyncSnapsh
       return { plan: null, snapshot: null, reviewing: false };
   }
 }
+
+/** The dialog named by `?dialog=description|advanced|changes`, opened once the page is up. */
+export function previewDialog(): string | null {
+  return typeof location !== "undefined" ? new URLSearchParams(location.search).get("dialog") : null;
+}

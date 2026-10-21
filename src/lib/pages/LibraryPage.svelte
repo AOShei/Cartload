@@ -94,11 +94,14 @@
     color: var(--danger);
   }
 
+  /* Three full-height columns; only their inner lists scroll. The tree never goes under
+     240 px ("Console menu" and "More games..." fit) and the detail panel under 340 px (the
+     fields need the room); both grow a little with the window. */
   .library {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 184px minmax(0, 1fr) 256px;
+    grid-template-columns: minmax(240px, 13vw) minmax(0, 1fr) minmax(340px, 20vw);
     grid-template-rows: minmax(0, 1fr) auto;
     gap: var(--space-3);
   }
@@ -118,6 +121,8 @@
 
   .bar {
     grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
   }
 
   .drop-overlay {
@@ -140,9 +145,5 @@
     font-weight: var(--weight-semibold);
   }
 
-  @media (max-width: 1023px) {
-    .library {
-      grid-template-columns: 168px minmax(0, 1fr) 240px;
-    }
-  }
+
 </style>

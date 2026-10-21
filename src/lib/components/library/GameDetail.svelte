@@ -1,7 +1,10 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
+  import Dialog from "../Dialog.svelte";
   import Icon from "../Icon.svelte";
+  import { inTauri } from "../../api/tauri";
   import type { Game, GameEdit, MenuEntry, MenuPath } from "../../api/types";
+  import { previewDialog } from "../../dev/preview";
   import { formatBytes, libraryStore, type Tile } from "../../state";
 
   const single = $derived(libraryStore.single);
@@ -57,6 +60,57 @@
 
   function revert(): void {
     form = snapshot ? { ...snapshot } : null;
+  }
+
+  /* The description and the advanced fields edit in dialogs (docs/design.md): the panel
+     keeps its shape and the editors get the room. Save writes the draft into the form and
+     saves the game; Cancel and Escape drop the draft. */
+  let descOpen = $state(false);
+  let descDraft = $state("");
+  let advOpen = $state(false);
+  let advDraft = $state({ application: "", args: "", compress: false });
+
+  function openDescription(): void {
+    descDraft = form?.description ?? "";
+    descOpen = true;
+  }
+
+  async function saveDescription(): Promise<void> {
+    if (!form) {
+      return;
+    }
+    form.description = descDraft;
+    descOpen = false;
+    await save();
+  }
+
+  function openAdvanced(): void {
+    if (form) {
+      advDraft = { application: form.application, args: form.args, compress: form.compress ?? false };
+      advOpen = true;
+    }
+  }
+
+  onMount(() => {
+    if (!inTauri) {
+      const wanted = previewDialog();
+      if (wanted === "description") {
+        openDescription();
+      } else if (wanted === "advanced") {
+        openAdvanced();
+      }
+    }
+  });
+
+  async function saveAdvanced(): Promise<void> {
+    if (!form) {
+      return;
+    }
+    form.application = advDraft.application;
+    form.args = advDraft.args;
+    form.compress = advDraft.compress;
+    advOpen = false;
+    await save();
   }
 
   async function removeSelected(): Promise<void> {
@@ -174,10 +228,15 @@
             <span>At the same time</span>
           </label>
         </div>
-        <label>
-          <span>Description</span>
-          <textarea rows="3" bind:value={form.description}></textarea>
-        </label>
+        <div class="field">
+          <span class="field-label" id="description-label">Description</span>
+          <button type="button" class="desc-preview" onclick={openDescription} aria-labelledby="description-label" aria-describedby="description-text" title="Edit the description">
+            <span class="clamp" id="description-text" class:muted={form.description.trim() === ""}>
+              {form.description.trim() === "" ? "No description yet." : form.description}
+            </span>
+            <span class="edit-tag" aria-hidden="true">Edit</span>
+          </button>
+        </div>
         {#if dirty}
           <div class="save-row">
             <button type="submit" class="btn btn-primary" disabled={libraryStore.saving}>
@@ -188,33 +247,59 @@
           </div>
         {/if}
 
-        <details class="advanced">
-          <summary>Advanced</summary>
-          <label>
-            <span>Launch command</span>
-            <input type="text" class="mono" bind:value={form.application} />
-          </label>
-          <label>
-            <span>Arguments</span>
-            <input type="text" class="mono" bind:value={form.args} />
-          </label>
-          <label class="check">
-            <input type="checkbox" bind:checked={form.compress} />
-            <span>Compress for the console (7z, needs the tiny7zx mod; roughly halves the space a SNES game takes)</span>
-          </label>
-          <p class="mono preview">{form.application} /var/games/{game.game.code}/{game.game.rom_file}{form.compress ? ".7z" : ""} {form.args}</p>
-          <dl class="facts">
-            <dt>Code</dt><dd class="mono">{game.game.code}</dd>
-            <dt>ROM</dt><dd class="mono">{game.game.rom_file}</dd>
-            <dt>Imported from</dt><dd>{game.game.original_file}</dd>
-            <dt>CRC-32</dt><dd class="mono">{game.game.crc32.toString(16).toUpperCase().padStart(8, "0")}</dd>
-            <dt>Size on the console</dt><dd class="num">{formatBytes(game.size)}{game.game.compress ? " (compressed)" : ""}</dd>
-            <dt>Saves</dt><dd class="num">{game.game.save_count}</dd>
-            {#if game.game.db_name}<dt>Hash database</dt><dd>{game.game.db_name}</dd>{/if}
-            {#if game.game.tgdb_id}<dt>TheGamesDB</dt><dd class="num">{game.game.tgdb_id}</dd>{/if}
-          </dl>
-        </details>
+        <div class="advanced-row">
+          <button type="button" class="btn btn-quiet btn-sm" onclick={openAdvanced}>
+            <Icon name="more" size={14} />
+            <span>Advanced…</span>
+          </button>
+          <span class="muted small mono">{game.game.code}{form.compress ? " · compressed" : ""}</span>
+        </div>
       </form>
+
+      <Dialog open={descOpen} title="Description of {game.game.name}" width="640px" onclose={() => (descOpen = false)}>
+        <textarea class="editor" rows="14" bind:value={descDraft} aria-label="Description" data-autofocus></textarea>
+        <p class="muted small">Shown on the console with the game's cover.</p>
+        {#snippet actions()}
+          <button type="button" class="btn btn-primary" onclick={saveDescription} disabled={libraryStore.saving}>
+            {#if libraryStore.saving}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+            {libraryStore.saving ? "Saving…" : "Save"}
+          </button>
+          <button type="button" class="btn btn-quiet" onclick={() => (descOpen = false)}>Cancel</button>
+        {/snippet}
+      </Dialog>
+
+      <Dialog open={advOpen} title="Advanced: {game.game.name}" width="600px" onclose={() => (advOpen = false)}>
+        <label>
+          <span>Launch command</span>
+          <input type="text" class="mono" bind:value={advDraft.application} data-autofocus />
+        </label>
+        <label>
+          <span>Arguments</span>
+          <input type="text" class="mono" bind:value={advDraft.args} />
+        </label>
+        <label class="check">
+          <input type="checkbox" bind:checked={advDraft.compress} />
+          <span>Compress for the console (7z, needs the tiny7zx mod; roughly halves the space a SNES game takes)</span>
+        </label>
+        <p class="mono preview">{advDraft.application} /var/games/{game.game.code}/{game.game.rom_file}{advDraft.compress ? ".7z" : ""} {advDraft.args}</p>
+        <dl class="facts">
+          <dt>Code</dt><dd class="mono">{game.game.code}</dd>
+          <dt>ROM</dt><dd class="mono">{game.game.rom_file}</dd>
+          <dt>Imported from</dt><dd>{game.game.original_file}</dd>
+          <dt>CRC-32</dt><dd class="mono">{game.game.crc32.toString(16).toUpperCase().padStart(8, "0")}</dd>
+          <dt>Size on the console</dt><dd class="num">{formatBytes(game.size)}{game.game.compress ? " (compressed)" : ""}</dd>
+          <dt>Saves</dt><dd class="num">{game.game.save_count}</dd>
+          {#if game.game.db_name}<dt>Hash database</dt><dd>{game.game.db_name}</dd>{/if}
+          {#if game.game.tgdb_id}<dt>TheGamesDB</dt><dd class="num">{game.game.tgdb_id}</dd>{/if}
+        </dl>
+        {#snippet actions()}
+          <button type="button" class="btn btn-primary" onclick={saveAdvanced} disabled={libraryStore.saving}>
+            {#if libraryStore.saving}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+            {libraryStore.saving ? "Saving…" : "Save"}
+          </button>
+          <button type="button" class="btn btn-quiet" onclick={() => (advOpen = false)}>Cancel</button>
+        {/snippet}
+      </Dialog>
 
       <div class="remove">
         {#if libraryStore.removePrompt}
@@ -328,6 +413,7 @@
 
   .cover {
     position: relative;
+    flex: none;
     aspect-ratio: 228 / 204;
     border-radius: var(--radius-m);
     overflow: hidden;
@@ -426,15 +512,79 @@
     color: var(--text-faint);
   }
 
-  .advanced {
-    margin-top: var(--space-2);
+  .field {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: 2px;
   }
 
-  .advanced summary {
-    font-size: var(--text-md);
+  .field-label {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  /* Three lines of the description, read-only; the whole block opens the editor. */
+  .desc-preview {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: calc(3 * var(--text-md) * var(--leading) + 2 * var(--space-2) + 2px);
+    padding: var(--space-2) var(--space-2);
+    padding-right: 52px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-s);
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+    cursor: text;
+    overflow: hidden;
+  }
+
+  .desc-preview:hover {
+    background: var(--surface-raised);
+  }
+
+  .clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: var(--leading);
+  }
+
+  .edit-tag {
+    position: absolute;
+    top: var(--space-1);
+    right: var(--space-1);
+    padding: 1px var(--space-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-s);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+  }
+
+  .desc-preview:hover .edit-tag {
+    color: var(--text);
+  }
+
+  .advanced-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+
+  .editor {
+    width: 100%;
+    min-height: 240px;
+    resize: vertical;
+    font-size: var(--text-base);
   }
 
   .preview {

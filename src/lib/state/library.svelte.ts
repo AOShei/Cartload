@@ -262,6 +262,11 @@ class LibraryStore {
           this.folder = path;
         }
       }
+      // `?select=N` selects the first N games of that folder, to show the detail panel.
+      const select = Number.parseInt(new URLSearchParams(location.search).get("select") ?? "", 10);
+      if (select > 0) {
+        this.selected = this.visibleTiles.filter((t) => t.kind === "game").slice(0, select).map((t) => t.id);
+      }
       return;
     }
     await on<ImportEvent>("library-import", (event) => this.onImportEvent(event));

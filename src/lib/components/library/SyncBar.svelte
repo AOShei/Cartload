@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { slide } from "svelte/transition";
+  import Dialog from "../Dialog.svelte";
   import Icon from "../Icon.svelte";
+  import { inTauri } from "../../api/tauri";
+  import { previewDialog } from "../../dev/preview";
   import { NORMAL, ms } from "../../motion";
   import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore } from "../../state";
 
@@ -37,15 +41,31 @@
     if (plan.noop) {
       return "The console is up to date.";
     }
+    // Explains the N of "Sync N changes": every change is one of these four.
     const parts: string[] = [];
     if (plan.uploads.length > 0) {
       parts.push(`${plan.uploads.length} file${plan.uploads.length === 1 ? "" : "s"} to upload (${formatBytes(plan.upload_size)})`);
     }
-    const removals = plan.deletions.length + plan.link_deletions.length + plan.empty_dirs.length;
-    if (removals > 0) {
-      parts.push(`${removals} to remove`);
+    if (plan.deletions.length > 0) {
+      parts.push(`${plan.deletions.length} file${plan.deletions.length === 1 ? "" : "s"} to remove`);
     }
-    return parts.join(", ") + ".";
+    if (plan.link_deletions.length > 0) {
+      parts.push(`${plan.link_deletions.length} link${plan.link_deletions.length === 1 ? "" : "s"} to reset`);
+    }
+    if (plan.empty_dirs.length > 0) {
+      parts.push(`${plan.empty_dirs.length} empty folder${plan.empty_dirs.length === 1 ? "" : "s"} to remove`);
+    }
+    return `${plan.changes} change${plan.changes === 1 ? "" : "s"}: ${parts.join(", ")}.`;
+  });
+
+  /** Files on the console that this library does not have: typically hakchi2 CE's copies. */
+  const replacesOthers = $derived(plan !== null && plan.deletions.length + plan.link_deletions.length > 0);
+  let changesOpen = $state(false);
+
+  onMount(() => {
+    if (!inTauri && previewDialog() === "changes") {
+      changesOpen = true;
+    }
   });
 
   const canSync = $derived(connected && plan !== null && plan.fits && !running && !syncStore.starting && !libraryStore.importing);
@@ -68,6 +88,41 @@
   );
 </script>
 
+{#snippet changeLists(p: NonNullable<typeof plan>, expanded: boolean)}
+  <div class="columns">
+    <details open={expanded || (p.uploads.length > 0 && p.uploads.length <= 12)}>
+      <summary><Icon name="upload" size={14} /> Upload {p.uploads.length} file{p.uploads.length === 1 ? "" : "s"} ({formatBytes(p.upload_size)})</summary>
+      <ul class="files mono">
+        {#each p.uploads as file (file.path)}
+          <li><span>{file.path.replace(/^\.\//, "")}</span><span class="num">{formatBytes(file.size)}</span></li>
+        {:else}
+          <li class="muted">Nothing to upload.</li>
+        {/each}
+      </ul>
+    </details>
+    <details open={expanded || (p.deletions.length + p.link_deletions.length + p.empty_dirs.length > 0 && p.deletions.length <= 12)}>
+      <summary><Icon name="trash" size={14} /> Remove {p.deletions.length} file{p.deletions.length === 1 ? "" : "s"}, reset {p.link_deletions.length} link{p.link_deletions.length === 1 ? "" : "s"}, remove {p.empty_dirs.length} empty folder{p.empty_dirs.length === 1 ? "" : "s"}</summary>
+      <ul class="files mono">
+        {#each p.deletions as path (path)}
+          <li><span>{path.replace(/^\.\//, "")}</span><span class="muted">file</span></li>
+        {/each}
+        {#each p.link_deletions as path (path)}
+          <li><span>{path.replace(/^\.\//, "")}</span><span class="muted">link</span></li>
+        {/each}
+        {#each p.empty_dirs as path (path)}
+          <li><span>{path.replace(/^\.\//, "")}</span><span class="muted">folder</span></li>
+        {/each}
+        {#if p.deletions.length + p.link_deletions.length + p.empty_dirs.length === 0}
+          <li class="muted">Nothing to remove.</li>
+        {/if}
+      </ul>
+    </details>
+  </div>
+  {#if p.deletions.length + p.link_deletions.length > 0}
+    <p class="muted">If hakchi2 CE synced this console, the first Cartload sync replaces its files with this library.</p>
+  {/if}
+{/snippet}
+
 <footer class="sync card" aria-label="Sync">
   {#if syncStore.reviewing && plan}
     <section class="panel" aria-label="Sync plan" transition:slide={{ duration: ms(NORMAL) }}>
@@ -78,28 +133,7 @@
       {#if plan.noop}
         <p>Nothing to transfer: the console already holds every file. Syncing anyway re-links the games and restarts the menu.</p>
       {/if}
-      <div class="columns">
-        <details open={plan.uploads.length > 0 && plan.uploads.length <= 12}>
-          <summary><Icon name="upload" size={14} /> Upload {plan.uploads.length} file{plan.uploads.length === 1 ? "" : "s"} ({formatBytes(plan.upload_size)})</summary>
-          <ul class="files mono">
-            {#each plan.uploads as file (file.path)}
-              <li><span>{file.path.replace(/^\.\//, "")}</span><span class="num">{formatBytes(file.size)}</span></li>
-            {:else}
-              <li class="muted">Nothing to upload.</li>
-            {/each}
-          </ul>
-        </details>
-        <details open={plan.deletions.length + plan.link_deletions.length + plan.empty_dirs.length > 0 && plan.deletions.length <= 12}>
-          <summary><Icon name="trash" size={14} /> Remove {plan.deletions.length} file{plan.deletions.length === 1 ? "" : "s"}, {plan.link_deletions.length} link{plan.link_deletions.length === 1 ? "" : "s"}, {plan.empty_dirs.length} director{plan.empty_dirs.length === 1 ? "y" : "ies"}</summary>
-          <ul class="files mono">
-            {#each [...plan.deletions, ...plan.link_deletions, ...plan.empty_dirs] as path (path)}
-              <li><span>{path.replace(/^\.\//, "")}</span></li>
-            {:else}
-              <li class="muted">Nothing to remove.</li>
-            {/each}
-          </ul>
-        </details>
-      </div>
+      {@render changeLists(plan, false)}
       <p class="muted">{plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} already on the console stay as they are. The console's menu restarts when the sync ends.</p>
       <div class="panel-actions">
         <button type="button" class="btn btn-primary" onclick={() => syncStore.run()} disabled={!canSync}>
@@ -178,8 +212,14 @@
       <span class="caps">Changes</span>
       <span class="muted pending-text">
         {#if syncStore.planning && !plan}<span class="spinner spinner-sm" aria-hidden="true"></span>{/if}
-        {pending}
+        <span>{pending}</span>
+        {#if plan && !plan.noop && plan.fits && !running}
+          <button type="button" class="btn btn-quiet btn-sm" onclick={() => (changesOpen = true)}>Show changes</button>
+        {/if}
       </span>
+      {#if replacesOthers && !running}
+        <span class="muted note">If hakchi2 CE synced this console, the first Cartload sync replaces its files with this library.</span>
+      {/if}
     </div>
     <button type="button" class="btn btn-primary" onclick={() => syncStore.review()} disabled={!canSync || syncStore.reviewing}>
       <Icon name="sync" size={16} />
@@ -188,6 +228,20 @@
   </div>
 </footer>
 
+{#if plan}
+  <Dialog open={changesOpen} title="What the sync will change" width="760px" onclose={() => (changesOpen = false)}>
+    <p class="muted num">{plan.games} games, {plan.originals} built in, {plan.folders} folders · {formatBytes(plan.total_size)} on the console · {plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} unchanged</p>
+    {@render changeLists(plan, true)}
+    {#snippet actions()}
+      <button type="button" class="btn btn-primary" onclick={() => { changesOpen = false; syncStore.review(); }} disabled={!canSync || syncStore.reviewing}>
+        <Icon name="sync" size={16} />
+        <span>{syncLabel}</span>
+      </button>
+      <button type="button" class="btn btn-quiet" onclick={() => (changesOpen = false)}>Close</button>
+    {/snippet}
+  </Dialog>
+{/if}
+
 <style>
   .sync {
     display: flex;
@@ -195,10 +249,13 @@
     border-radius: var(--radius-m);
   }
 
+  /* The explanation of the changes takes the rest of the row; on a narrow window it wraps
+     onto its own line rather than stacking its words. */
   .bar-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-5);
+    gap: var(--space-2) var(--space-5);
     padding: var(--space-2) var(--space-4);
     font-size: var(--text-md);
   }
@@ -215,13 +272,22 @@
   }
 
   .pending {
-    flex: 1;
+    flex: 1 1 420px;
+  }
+
+  .bar-row > .btn-primary {
+    margin-left: auto;
   }
 
   .pending-text {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: var(--space-2);
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-2);
+  }
+
+  .note {
+    font-size: var(--text-sm);
   }
 
   .pending.warn .pending-text {
@@ -303,9 +369,13 @@
     margin: var(--space-1) 0 0;
     padding: 0;
     list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  /* In the bar's review panel the lists stay short; the dialog lets its content scroll. */
+  .panel .files {
     max-height: 144px;
     overflow: auto;
-    font-size: var(--text-sm);
   }
 
   .files li {
