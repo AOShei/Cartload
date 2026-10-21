@@ -105,7 +105,7 @@
   {#if status}
     <section class="card raw" aria-labelledby="raw-heading">
       <h2 id="raw-heading" class="caps">Technical details</h2>
-      <p class="muted raw-lede">Everything the console reported, for support and bug reports.</p>
+      <p class="muted raw-lede">Raw data from the console, useful in bug reports.</p>
       <pre>{JSON.stringify(status, null, 2)}</pre>
     </section>
   {/if}
