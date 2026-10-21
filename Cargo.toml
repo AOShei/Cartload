@@ -5,6 +5,7 @@ members = [
     "crates/console",
     "crates/hmod",
     "crates/library",
+    "crates/flow",
     "src-tauri",
 ]
 
@@ -27,6 +28,7 @@ cartload-fel = { path = "crates/fel" }
 cartload-console = { path = "crates/console" }
 cartload-hmod = { path = "crates/hmod" }
 cartload-library = { path = "crates/library" }
+cartload-flow = { path = "crates/flow" }
 
 [workspace.lints.rust]
 unsafe_code = "warn"

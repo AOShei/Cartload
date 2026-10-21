@@ -9,6 +9,7 @@ Checklists land per crate as each one gains hardware-facing functionality:
 - `crates/console`: discovery, SSH and FTP against a booted hakchi kernel (`04e8:6863`).
 - `crates/hmod`: kernel package install and version check on the console.
 - `crates/library`: sync of a small library and verification on the console menu.
+- `crates/flow`: the kernel install, memboot, dump and uninstall flows end to end.
 
 Each checklist states the starting console state, the exact command to run, and the expected
 output, so that a run can be reproduced and compared.
@@ -246,3 +247,164 @@ directory as busybox `ftpd` LIST lines after `INFO FTP welcome: ...`. All four a
 | Date | Console | Host | discover | info | exec / ls | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126, kernel 3.4.113.29-madmonkey | Linux 6.18.57, hakchi0 169.254.68.74 | OK, USB link and mDNS, dropbear_2018.76 | OK, output above | not run (brief allowed discover and info only) | first attempt failed auth until the `none` method was tried before `password` |
+
+## Install kernel
+
+Crate: `crates/flow`, binary `cartload-flow`. Runs hakchi2 CE's "Install / Repair" sequence
+end to end: memboot, grow the data partition, upload `hakchi.hmod`, run the device-side
+installer (`boot`), wait for the reboot, verify. This **writes to NAND**: u-boot, the kernel
+partition (after the installer backs the stock kernel up to its backup sectors) and the data
+partition. The flow must be attended: it waits for the console to be put in FEL mode and prints
+what to do. A failed or interrupted run is resumed by rerunning the same command; finished steps
+are reported as "already done".
+
+### Prerequisites
+
+- Everything from "FEL memboot" (udev rule, NetworkManager link-local profile for `hakchi0`)
+  and "Console connect" (firewall).
+- `HMOD` set to `hakchi.hmod` (v1.0.4-126, md5 `2e163a25c98b4c05bed274817abb38da`).
+- Console connected over USB. Powered off for a first install (stock firmware); any hakchi
+  state for a repair.
+- Nothing else answering at `169.254.13.37` (one console at a time).
+
+### 1. Dry run (no console needed)
+
+```
+cargo run -p cartload-flow -- --dry-run install --hmod "$HMOD"
+```
+
+Expected: `package:` (path, 9340382 bytes, the md5 above), `version:   v1.0.4-126 (boot 1.0.3,
+kernel 3.4.113.29-madmonkey)`, `flow:     install (13 steps)`, the 13 steps `memboot`,
+`wait-console`, `detect`, `check-md`, `grow`, `reboot-grown`, `wait-console`, `detect`,
+`prepare`, `upload`, `install`, `wait-console`, `verify`, each with its description, then
+`dry run: inputs are valid, not touching USB`. Exit 0. `--dry-run uninstall` and
+`--dry-run dump-kernel kernel.img` list 8 and 6 steps and need no package.
+
+### 2. Install from stock firmware
+
+```
+cargo run -p cartload-flow -- install --hmod "$HMOD"
+```
+
+Every step prints `[ n/13] name: description`, its log lines indented, then `=> done (time)`,
+`=> already done: reason` or `=> not needed: reason`. Expected per step on a NES or SNES
+Classic Mini (`-v` adds the debug lines, among them the `sunxi-part` output):
+
+1. `memboot`: `waiting up to 120 s for a console in FEL mode: hold Reset, switch Power on,
+   release Reset after two seconds`. Do that now. Within a second of the device appearing:
+   `FEL device 1f3a:efe8 on bus ...`, `membooting hakchi v1.0.4-126 (...) through FEL`,
+   `preparing the boot images`, `verifying the FEL device`, `initialising DRAM with fes1.bin`,
+   `uploading the boot image`, `boot image: ... / 4587520 bytes (...%)` up to 100 %,
+   `starting u-boot (boota)`, `uploaded 4587520 bytes and ran boota 47400000; ...`. The
+   console screen stays black. A few seconds.
+2. `wait-console`: `waiting up to 120 s for the console on the USB network`, then within
+   about 10 to 15 s `the console answers SSH at 169.254.13.37:22`. On the host `lsusb` shows
+   `04e8:6863` and `1f3a:efe8` is gone.
+3. `detect`: `console: minimal memboot shell (hwid 0461872a872802079d2818c76c118000)`.
+4. `check-md`: `=> not needed: not a Mega Drive partition layout`.
+5. `grow`: `growing the data partition (nandX) from A to B` (or `growing the data partition
+   (sunxi-part grow)` when the dry-run output is not parseable), then `data partition nandX is
+   now B`. Record the sizes and, with `-v`, the raw `sunxi-part` lines: the parser follows
+   hakchi2 CE's `(mbr|nand[a-z]):label:sectors` and has not seen real output yet.
+   If `UDISK is still listed` appears, the grow did not take and the step ends `not needed`.
+6. `reboot-grown`: `uploading the boot image for kexec (4585472 bytes)`, progress, `kexec: the
+   console drops off the network now and comes back in the memboot shell`. On the host
+   `hakchi0` disappears and comes back.
+7. `wait-console`: `the console left the USB network`, then `the console answers SSH at ...`
+   within about 20 s.
+8. `detect`: the memboot shell again, same hwid.
+9. `prepare`: `=> done` with no log lines (three commands: the two `echo >> /hakchi/config`
+   and `mkdir -p /hakchi/transfer/`).
+10. `upload`: `uploading .../hakchi.hmod (9340382 bytes, hakchi v1.0.4-126 (...))` and
+    `hakchi.hmod: ... / 9340382 bytes (...%)` up to 100 %. A few seconds over USB.
+11. `install`: `running the installer on the console; it takes a few minutes and the
+    connection drops when the console reboots`, then `console: ...` lines echoing the
+    installer (`installing hakchi...`, `package hakchi installed`, ...). The console shows
+    hakchi's default image during the install and then reboots into the normal menu. Any
+    `flash md5 mismatch!`, `invalid image` or `flash boot0 failed!` line stops the flow.
+12. `wait-console`: offline, then back within 180 s.
+13. `verify`: `console: hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey) installed
+    on SNES Classic Mini (EUR) (hwid ...)`, `installed: ...`, `games storage
+    /var/lib/hakchi/games: ...`. Then `install finished: 13 steps in N min`.
+
+Afterwards `cargo run -p cartload-console -- info` prints the "Console connect" output and
+`cargo run -p cartload-flow -- dump-kernel kernel.img` can read the stock kernel the installer
+backed up. Record: console model and region, total time, the step 5 sizes, the installer lines
+from step 11.
+
+### 3. Resume
+
+Interrupt the run with Ctrl-C during step 10 (`upload`), then rerun the same command. Expected
+first lines: `[ 1/13] memboot` `=> already done: the console is already in the memboot shell`,
+`[ 2/13] wait-console` `=> already done: the console is already reachable`, `detect` done,
+`check-md` not needed, `grow` `=> already done: no UDISK partition left; ...`, `reboot-grown`
+`=> already done: the partition table did not change in this run`, `wait-console` already,
+`detect` done, `prepare` `=> already done: cf_install and cf_update are set and
+/hakchi/transfer exists`, then `upload` runs (or is already done when the interrupted upload
+had completed and the md5 matches) and the install continues as in section 2.
+
+### 4. Repair from a running hakchi kernel
+
+Same command with the console booted normally. Expected difference in step 1: `found hakchi
+v1.0.4-126 (...) installed on ...`, `membooting the package's boot.img with kexec from the
+running kernel`, `uploading the boot image for kexec (4585472 bytes)`, progress, `kexec: the
+console drops off the network now ...`; no Reset button, no FEL. Step 2 reports `the console
+left the USB network` first. Step 5 is `already done` (no UDISK), step 6 too. Steps 9 to 13 as
+in section 2; the installer prints `updating hakchi...` lines instead of `installing`.
+
+### 5. Negative checks
+
+Only with **no console attached** (an attached hakchi console would be membooted):
+
+- `cargo run -p cartload-flow -- --wait-fel 5 install --hmod "$HMOD"`: step 1 fails after
+  5 s with `a console in FEL mode (USB 1f3a:efe8) appearing did not happen within 5 s; power
+  the console off, hold Reset, ...`, then `rerun the same command to resume`, exit 1.
+- `install --hmod Cargo.toml`: `reading Cargo.toml: hakchi.hmod: Cargo.toml is not a readable
+  gzip tar archive: invalid gzip header`, exit 1, nothing else runs.
+
+### Memboot only
+
+```
+cargo run -p cartload-flow -- memboot --hmod "$HMOD"
+```
+
+Steps 1 to 3 of the install (`memboot`, `wait-console`, `detect`), console in FEL mode as in
+section 2. Ends with `console: minimal memboot shell (hwid ...)` and `memboot finished: 3 steps
+in ...`; `cargo run -p cartload-console -- exec -- cat /hakchi/config` then shows
+`export cf_memboot='y'`. Nothing is written to NAND; power-cycle the console to leave the shell.
+From a running hakchi kernel the first step kexecs instead (section 4).
+
+### Dump stock kernel
+
+```
+cargo run -p cartload-flow -- dump-kernel kernel.img
+```
+
+On an installed console booted normally (no `--hmod` needed): step 1 `membooting the kernel from
+NAND with kexec from the running kernel`, steps 2 and 3 as above, step 4 `wrote kernel.img:
+N bytes, kernel-dp-sneseur-release-v2.0.14-0-gd8b65c6.img (SNES Classic Mini (EUR))` (the image
+name follows the console's stock firmware version; `not a known stock kernel image (md5 ...)`
+means a dump that hakchi2 CE would not accept either: record the md5), step 5 `rebooting the
+console`, step 6 `the console left the USB network`. The console then boots hakchi normally.
+Rerunning with the same file: step 4 `=> already done: kernel.img already holds ...`.
+
+### Uninstall
+
+```
+cargo run -p cartload-flow -- uninstall
+```
+
+On an installed console booted normally: steps 1 to 3 as for the dump, 4 `stock kernel from
+the console's backup: N bytes, kernel-dp-...`, 5 `uploading the stock kernel (...)`, progress,
+`flashing the stock kernel (hakchi flashBoot2, verified by MD5)`, 6 `console: uninstalling
+hakchi...`, `console: done.`, 7 `rebooting the console`, 8 `the console left the USB network`.
+The console boots the stock firmware: its menu appears and `lsusb` shows `1f3a:efe8` (normal
+boot) and no `04e8:6863`. `install` from section 2 puts hakchi back. A console with no backup
+(`no stock kernel backup on the console: ...`) needs `--stock-kernel kernel.img` from an earlier
+dump; a file whose md5 is unknown is refused unless `--force-stock-kernel` is given.
+
+### Results
+
+| Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | | not yet run on hardware |

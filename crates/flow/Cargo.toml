@@ -1,0 +1,46 @@
+[package]
+name = "cartload-flow"
+description = "Resumable, observable kernel install / uninstall / memboot flows for the Classic Mini consoles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "cartload_flow"
+
+[[bin]]
+name = "cartload-flow"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# Command-line binary and its dependencies (argument parsing, log output).
+cli = ["dep:anyhow", "dep:clap", "dep:tracing-subscriber"]
+
+[dependencies]
+async-trait = "0.1"
+# The three device crates without their CLIs; hmod without HTTP (the flow takes a package path).
+cartload-console = { path = "../console", default-features = false }
+cartload-fel = { path = "../fel", default-features = false }
+cartload-hmod = { path = "../hmod", default-features = false }
+md5 = "0.8"
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "fs", "macros", "rt-multi-thread"] }
+tracing.workspace = true
+
+# CLI only.
+anyhow = { workspace = true, optional = true }
+clap = { version = "4", features = ["derive"], optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile = "3"
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

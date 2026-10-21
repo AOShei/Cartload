@@ -484,6 +484,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "cartload-flow"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cartload-console",
+ "cartload-fel",
+ "cartload-hmod",
+ "clap",
+ "md5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "cartload-hmod"
 version = "0.1.0"
 dependencies = [
