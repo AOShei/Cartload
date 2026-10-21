@@ -11,10 +11,12 @@ pub mod commands;
 pub mod error;
 pub mod failure;
 pub mod flow;
+pub mod library;
 pub mod logging;
 pub mod package;
 pub mod state;
 pub mod status;
+pub mod sync;
 pub mod usb;
 pub mod watcher;
 
@@ -24,9 +26,11 @@ use tauri::{AppHandle, Emitter};
 
 use crate::{
     flow::{FlowRunner, FlowSink, FlowSnapshot, RunnerOptions},
+    library::LibraryState,
     logging::LogBuffer,
     state::AppState,
     status::StatusReport,
+    sync::{SyncRunner, SyncSink, SyncSnapshot},
     watcher::{StatusSink, Watcher, WatcherOptions},
 };
 
@@ -67,6 +71,12 @@ impl FlowSink for TauriSink {
     }
 }
 
+impl SyncSink for TauriSink {
+    fn sync_changed(&self, snapshot: &SyncSnapshot) {
+        self.emit(sync::SYNC_EVENT, snapshot);
+    }
+}
+
 /// The command handler, with `console_exec` only when the `dev-exec` feature is on.
 fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     #[cfg(feature = "dev-exec")]
@@ -83,6 +93,21 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             commands::flow_steps,
             commands::package_info,
             commands::package_update,
+            commands::library_list,
+            commands::library_import,
+            commands::library_update,
+            commands::library_remove,
+            commands::menu_get,
+            commands::menu_set_structure,
+            commands::menu_move,
+            commands::menu_edit,
+            commands::art_fetch,
+            commands::art_set_cover,
+            commands::tgdb_key_get,
+            commands::tgdb_key_set,
+            commands::sync_plan,
+            commands::sync_run,
+            commands::sync_status,
             commands::console_exec,
         ]
     }
@@ -100,6 +125,21 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             commands::flow_steps,
             commands::package_info,
             commands::package_update,
+            commands::library_list,
+            commands::library_import,
+            commands::library_update,
+            commands::library_remove,
+            commands::menu_get,
+            commands::menu_set_structure,
+            commands::menu_move,
+            commands::menu_edit,
+            commands::art_fetch,
+            commands::art_set_cover,
+            commands::tgdb_key_get,
+            commands::tgdb_key_set,
+            commands::sync_plan,
+            commands::sync_run,
+            commands::sync_status,
         ]
     }
 }
@@ -121,11 +161,30 @@ pub fn run() {
         flow::usb_backend(),
         RunnerOptions::default(),
     ));
+    let library = match LibraryState::open() {
+        Ok(library) => Arc::new(library),
+        Err(error) => {
+            eprintln!("could not open the games library: {error}");
+            std::process::exit(1);
+        }
+    };
+    let sync_runner = Arc::new(SyncRunner::new(
+        Arc::clone(&state),
+        Arc::clone(&watcher),
+        Arc::clone(&library),
+        sink.clone(),
+    ));
+    let covers = Arc::clone(&library);
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .manage(Arc::clone(&watcher))
         .manage(runner)
+        .manage(library)
+        .manage(sync_runner)
+        .register_uri_scheme_protocol(library::COVER_SCHEME, move |_ctx, request| {
+            covers.cover_response(request.uri().path_and_query().map_or("", |p| p.as_str()))
+        })
         .setup(move |app| {
             let handle = app.handle().clone();
             let _ = sink.handle.set(handle.clone());

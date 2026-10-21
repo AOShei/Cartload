@@ -26,6 +26,19 @@ export const ICONS = {
   circle: "M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0",
   dash: "M7 12h10",
   undo: "M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3",
+  folder: "M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z",
+  folderPlus: "M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM12 11v6M9 14h6",
+  plus: "M12 5v14M5 12h14",
+  grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  list: "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
+  image: "M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M15 9m-1 0a1 1 0 1 0 2 0a1 1 0 1 0-2 0",
+  search: "M11 11m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0M20 20l-4-4",
+  edit: "M4 20h4l11-11-4-4L4 16zM13 7l4 4",
+  cartridge: "M7 3h10v4h2v14H5V7h2zM9 10h6M9 14h6",
+  upload: "M12 16V5M7 10l5-5 5 5M5 19h14",
+  sync: "M20 11a8 8 0 0 0-14.5-4.5M4 13a8 8 0 0 0 14.5 4.5M4 4v5h5M20 20v-5h-5",
+  chevronDown: "M6 9l6 6 6-6",
+  builtIn: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5",
 } as const;
 
 export type IconName = keyof typeof ICONS;

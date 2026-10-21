@@ -6,7 +6,7 @@
 //! folder is an entry with code `CLV-S-<index>` whose launch command is `chmenu <index>`, so
 //! the folder code is decided when the tree is exported ([`export`]).
 
-use std::str::FromStr;
+use std::{collections::BTreeSet, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -580,6 +580,304 @@ pub fn export(menu: &Menu) -> Vec<ExportedMenu> {
     menus
 }
 
+/// Position of an entry in the tree: the index of each entry on the way down from the root
+/// menu. The empty path is the root menu itself.
+pub type MenuPath = Vec<usize>;
+
+/// Something to move in the tree.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum MenuItem {
+    /// A library or firmware game, by code (a code appears once in the tree).
+    Game {
+        /// Game code.
+        code: String,
+    },
+    /// A folder, by path.
+    Folder {
+        /// Path of the folder.
+        path: MenuPath,
+    },
+}
+
+fn back_to_parent() -> Entry {
+    Entry::Back(BackLink {
+        name: names::BACK.to_string(),
+        position: Position::Back,
+        image: FolderImage::Back,
+        target: LinkTarget::Parent,
+    })
+}
+
+fn no_folder(path: &[usize]) -> Error {
+    Error::Invalid(format!("no folder at {path:?}"))
+}
+
+/// Editing a tree by hand (the Library page's folder tree). Every operation keeps the tree
+/// valid: a game appears once, every folder keeps a back link, the root cannot move.
+impl Menu {
+    /// The entries of the menu at `path` (the root menu for an empty path), when `path`
+    /// leads to a folder.
+    pub fn entries_at(&self, path: &[usize]) -> Option<&Vec<Entry>> {
+        let mut entries = &self.entries;
+        for &index in path {
+            match entries.get(index)? {
+                Entry::Folder(folder) => entries = &folder.entries,
+                _ => return None,
+            }
+        }
+        Some(entries)
+    }
+
+    fn entries_at_mut(&mut self, path: &[usize]) -> Option<&mut Vec<Entry>> {
+        let mut entries = &mut self.entries;
+        for &index in path {
+            match entries.get_mut(index)? {
+                Entry::Folder(folder) => entries = &mut folder.entries,
+                _ => return None,
+            }
+        }
+        Some(entries)
+    }
+
+    /// The folder at `path` (never the root, which is not a folder).
+    pub fn folder(&self, path: &[usize]) -> Option<&Folder> {
+        let (last, parent) = path.split_last()?;
+        match self.entries_at(parent)?.get(*last)? {
+            Entry::Folder(folder) => Some(folder),
+            _ => None,
+        }
+    }
+
+    /// Where a game or firmware game sits.
+    pub fn find(&self, code: &str) -> Option<MenuPath> {
+        fn walk(entries: &[Entry], code: &str, path: &mut MenuPath) -> bool {
+            for (index, entry) in entries.iter().enumerate() {
+                path.push(index);
+                match entry {
+                    Entry::Game { code: c } | Entry::Original { code: c } if c == code => {
+                        return true;
+                    }
+                    Entry::Folder(folder) if walk(&folder.entries, code, path) => return true,
+                    _ => {}
+                }
+                path.pop();
+            }
+            false
+        }
+        let mut path = Vec::new();
+        walk(&self.entries, code, &mut path).then_some(path)
+    }
+
+    /// Number of games (library and firmware) in the menu at `path` and below.
+    pub fn game_count(&self, path: &[usize]) -> usize {
+        fn count(entries: &[Entry]) -> usize {
+            entries
+                .iter()
+                .map(|e| match e {
+                    Entry::Game { .. } | Entry::Original { .. } => 1,
+                    Entry::Folder(folder) => count(&folder.entries),
+                    Entry::Back(_) => 0,
+                })
+                .sum()
+        }
+        self.entries_at(path).map_or(0, |entries| count(entries))
+    }
+
+    fn take(&mut self, path: &[usize]) -> Option<Entry> {
+        let (last, parent) = path.split_last()?;
+        let entries = self.entries_at_mut(parent)?;
+        (*last < entries.len()).then(|| entries.remove(*last))
+    }
+
+    /// Inserts `entry` into the menu at `folder`: at `index`, or without one after the last
+    /// game or folder (before the trailing back link). Returns where it landed.
+    fn insert(&mut self, folder: &[usize], index: Option<usize>, entry: Entry) -> Result<usize> {
+        let entries = self
+            .entries_at_mut(folder)
+            .ok_or_else(|| no_folder(folder))?;
+        let end = entries
+            .iter()
+            .rposition(|e| !matches!(e, Entry::Back(_)))
+            .map_or(0, |i| i + 1);
+        let at = index.map_or(end, |i| i.min(end));
+        entries.insert(at, entry);
+        Ok(at)
+    }
+
+    /// Moves `items` into the menu at `target` (the root for an empty path), at `index` among
+    /// its entries or after the last one. A folder cannot be moved into itself; an item inside
+    /// another moved folder moves with that folder. Moved items keep their tree order.
+    pub fn move_items(
+        &mut self,
+        items: &[MenuItem],
+        target: &[usize],
+        index: Option<usize>,
+    ) -> Result<()> {
+        self.entries_at(target).ok_or_else(|| no_folder(target))?;
+        let mut paths: Vec<MenuPath> = Vec::new();
+        for item in items {
+            let path = match item {
+                MenuItem::Game { code } => self
+                    .find(code)
+                    .ok_or_else(|| Error::Invalid(format!("{code} is not in the menu")))?,
+                MenuItem::Folder { path } => {
+                    self.folder(path).ok_or_else(|| no_folder(path))?;
+                    path.clone()
+                }
+            };
+            if target.starts_with(&path) {
+                return Err(Error::Invalid(
+                    "a folder cannot be moved into itself".to_string(),
+                ));
+            }
+            paths.push(path);
+        }
+        paths.sort();
+        paths.dedup();
+        let roots: Vec<MenuPath> = paths
+            .iter()
+            .filter(|p| !paths.iter().any(|q| q.len() < p.len() && p.starts_with(q)))
+            .cloned()
+            .collect();
+
+        // Remove from the last path to the first, so the earlier indices stay valid, and keep
+        // the target's coordinates in step with the removals above it.
+        let mut target: MenuPath = target.to_vec();
+        let mut index = index;
+        let mut taken: Vec<Entry> = Vec::new();
+        for path in roots.iter().rev() {
+            let Some((last, parent)) = path.split_last() else {
+                return Err(Error::Invalid("the root menu cannot be moved".to_string()));
+            };
+            let depth = path.len();
+            let entry = self
+                .take(path)
+                .ok_or_else(|| Error::Invalid(format!("no entry at {path:?}")))?;
+            taken.push(entry);
+            if target.len() >= depth && target[..depth - 1] == *parent && target[depth - 1] > *last
+            {
+                target[depth - 1] -= 1;
+            } else if target.len() == depth - 1
+                && target[..] == *parent
+                && let Some(i) = index
+                && *last < i
+            {
+                index = Some(i - 1);
+            }
+        }
+        taken.reverse();
+        for (offset, entry) in taken.into_iter().enumerate() {
+            self.insert(&target, index.map(|i| i + offset), entry)?;
+        }
+        Ok(())
+    }
+
+    /// Adds an empty folder (with its back link) to the menu at `parent`; returns its path.
+    pub fn add_folder(&mut self, parent: &[usize], name: &str) -> Result<MenuPath> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(Error::Invalid("the folder needs a name".to_string()));
+        }
+        let folder = Folder {
+            name: name.to_string(),
+            position: Position::Right,
+            image: FolderImage::Folder,
+            entries: vec![back_to_parent()],
+        };
+        let at = self.insert(parent, None, Entry::Folder(folder))?;
+        let mut path = parent.to_vec();
+        path.push(at);
+        Ok(path)
+    }
+
+    /// Renames the folder at `path`.
+    pub fn rename_folder(&mut self, path: &[usize], name: &str) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(Error::Invalid("the folder needs a name".to_string()));
+        }
+        let (last, parent) = path.split_last().ok_or_else(|| no_folder(path))?;
+        match self.entries_at_mut(parent).and_then(|e| e.get_mut(*last)) {
+            Some(Entry::Folder(folder)) => {
+                folder.name = name.to_string();
+                Ok(())
+            }
+            _ => Err(no_folder(path)),
+        }
+    }
+
+    /// Removes the folder at `path`; its games and sub-folders take its place in the parent
+    /// menu.
+    pub fn remove_folder(&mut self, path: &[usize]) -> Result<()> {
+        self.folder(path).ok_or_else(|| no_folder(path))?;
+        let (last, parent) = path.split_last().ok_or_else(|| no_folder(path))?;
+        let Some(Entry::Folder(folder)) = self.take(path) else {
+            return Err(no_folder(path));
+        };
+        let contents = folder
+            .entries
+            .into_iter()
+            .filter(|e| !matches!(e, Entry::Back(_)));
+        let entries = self
+            .entries_at_mut(parent)
+            .ok_or_else(|| no_folder(parent))?;
+        let at = (*last).min(entries.len());
+        entries.splice(at..at, contents);
+        Ok(())
+    }
+
+    /// Brings the tree in line with the library: entries of games that are gone are removed
+    /// and games that are not in the tree are added to the root menu. Returns whether
+    /// anything changed. Folders left with nothing but a back link stay (the export drops
+    /// them).
+    pub fn reconcile(&mut self, games: &[GameRef]) -> bool {
+        fn prune(entries: &mut Vec<Entry>, known: &BTreeSet<&str>) -> bool {
+            let before = entries.len();
+            entries.retain(|e| match e {
+                Entry::Game { code } | Entry::Original { code } => known.contains(code.as_str()),
+                _ => true,
+            });
+            let mut changed = entries.len() != before;
+            for entry in entries.iter_mut() {
+                if let Entry::Folder(folder) = entry {
+                    changed |= prune(&mut folder.entries, known);
+                }
+            }
+            changed
+        }
+        let known: BTreeSet<&str> = games.iter().map(|g| g.code.as_str()).collect();
+        let mut changed = prune(&mut self.entries, &known);
+        let present: BTreeSet<String> = self.codes().into_iter().map(str::to_string).collect();
+        let mut missing: Vec<&GameRef> = games
+            .iter()
+            .filter(|g| !present.contains(&g.code))
+            .collect();
+        missing.sort_by(|a, b| a.sort_title.cmp(&b.sort_title).then(a.code.cmp(&b.code)));
+        for game in missing {
+            if self.insert(&[], None, game_entry(game)).is_ok() {
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    /// Gives every folder without a back link one that leads to its parent menu.
+    pub fn ensure_back_links(&mut self) {
+        fn walk(entries: &mut [Entry]) {
+            for entry in entries {
+                if let Entry::Folder(folder) = entry {
+                    if !folder.entries.iter().any(|e| matches!(e, Entry::Back(_))) {
+                        folder.entries.push(back_to_parent());
+                    }
+                    walk(&mut folder.entries);
+                }
+            }
+        }
+        walk(&mut self.entries);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
@@ -886,5 +1184,245 @@ mod tests {
         assert_eq!(Position::Right.sort_fields().0, 'Э');
         assert_eq!(Position::Back.sort_fields().3, "9999-99-99");
         assert_eq!(Position::LeftBack.sort_fields().4, "\u{1}".repeat(10));
+    }
+
+    fn edited_sample() -> Menu {
+        let games: Vec<GameRef> = ["Aladdin", "Axelay", "Batman", "Contra", "Cybernator"]
+            .iter()
+            .enumerate()
+            .map(|(i, title)| GameRef {
+                code: format!("CLV-U-{:05}", i),
+                sort_title: title.to_lowercase(),
+                original: false,
+            })
+            .collect();
+        build(
+            &games,
+            &MenuOptions {
+                structure: Structure::Letters,
+                originals_at_root: false,
+            },
+        )
+    }
+
+    fn names_at(menu: &Menu, path: &[usize]) -> Vec<String> {
+        menu.entries_at(path)
+            .expect("folder")
+            .iter()
+            .map(|e| match e {
+                Entry::Game { code } | Entry::Original { code } => code.clone(),
+                Entry::Folder(f) => format!("[{}]", f.name),
+                Entry::Back(b) => format!("<{}", b.name),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn paths_find_and_count() {
+        let menu = edited_sample();
+        assert_eq!(names_at(&menu, &[]), ["[A]", "[B]", "[C]"]);
+        assert_eq!(
+            names_at(&menu, &[0]),
+            ["CLV-U-00000", "CLV-U-00001", "<Back"]
+        );
+        assert_eq!(menu.find("CLV-U-00003"), Some(vec![2, 0]));
+        assert_eq!(menu.find("CLV-U-99999"), None);
+        assert_eq!(menu.folder(&[1]).map(|f| f.name.as_str()), Some("B"));
+        assert!(menu.folder(&[]).is_none());
+        assert!(menu.folder(&[0, 0]).is_none(), "a game is not a folder");
+        assert!(menu.entries_at(&[0, 0]).is_none());
+        assert_eq!(menu.game_count(&[]), 5);
+        assert_eq!(menu.game_count(&[2]), 2);
+    }
+
+    #[test]
+    fn move_games_between_folders_and_to_the_root() {
+        let mut menu = edited_sample();
+        menu.move_items(
+            &[MenuItem::Game {
+                code: "CLV-U-00000".into(),
+            }],
+            &[1],
+            None,
+        )
+        .unwrap();
+        assert_eq!(names_at(&menu, &[0]), ["CLV-U-00001", "<Back"]);
+        assert_eq!(
+            names_at(&menu, &[1]),
+            ["CLV-U-00002", "CLV-U-00000", "<Back"],
+            "lands before the back link"
+        );
+
+        // To the root, at a given index, two at once in their original order.
+        menu.move_items(
+            &[
+                MenuItem::Game {
+                    code: "CLV-U-00004".into(),
+                },
+                MenuItem::Game {
+                    code: "CLV-U-00003".into(),
+                },
+            ],
+            &[],
+            Some(1),
+        )
+        .unwrap();
+        assert_eq!(
+            names_at(&menu, &[]),
+            ["[A]", "CLV-U-00003", "CLV-U-00004", "[B]", "[C]"],
+            "moved items keep their tree order"
+        );
+        assert_eq!(names_at(&menu, &[4]), ["<Back"]);
+        assert_eq!(export(&menu).len(), 3, "the emptied folder is not exported");
+    }
+
+    #[test]
+    fn move_folders_and_refuse_cycles() {
+        let mut menu = edited_sample();
+        // C into A: the target's index shifts because C was after A... it was not; B into A:
+        menu.move_items(&[MenuItem::Folder { path: vec![1] }], &[0], None)
+            .unwrap();
+        assert_eq!(names_at(&menu, &[]), ["[A]", "[C]"]);
+        assert_eq!(
+            names_at(&menu, &[0]),
+            ["CLV-U-00000", "CLV-U-00001", "[B]", "<Back"]
+        );
+        // A folder before the target shifts the target's index: move A into C (C is now [1]).
+        menu.move_items(&[MenuItem::Folder { path: vec![0] }], &[1], Some(0))
+            .unwrap();
+        assert_eq!(names_at(&menu, &[]), ["[C]"]);
+        assert_eq!(
+            names_at(&menu, &[0]),
+            ["[A]", "CLV-U-00003", "CLV-U-00004", "<Back"]
+        );
+        // Into itself or into its own child: refused, nothing changes.
+        let before = menu.clone();
+        assert!(matches!(
+            menu.move_items(&[MenuItem::Folder { path: vec![0] }], &[0], None),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            menu.move_items(&[MenuItem::Folder { path: vec![0] }], &[0, 0], None),
+            Err(Error::Invalid(_))
+        ));
+        assert!(
+            matches!(
+                menu.move_items(&[MenuItem::Folder { path: vec![0, 1] }], &[], None),
+                Err(Error::Invalid(_))
+            ),
+            "a game is not a folder"
+        );
+        assert_eq!(menu, before);
+        // A folder and a game inside it: the game moves with the folder, not twice.
+        menu.move_items(
+            &[
+                MenuItem::Folder { path: vec![0, 0] },
+                MenuItem::Game {
+                    code: "CLV-U-00001".into(),
+                },
+            ],
+            &[],
+            Some(0),
+        )
+        .unwrap();
+        assert_eq!(names_at(&menu, &[]), ["[A]", "[C]"]);
+        assert_eq!(
+            names_at(&menu, &[0]),
+            ["CLV-U-00000", "CLV-U-00001", "[B]", "<Back"]
+        );
+    }
+
+    #[test]
+    fn reorder_within_the_same_menu() {
+        let mut menu = Menu {
+            entries: vec![
+                Entry::Game { code: "a".into() },
+                Entry::Game { code: "b".into() },
+                Entry::Game { code: "c".into() },
+            ],
+        };
+        menu.move_items(&[MenuItem::Game { code: "a".into() }], &[], Some(2))
+            .unwrap();
+        assert_eq!(names_at(&menu, &[]), ["b", "a", "c"]);
+        menu.move_items(&[MenuItem::Game { code: "c".into() }], &[], Some(0))
+            .unwrap();
+        assert_eq!(names_at(&menu, &[]), ["c", "b", "a"]);
+    }
+
+    #[test]
+    fn folders_are_added_renamed_and_removed() {
+        let mut menu = edited_sample();
+        let path = menu.add_folder(&[], "  Favourites ").unwrap();
+        assert_eq!(path, vec![3]);
+        assert_eq!(names_at(&menu, &[3]), ["<Back"]);
+        let nested = menu.add_folder(&[3], "RPG").unwrap();
+        assert_eq!(nested, vec![3, 0]);
+        assert_eq!(names_at(&menu, &[3]), ["[RPG]", "<Back"]);
+        assert!(matches!(menu.add_folder(&[], "  "), Err(Error::Invalid(_))));
+        menu.rename_folder(&[3], "Best").unwrap();
+        assert_eq!(menu.folder(&[3]).unwrap().name, "Best");
+        assert!(matches!(
+            menu.rename_folder(&[0, 0], "x"),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            menu.rename_folder(&[], "x"),
+            Err(Error::Invalid(_))
+        ));
+        // Removing C puts its games where the folder was.
+        menu.remove_folder(&[2]).unwrap();
+        assert_eq!(
+            names_at(&menu, &[]),
+            ["[A]", "[B]", "CLV-U-00003", "CLV-U-00004", "[Best]"]
+        );
+        assert!(matches!(menu.remove_folder(&[2]), Err(Error::Invalid(_))));
+    }
+
+    #[test]
+    fn reconcile_adds_new_games_and_drops_missing_ones() {
+        let mut menu = edited_sample();
+        let games: Vec<GameRef> = ["CLV-U-00000", "CLV-U-00002", "CLV-U-00009", "CLV-P-SAAAE"]
+            .iter()
+            .map(|code| GameRef {
+                code: (*code).to_string(),
+                sort_title: code.to_lowercase(),
+                original: code.starts_with("CLV-P"),
+            })
+            .collect();
+        assert!(menu.reconcile(&games));
+        assert_eq!(
+            names_at(&menu, &[]),
+            ["[A]", "[B]", "[C]", "CLV-P-SAAAE", "CLV-U-00009"]
+        );
+        assert_eq!(names_at(&menu, &[0]), ["CLV-U-00000", "<Back"]);
+        assert_eq!(names_at(&menu, &[2]), ["<Back"]);
+        assert!(matches!(menu.entries[3], Entry::Original { .. }));
+        assert!(!menu.reconcile(&games), "a second pass changes nothing");
+    }
+
+    #[test]
+    fn back_links_are_added_where_missing() {
+        let mut menu = Menu {
+            entries: vec![Entry::Folder(Folder {
+                name: "X".into(),
+                position: Position::Right,
+                image: FolderImage::Folder,
+                entries: vec![
+                    Entry::Game { code: "a".into() },
+                    Entry::Folder(Folder {
+                        name: "Y".into(),
+                        position: Position::Right,
+                        image: FolderImage::Folder,
+                        entries: vec![Entry::Game { code: "b".into() }],
+                    }),
+                ],
+            })],
+        };
+        menu.ensure_back_links();
+        assert_eq!(names_at(&menu, &[0]), ["a", "[Y]", "<Back"]);
+        assert_eq!(names_at(&menu, &[0, 1]), ["b", "<Back"]);
+        let again = menu.clone();
+        menu.ensure_back_links();
+        assert_eq!(menu, again);
     }
 }

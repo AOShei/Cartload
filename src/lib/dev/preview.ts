@@ -340,3 +340,269 @@ export function previewPackage(): PackageStatus {
   const make = (name && packageFixtures[name]) || packageFixtures["cached"]!;
   return make();
 }
+
+/* Library page fixtures: `?library=some|empty|many` and `?sync=none|plan|review|running|done|failed`. */
+
+import type {
+  GameView,
+  LibraryView,
+  MenuEntry,
+  MenuView,
+  SyncPlanView,
+  SyncSnapshot,
+} from "../api/types";
+
+const PREVIEW_GAMES: [string, "snes" | "nes", string, string, number, boolean][] = [
+  ["Chrono Trigger", "snes", "SQUARESOFT", "1995-03-11", 1, false],
+  ["ActRaiser", "snes", "ENIX", "1990-12-16", 1, true],
+  ["Super Metroid", "snes", "NINTENDO", "1994-03-19", 1, false],
+  ["EarthBound", "snes", "NINTENDO", "1994-08-27", 1, true],
+  ["Donkey Kong Country", "snes", "NINTENDO", "1994-11-21", 2, false],
+  ["Contra III: The Alien Wars", "snes", "KONAMI", "1992-02-28", 2, false],
+  ["Mega Man X", "snes", "CAPCOM", "1993-12-17", 1, true],
+  ["Kirby's Dream Land 3", "snes", "NINTENDO", "1997-11-27", 2, false],
+  ["Castlevania III: Dracula's Curse", "nes", "KONAMI", "1989-12-22", 1, false],
+  ["Mega Man 2", "nes", "CAPCOM", "1988-12-24", 1, true],
+  ["Metroid", "nes", "NINTENDO", "1986-08-06", 1, false],
+  ["Ninja Gaiden", "nes", "TECMO", "1988-12-09", 1, false],
+  ["Zelda II: The Adventure of Link", "nes", "NINTENDO", "1987-01-14", 1, true],
+  ["Tetris", "nes", "NINTENDO", "1989-11-01", 1, false],
+];
+
+function previewCode(index: number, system: "snes" | "nes"): string {
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let n = index * 7919 + 13;
+  let code = "";
+  for (let i = 0; i < 5; i += 1) {
+    code += letters[n % 26];
+    n = Math.floor(n / 26) + 3;
+  }
+  return `CLV-${system === "snes" ? "U" : "H"}-${code}`;
+}
+
+/** An inline SVG cover, so previews need no files. */
+function previewCover(name: string, system: "snes" | "nes", placeholder: boolean): string {
+  const hue = (name.length * 37) % 360;
+  const bg = placeholder ? "#d8d4cd" : `hsl(${hue} 45% 45%)`;
+  const text = placeholder ? "#6b665e" : "#fff";
+  const label = name.length > 18 ? `${name.slice(0, 17)}…` : name;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="228" height="204"><rect width="228" height="204" fill="${bg}"/><text x="114" y="104" text-anchor="middle" font-family="sans-serif" font-size="16" fill="${text}">${label.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</text><text x="114" y="130" text-anchor="middle" font-family="sans-serif" font-size="11" fill="${text}" opacity="0.8">${system.toUpperCase()}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function previewGame(index: number, placeholderEvery: number): GameView {
+  const [name, system, publisher, date, players, art] = PREVIEW_GAMES[index % PREVIEW_GAMES.length]!;
+  const code = previewCode(index, system);
+  const placeholder = !art || index % placeholderEvery === 0;
+  const safe = name.replace(/[^A-Za-z0-9]+/g, "_");
+  return {
+    game: {
+      code,
+      name: index >= PREVIEW_GAMES.length ? `${name} ${Math.floor(index / PREVIEW_GAMES.length) + 1}` : name,
+      sort_name: "",
+      system,
+      rom_file: system === "snes" ? `${safe}.sfrom` : `${safe}.nes`,
+      crc32: 0x2d206bf7 + index,
+      file_crc32: 0x2d206bf7 + index,
+      original_file: `${name}.${system === "snes" ? "smc" : "nes"}`,
+      players,
+      simultaneous: players === 2,
+      release_date: date,
+      publisher,
+      copyright: "",
+      save_count: 3,
+      application: system === "snes" ? "/bin/clover-canoe-shvc-wr -rom" : "/bin/clover-kachikachi-wr",
+      args: system === "snes" ? "--volume 100 -rollback-snapshot-period 600" : "--guest-overscan-dimensions 0,0,9,3 --initial-fadein-durations 10,2 --volume 75 --enable-armet",
+      tgdb_ids: [1255 + index],
+      tgdb_id: placeholder ? null : 1255 + index,
+      description: placeholder ? "" : "A classic, still worth a Sunday afternoon.",
+      db_name: `${name} (USA).${system === "snes" ? "sfc" : "nes"}`,
+      snes: null,
+      nes: null,
+      placeholder_art: placeholder,
+    },
+    size: system === "snes" ? 4_194_400 + index * 1024 : 262_160 + index * 512,
+    cover: previewCover(name, system, placeholder),
+    thumbnail: previewCover(name, system, placeholder),
+    system_name: system === "snes" ? "SNES" : "NES",
+  };
+}
+
+function lettersMenu(games: GameView[], originals: { code: string; name: string }[]): MenuEntry[] {
+  const buckets = new Map<string, MenuEntry[]>();
+  for (const view of games) {
+    const initial = view.game.name[0]?.toUpperCase() ?? "#";
+    const key = /[A-Z]/.test(initial) ? initial : "#";
+    const bucket = buckets.get(key) ?? [];
+    bucket.push({ kind: "game", code: view.game.code });
+    buckets.set(key, bucket);
+  }
+  const folders: MenuEntry[] = [...buckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([letter, entries]) => ({
+      kind: "folder",
+      name: letter,
+      position: "right",
+      image: letter === "#" ? "number" : { letter },
+      entries: [...entries, { kind: "back", name: "Back", position: "back", image: "back", target: "parent" }],
+    }));
+  if (originals.length === 0) {
+    return folders;
+  }
+  return [
+    ...originals.map((o): MenuEntry => ({ kind: "original", code: o.code })),
+    {
+      kind: "folder",
+      name: "More games...",
+      position: "rightmost",
+      image: "folder",
+      entries: [
+        ...folders,
+        { kind: "back", name: "Original games", position: "back", image: "back", target: "root" },
+      ],
+    },
+  ];
+}
+
+const ORIGINALS = [
+  ["CLV-P-SAAAE", "Super Mario World"],
+  ["CLV-P-SAABE", "F-ZERO"],
+  ["CLV-P-SAAEE", "The Legend of Zelda: A Link to the Past"],
+  ["CLV-P-SAAFE", "Super Mario Kart"],
+].map(([code, name]) => ({ code: code!, name: name! }));
+
+/** The library fixture named by `?library=`, or a dozen games. */
+export function previewLibrary(): { view: LibraryView; menu: MenuView } {
+  const name =
+    typeof location !== "undefined" ? new URLSearchParams(location.search).get("library") : null;
+  const count = name === "empty" ? 0 : name === "many" ? 120 : PREVIEW_GAMES.length;
+  const games = Array.from({ length: count }, (_, i) => previewGame(i, 5)).sort((a, b) =>
+    a.game.code.localeCompare(b.game.code),
+  );
+  const connected =
+    typeof location !== "undefined" && new URLSearchParams(location.search).get("preview") === "connected";
+  const originals = connected ? ORIGINALS : [];
+  const byName = [...games].sort((a, b) => a.game.name.localeCompare(b.game.name));
+  return {
+    view: {
+      root: "/home/user/.local/share/cartload/library",
+      games,
+      total_size: games.reduce((sum, g) => sum + g.size, 0),
+    },
+    menu: {
+      entries: count === 0 ? [] : lettersMenu(byName, originals),
+      options: { structure: { kind: "letters" }, originals_at_root: true },
+      custom: name === "many",
+      system_code: connected ? "snes-eur" : null,
+      originals,
+    },
+  };
+}
+
+function previewPlan(changes: number): SyncPlanView {
+  const uploads = Array.from({ length: changes }, (_, i) => ({
+    path: `./.storage/CLV-U-AAAA${i}/Game_${i}.sfrom`,
+    size: 2_097_152 + i * 4096,
+  }));
+  return {
+    system_code: "snes-eur",
+    upload_path: "/var/lib/hakchi/games/snes-eur",
+    games: 14,
+    originals: 21,
+    folders: 6,
+    files: 88,
+    uploads,
+    deletions: changes > 0 ? ["./.storage/CLV-U-ZZZZZ/Old_Game.sfrom", "./.storage/CLV-U-ZZZZZ/CLV-U-ZZZZZ.png"] : [],
+    link_deletions: changes > 0 ? ["./000/CLV-P-SAAAE/autoplay"] : [],
+    empty_dirs: changes > 0 ? ["./.storage/CLV-U-ZZZZZ"] : [],
+    unchanged: 88 - uploads.length,
+    total_size: 61_337_600,
+    upload_size: uploads.reduce((sum, f) => sum + f.size, 0),
+    available: 325_582_848,
+    fits: true,
+    noop: changes === 0,
+    changes: changes === 0 ? 0 : uploads.length + 4,
+    storage: { total: 369_737_728, used: 32_718_848, free: 325_582_848 },
+    planned_at: Date.now(),
+  };
+}
+
+/** The sync fixture named by `?sync=`. */
+export function previewSync(): { plan: SyncPlanView | null; snapshot: SyncSnapshot | null; reviewing: boolean } {
+  const name =
+    typeof location !== "undefined" ? new URLSearchParams(location.search).get("sync") : null;
+  const now = Date.now();
+  const base: SyncSnapshot = {
+    seq: 1,
+    state: "idle",
+    plan: null,
+    step: null,
+    upload: null,
+    log: [],
+    report: null,
+    error: null,
+    started_at: null,
+    finished_at: null,
+  };
+  switch (name) {
+    case "plan":
+      return { plan: previewPlan(3), snapshot: null, reviewing: false };
+    case "review":
+      return { plan: previewPlan(3), snapshot: null, reviewing: true };
+    case "uptodate":
+      return { plan: previewPlan(0), snapshot: null, reviewing: false };
+    case "running":
+      return {
+        plan: previewPlan(3),
+        snapshot: {
+          ...base,
+          seq: 20,
+          state: "running",
+          plan: previewPlan(3),
+          step: { index: 5, total: 9, name: "upload", label: "Upload the games", detail: "3 files, 6.0 MB" },
+          upload: {
+            path: "./.storage/CLV-U-AAAA1/Game_1.sfrom",
+            done: 1_200_000,
+            total: 2_101_248,
+            overall_done: 3_300_000,
+            overall_total: 6_303_744,
+          },
+          log: ["umount: /var/games: not mounted", "removed 2 files, 1 symlink, 1 directory"],
+          started_at: now - 7_000,
+        },
+        reviewing: false,
+      };
+    case "done":
+      return {
+        plan: previewPlan(0),
+        snapshot: {
+          ...base,
+          seq: 40,
+          state: "done",
+          plan: previewPlan(3),
+          step: { index: 9, total: 9, name: "done", label: "Done", detail: "" },
+          report: { uploaded_files: 3, uploaded_bytes: 6_303_744, removed_files: 2, removed_links: 1, removed_dirs: 1, games_mounted: true },
+          started_at: now - 15_000,
+          finished_at: now - 2_000,
+        },
+        reviewing: false,
+      };
+    case "failed":
+      return {
+        plan: previewPlan(3),
+        snapshot: {
+          ...base,
+          seq: 12,
+          state: "failed",
+          plan: previewPlan(3),
+          step: { index: 5, total: 9, name: "upload", label: "Upload the games", detail: "" },
+          error: { message: "FTP transfer failed: the console closed the connection.", detail: "ftp: STOR ./.storage/CLV-U-AAAA1/Game_1.sfrom\ncaused by: connection reset by peer" },
+          started_at: now - 9_000,
+          finished_at: now - 1_000,
+        },
+        reviewing: false,
+      };
+    default:
+      return { plan: null, snapshot: null, reviewing: false };
+  }
+}

@@ -6,14 +6,23 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
+use std::path::PathBuf;
+
+use cartload_library::{MenuOptions, menu::MenuItem};
+
 use crate::{
     PACKAGE_EVENT,
     error::CommandError,
     flow::{FlowKind, FlowRunner, FlowSnapshot, StepSnapshot},
+    library::{
+        ART_EVENT, ArtOutcome, GameEdit, GameView, IMPORT_EVENT, ImportReport, KeyStatus,
+        LibraryState, LibraryView, MenuEdit, MenuView,
+    },
     logging::LogLine,
     package::{self, DownloadProgress, PackageStatus},
     state::AppState,
     status::StatusReport,
+    sync::{SyncPlanView, SyncRunner, SyncSnapshot},
     watcher::{FelProbe, Watcher},
 };
 
@@ -159,6 +168,165 @@ pub async fn package_update(
         }
     })
     .await
+}
+
+/// Every game in the library with its size and cover URL.
+#[tauri::command]
+pub async fn library_list(
+    library: State<'_, Arc<LibraryState>>,
+) -> Result<LibraryView, CommandError> {
+    library.view()
+}
+
+/// Imports files and folders; one `library-import` event per file, before and after it.
+/// With `folder`, the new games go to that folder of an edited tree.
+#[tauri::command]
+pub async fn library_import(
+    app: AppHandle,
+    library: State<'_, Arc<LibraryState>>,
+    paths: Vec<PathBuf>,
+    folder: Option<Vec<usize>>,
+) -> Result<ImportReport, CommandError> {
+    let _busy = library.begin("import")?;
+    tracing::info!(files = paths.len(), "library_import");
+    library
+        .import(&paths, folder.as_deref(), |event| {
+            if let Err(error) = app.emit(IMPORT_EVENT, event) {
+                tracing::warn!(%error, "could not emit {IMPORT_EVENT}");
+            }
+        })
+        .await
+}
+
+/// Saves the editable fields of a game.
+#[tauri::command]
+pub async fn library_update(
+    library: State<'_, Arc<LibraryState>>,
+    edit: GameEdit,
+) -> Result<GameView, CommandError> {
+    library.update(&edit)
+}
+
+/// Removes games from the library (not from the console until the next sync).
+#[tauri::command]
+pub async fn library_remove(
+    library: State<'_, Arc<LibraryState>>,
+    codes: Vec<String>,
+) -> Result<usize, CommandError> {
+    tracing::info!(count = codes.len(), "library_remove");
+    library.remove(&codes)
+}
+
+/// The folder tree the console will show.
+#[tauri::command]
+pub async fn menu_get(
+    state: State<'_, Arc<AppState>>,
+    library: State<'_, Arc<LibraryState>>,
+) -> Result<MenuView, CommandError> {
+    library.menu_view(&state.report().status)
+}
+
+/// Applies an automatic structure (replacing a tree edited by hand).
+#[tauri::command]
+pub async fn menu_set_structure(
+    state: State<'_, Arc<AppState>>,
+    library: State<'_, Arc<LibraryState>>,
+    options: MenuOptions,
+) -> Result<MenuView, CommandError> {
+    library.set_structure(options)?;
+    library.menu_view(&state.report().status)
+}
+
+/// Moves games and folders into a folder (the root for an empty path), at `index` or at the
+/// end.
+#[tauri::command]
+pub async fn menu_move(
+    state: State<'_, Arc<AppState>>,
+    library: State<'_, Arc<LibraryState>>,
+    items: Vec<MenuItem>,
+    target: Vec<usize>,
+    index: Option<usize>,
+) -> Result<MenuView, CommandError> {
+    let status = state.report().status;
+    library.move_items(&status, &items, &target, index)?;
+    library.menu_view(&status)
+}
+
+/// Adds, renames or removes a folder.
+#[tauri::command]
+pub async fn menu_edit(
+    state: State<'_, Arc<AppState>>,
+    library: State<'_, Arc<LibraryState>>,
+    edit: MenuEdit,
+) -> Result<MenuView, CommandError> {
+    let status = state.report().status;
+    library.apply_menu_edit(&status, &edit)?;
+    library.menu_view(&status)
+}
+
+/// Fetches cover art and metadata from TheGamesDB; progress as `art-progress` events.
+#[tauri::command]
+pub async fn art_fetch(
+    app: AppHandle,
+    library: State<'_, Arc<LibraryState>>,
+    codes: Vec<String>,
+    force: bool,
+) -> Result<ArtOutcome, CommandError> {
+    let _busy = library.begin("art")?;
+    tracing::info!(games = codes.len(), force, "art_fetch");
+    library
+        .fetch_art(&codes, force, |progress| {
+            if let Err(error) = app.emit(ART_EVENT, progress) {
+                tracing::warn!(%error, "could not emit {ART_EVENT}");
+            }
+        })
+        .await
+}
+
+/// Uses an image file as the cover of a game.
+#[tauri::command]
+pub async fn art_set_cover(
+    library: State<'_, Arc<LibraryState>>,
+    code: String,
+    path: PathBuf,
+) -> Result<GameView, CommandError> {
+    library.set_cover(&code, &path)
+}
+
+/// Where the TheGamesDB key comes from.
+#[tauri::command]
+pub async fn tgdb_key_get(
+    library: State<'_, Arc<LibraryState>>,
+) -> Result<KeyStatus, CommandError> {
+    library.key_status()
+}
+
+/// Stores a TheGamesDB key in the library settings, or clears it.
+#[tauri::command]
+pub async fn tgdb_key_set(
+    library: State<'_, Arc<LibraryState>>,
+    key: Option<String>,
+) -> Result<KeyStatus, CommandError> {
+    library.set_key(key.as_deref())
+}
+
+/// What a sync would do, against the connected console (read only).
+#[tauri::command]
+pub async fn sync_plan(runner: State<'_, Arc<SyncRunner>>) -> Result<SyncPlanView, CommandError> {
+    runner.plan().await
+}
+
+/// Runs a sync; progress as `sync-progress` events. Returns the final snapshot.
+#[tauri::command]
+pub async fn sync_run(runner: State<'_, Arc<SyncRunner>>) -> Result<SyncSnapshot, CommandError> {
+    tracing::info!("sync_run");
+    runner.run().await
+}
+
+/// The latest sync snapshot.
+#[tauri::command]
+pub async fn sync_status(runner: State<'_, Arc<SyncRunner>>) -> Result<SyncSnapshot, CommandError> {
+    Ok(runner.snapshot())
 }
 
 /// What a shell line on the console produced.

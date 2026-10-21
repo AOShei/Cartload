@@ -305,12 +305,12 @@ impl ConsoleStatus {
                 ..
             } => describe_connected(address, link, info),
             Self::Working {
+                flow,
                 title,
                 step,
                 index,
                 total,
-                ..
-            } => describe_working(title, step.as_deref(), *index, *total),
+            } => describe_working(flow, title, step.as_deref(), *index, *total),
         };
         StatusReport {
             status: self.clone(),
@@ -533,17 +533,20 @@ pub fn working_sentence(
 }
 
 fn describe_working(
+    flow: &str,
     title: &str,
     step: Option<&str>,
     index: Option<usize>,
     total: usize,
 ) -> Description {
+    let page = if flow == "sync" { "Library" } else { "Kernel" };
     (
         Tone::Busy,
         working_sentence(title, step, index, total),
-        "Leave the console and the USB cable alone until it finishes. The Kernel page shows \
-         every step."
-            .into(),
+        format!(
+            "Leave the console and the USB cable alone until it finishes. The {page} page shows \
+             every step."
+        ),
         vec![],
     )
 }

@@ -1,6 +1,39 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+  import { tgdbKeyGet, tgdbKeySet } from "../api/commands";
+  import { AppError, inTauri } from "../api/tauri";
+  import type { KeyStatus } from "../api/types";
   import Icon from "../components/Icon.svelte";
-  import { app, preferences, type Theme } from "../state";
+  import { app, libraryStore, preferences, toasts, type Theme } from "../state";
+
+  let keyStatus = $state<KeyStatus | null>(null);
+  let keyValue = $state("");
+  let keyBusy = $state(false);
+
+  onMount(() => {
+    void libraryStore.start();
+    if (inTauri) {
+      void tgdbKeyGet().then((status) => (keyStatus = status)).catch(() => {});
+    }
+  });
+
+  async function saveKey(clear: boolean): Promise<void> {
+    if (!inTauri) {
+      toasts.info("Keys are stored inside the desktop app only.");
+      return;
+    }
+    keyBusy = true;
+    try {
+      keyStatus = await tgdbKeySet(clear ? null : keyValue);
+      keyValue = "";
+      toasts.success(clear ? "TheGamesDB key removed." : "TheGamesDB key stored.");
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(e.message, e.detail);
+    } finally {
+      keyBusy = false;
+    }
+  }
 
   const themes: { id: Theme; label: string; hint: string }[] = [
     { id: "system", label: "Follow the system", hint: "Light or dark, as the desktop is set." },
@@ -48,6 +81,32 @@
         <span class="muted"> · every command sent to the console and USB events.</span>
       </span>
     </label>
+  </section>
+
+  <section class="card" aria-labelledby="library-heading">
+    <h2 id="library-heading">Library</h2>
+    <p class="muted">Games are kept in <span class="mono">{libraryStore.view?.root ?? "the user data directory"}</span>.</p>
+    <h3>TheGamesDB key</h3>
+    <p class="muted">
+      Cover art and metadata come from TheGamesDB, which needs a free API key from thegamesdb.net.
+      {#if keyStatus?.environment}
+        The CARTLOAD_TGDB_KEY variable is set and is used.
+      {:else if keyStatus?.stored}
+        A key is stored.
+      {:else}
+        No key yet.
+      {/if}
+      {#if keyStatus?.remaining !== null && keyStatus?.remaining !== undefined}
+        {keyStatus.remaining} requests left this month.
+      {/if}
+    </p>
+    <form class="key" onsubmit={(e) => { e.preventDefault(); void saveKey(false); }}>
+      <input type="password" bind:value={keyValue} placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"} aria-label="TheGamesDB API key" autocomplete="off" />
+      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>Store</button>
+      {#if keyStatus?.stored}
+        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => saveKey(true)}>Remove</button>
+      {/if}
+    </form>
   </section>
 
   <section class="card" aria-labelledby="about-heading">
@@ -106,5 +165,23 @@
     margin: 0;
     padding-left: 1.2rem;
     font-size: 0.85rem;
+  }
+
+  h3 {
+    margin-top: var(--space-2);
+    font-size: 0.95rem;
+  }
+
+  .key {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .key input {
+    flex: 1;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-s);
+    background: var(--surface);
   }
 </style>

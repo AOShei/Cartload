@@ -230,3 +230,270 @@ export interface DownloadProgress {
   done: number;
   total: number | null;
 }
+
+/* Library page (library.rs, sync.rs) */
+
+export type System = "snes" | "nes" | "mega-drive";
+
+/** `cartload_library::Game` (game.json). */
+export interface Game {
+  code: string;
+  name: string;
+  sort_name: string;
+  system: System;
+  rom_file: string;
+  crc32: number;
+  file_crc32: number;
+  original_file: string;
+  players: number;
+  simultaneous: boolean;
+  release_date: string;
+  publisher: string;
+  copyright: string;
+  save_count: number;
+  application: string;
+  args: string;
+  tgdb_ids: number[];
+  tgdb_id: number | null;
+  description: string;
+  db_name: string | null;
+  snes: unknown;
+  nes: unknown;
+  placeholder_art: boolean;
+}
+
+export interface GameView {
+  game: Game;
+  size: number;
+  cover: string;
+  thumbnail: string;
+  system_name: string;
+}
+
+export interface LibraryView {
+  root: string;
+  games: GameView[];
+  total_size: number;
+}
+
+export type Position = "left-back" | "leftmost" | "left" | "right" | "rightmost" | "back";
+
+export type FolderImage = "folder" | "back" | "home" | "number" | { letter: string };
+
+export interface MenuFolder {
+  kind: "folder";
+  name: string;
+  position: Position;
+  image: FolderImage;
+  entries: MenuEntry[];
+}
+
+export type MenuEntry =
+  | { kind: "game"; code: string }
+  | { kind: "original"; code: string }
+  | MenuFolder
+  | { kind: "back"; name: string; position: Position; image: FolderImage; target: "parent" | "root" };
+
+export type Structure = { kind: "flat" } | { kind: "letters" } | { kind: "count"; max: number };
+
+export interface MenuOptions {
+  structure: Structure;
+  originals_at_root: boolean;
+}
+
+export interface OriginalView {
+  code: string;
+  name: string;
+}
+
+export interface MenuView {
+  entries: MenuEntry[];
+  options: MenuOptions;
+  custom: boolean;
+  system_code: string | null;
+  originals: OriginalView[];
+}
+
+/** A path of entry indices from the root menu; `[]` is the root itself. */
+export type MenuPath = number[];
+
+export type MenuItem = { kind: "game"; code: string } | { kind: "folder"; path: MenuPath };
+
+export type MenuEdit =
+  | { op: "add_folder"; parent: MenuPath; name: string }
+  | { op: "rename_folder"; path: MenuPath; name: string }
+  | { op: "remove_folder"; path: MenuPath };
+
+export interface ImportedGame {
+  code: string;
+  name: string;
+  system: string;
+  matched: boolean;
+  replaced: boolean;
+  warnings: string[];
+}
+
+export type ImportOutcome =
+  | { state: "imported"; games: ImportedGame[] }
+  | { state: "failed"; error: string }
+  | { state: "skipped"; reason: string };
+
+/** Payload of the `library-import` event: before (no outcome) and after each file. */
+export interface ImportEvent {
+  index: number;
+  total: number;
+  path: string;
+  outcome: ImportOutcome | null;
+}
+
+export interface ImportReport {
+  files: ImportEvent[];
+  imported: number;
+  unmatched: number;
+  failed: number;
+  skipped: number;
+  codes: string[];
+}
+
+export interface GameEdit {
+  code: string;
+  name: string;
+  sort_name: string;
+  publisher: string;
+  release_date: string;
+  players: number;
+  simultaneous: boolean;
+  copyright: string;
+  description: string;
+  application: string;
+  args: string;
+}
+
+export type MatchSource = "hash_db" | "search" | "manual";
+
+export type ArtEvent =
+  | { event: "searching"; code: string; query: string }
+  | { event: "matched"; code: string; id: number; title: string; source: MatchSource }
+  | { event: "no_match"; code: string; queries: string[] }
+  | { event: "fetching"; code: string | null; what: string }
+  | { event: "done"; code: string; outcome: ArtGameOutcome }
+  | { event: "failed"; code: string; error: string };
+
+export type CoverStatus = "unchanged" | "written" | "no_box_art" | "no_match";
+
+export interface ArtGameOutcome {
+  id: number | null;
+  title: string | null;
+  source: MatchSource | null;
+  cover: CoverStatus;
+  cover_size: [number, number] | null;
+  thumbnail_size: [number, number] | null;
+  from_cache: boolean;
+  logo: string;
+  metadata: string[];
+}
+
+/** Payload of the `art-progress` event. */
+export interface ArtProgress {
+  done: number;
+  total: number;
+  event: ArtEvent;
+}
+
+export interface ArtGameResult {
+  code: string;
+  outcome: ArtGameOutcome | null;
+  error: string | null;
+}
+
+export interface Allowance {
+  remaining: number | null;
+  extra: number;
+  refresh_at: number | null;
+  updated_at: number;
+}
+
+export interface ArtOutcome {
+  report: { results: ArtGameResult[]; allowance: Allowance };
+  summary: string;
+}
+
+export interface KeyStatus {
+  stored: boolean;
+  environment: boolean;
+  remaining: number | null;
+}
+
+export interface FileView {
+  path: string;
+  size: number;
+}
+
+export interface StorageView {
+  total: number;
+  used: number;
+  free: number;
+}
+
+export interface SyncPlanView {
+  system_code: string;
+  upload_path: string;
+  games: number;
+  originals: number;
+  folders: number;
+  files: number;
+  uploads: FileView[];
+  deletions: string[];
+  link_deletions: string[];
+  empty_dirs: string[];
+  unchanged: number;
+  total_size: number;
+  upload_size: number;
+  available: number | null;
+  fits: boolean;
+  noop: boolean;
+  changes: number;
+  storage: StorageView | null;
+  planned_at: number;
+}
+
+export type SyncState = "idle" | "running" | "done" | "failed";
+
+export interface SyncStep {
+  index: number;
+  total: number;
+  name: string;
+  label: string;
+  detail: string;
+}
+
+export interface UploadView {
+  path: string;
+  done: number;
+  total: number;
+  overall_done: number;
+  overall_total: number;
+}
+
+export interface SyncReportView {
+  uploaded_files: number;
+  uploaded_bytes: number;
+  removed_files: number;
+  removed_links: number;
+  removed_dirs: number;
+  games_mounted: boolean;
+}
+
+/** Payload of the `sync-progress` event and of `sync_run` / `sync_status`. */
+export interface SyncSnapshot {
+  seq: number;
+  state: SyncState;
+  plan: SyncPlanView | null;
+  step: SyncStep | null;
+  upload: UploadView | null;
+  log: string[];
+  report: SyncReportView | null;
+  error: { message: string; detail: string | null } | null;
+  started_at: number | null;
+  finished_at: number | null;
+}

@@ -41,6 +41,10 @@ pub struct LibraryConfig {
     /// TheGamesDB API key, when stored here rather than in the environment.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tgdb_key: Option<String>,
+    /// A folder tree edited by hand. When set it is used instead of the automatic structure
+    /// in `menu`, brought in line with the library's games on every read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_menu: Option<crate::menu::Menu>,
 }
 
 /// The result of importing one ROM.
@@ -632,6 +636,7 @@ mod tests {
             },
             last_console: Some("snes-eur".into()),
             tgdb_key: None,
+            custom_menu: None,
         };
         library.save_config(&config).unwrap();
         assert_eq!(library.config().unwrap(), config);

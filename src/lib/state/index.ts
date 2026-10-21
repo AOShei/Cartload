@@ -6,3 +6,19 @@ export { preferences, applyTheme, type Theme } from "./preferences.svelte";
 export { toasts, type Toast, type ToastKind } from "./toasts.svelte";
 export { flowStore, flowTitle, formatDuration, type Stage } from "./flow.svelte";
 export { packageStore, formatBytes } from "./package.svelte";
+export {
+  libraryStore,
+  breadcrumbs,
+  countGames,
+  entriesAt,
+  folderAt,
+  folderId,
+  findGame,
+  pathKey,
+  samePath,
+  baseName,
+  DRAG_TYPE,
+  type Tile,
+  type ViewMode,
+} from "./library.svelte";
+export { syncStore, idleSync } from "./sync.svelte";

@@ -95,8 +95,14 @@
   main {
     flex: 1;
     min-height: 0;
-    padding: var(--space-5) var(--space-6) var(--space-6);
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-5) var(--space-6) var(--space-4);
     overflow: auto;
+  }
+
+  .page-header {
+    flex: none;
   }
 
   .page-header {

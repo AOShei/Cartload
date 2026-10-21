@@ -658,3 +658,48 @@ With an installed console running hakchi, open "More" (closes on Escape or a cli
 | Date | Console | Host | 1 | 2 | 3 | 4 | 5 | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | | | | | | | | | not yet run on hardware (a console running hakchi was attached during the task; no flow was started) |
+
+## Library page (desktop app)
+
+Crate: `src-tauri` (the app). Needs a console running hakchi on USB and a few ROM files. The
+headless check first: `cargo run -p cartload-app --example plan` lists the library, waits for
+the console, caches its firmware launch entries and prints the sync plan without changing
+anything on the console. Run on 2026-10-21 against the SNES Classic Mini (EUR) with one game
+in the library: 21 firmware entries cached, plan of 31 uploads (4 236 052 bytes), 5 removals
+and 21 stale links, fits; the same numbers task 06's CLI produced.
+
+Then the app (`WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo tauri dev` on this host), Library page:
+
+1. **Tree and bar.** With the console connected, the tree reads "Console menu" with the
+   firmware games under it (21 on a SNES Classic) once the first plan has run, the sync bar
+   shows the console's used/total bytes from the status, the library size, and "N files to
+   upload" or "The console is up to date".
+2. **Import.** Drop one `.sfc` and one folder of ROMs onto the window: the overlay appears
+   while dragging, the import panel lists every file with its outcome (code, hash database
+   match or "named after the file", warnings), the new games are selected in the grid, and the
+   bar's pending count grows. Repeat with "Add games…" (native dialog).
+3. **Edit.** Select a game, change the name and press Enter: "Save" disappears, the tile
+   updates, the plan gains one upload (the launch entry). Try an invalid date: the toast says
+   YYYY-MM-DD and nothing is saved.
+4. **Art.** Store a TheGamesDB key on the Settings page, select a game, "Fetch art": the
+   progress line runs through searching/fetching, the cover replaces the placeholder,
+   publisher and date fill in. "Choose image…" with a PNG replaces the cover without network.
+5. **Folders.** "New folder", name it, drag a game from the grid onto it in the tree: the tree
+   heading changes to "Folders edited by hand", the folder count updates. Rename (F2) and
+   remove the folder: the game returns to the parent. Open the structure popover, apply
+   "Folders A to Z": the edited tree is replaced.
+6. **Sync.** "Sync N changes" opens the plan with the uploads and removals listed; "Sync now"
+   runs it: the panel shows step 1 to 9 with the upload bar, the status bar reads "Syncing
+   games: step N of 9, …", and at the end "Synced in X s" with the counts; the console's menu
+   restarts with the games in the chosen folders, the bar reads "The console is up to date",
+   and the storage numbers refresh.
+7. **Remove.** Remove a game (confirmation worded "Remove 1 game"): the plan lists its files
+   under "Remove"; sync again and check the console's menu.
+8. **Keyboard.** In the grid: arrows move, Shift extends, Ctrl+A selects all, Enter opens a
+   folder, Backspace goes up. In the tree: arrows move, Right/Left expand/collapse, F2 renames.
+
+### Results
+
+| Date | Console | Steps | Notes |
+| --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini (EUR) | headless plan only | app sync not run (user absent) |
