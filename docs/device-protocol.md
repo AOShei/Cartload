@@ -51,8 +51,8 @@ The kernel package. A gzip tar with: `boot/boot.img`, `boot/uboot.bin`, `bin/` (
 sunxi-* tools, xdelta3), `etc/preinit.d/`, `install`, `uninstall`, `var/version`.
 hakchi2 CE ships v1.0.4-126 from
 `https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod`
-and also knows `https://hakchi.net/hakchi/hmods/hakchi-latest.hmod`. `fes1.bin` ships inside the
-app (`data/fes1.bin`), not in the hmod. Source for the kernel side: madmonkey1907/hakchi (GPL-3).
+and also knows `https://hakchi.net/hakchi/hmods/hakchi-latest.hmod`. `fes1.bin` ships with the
+hakchi2 CE source tree (`hakchi_gui/data/fes1.bin`), not in the hmod. Source for the kernel side: madmonkey1907/hakchi (GPL-3).
 
 ## Device-side `hakchi` script
 

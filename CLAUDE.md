@@ -16,7 +16,7 @@ implementation, not its code or its UI patterns.
   (memboot and kernel install sequence), `hakchi_gui/Tasks/SyncTask.cs` (sync),
   `hakchi_gui/hakchi.cs` (device constants), `hakchi_gui/Hmod/` (hmod package handling).
   A built copy with the kernel package is at `~/Documents/Hakchi2-CE/hakchi_gui/bin/Release/net48/`
-  (`mods/hmods/hakchi.hmod`, `data/fes1.bin`). Do not modify anything under that tree.
+  (`mods/hmods/hakchi.hmod`); `fes1.bin` is in the source tree at `~/Documents/Hakchi2-CE/hakchi_gui/data/fes1.bin`. Do not modify anything under that tree.
 
 ## Layout
 
