@@ -22,6 +22,7 @@ pub mod watcher;
 
 use std::sync::{Arc, OnceLock};
 
+use tauri::Manager;
 use tauri::{AppHandle, Emitter};
 
 use crate::{
@@ -203,6 +204,9 @@ pub fn run() {
                 }
             }));
             tauri::async_runtime::spawn(watcher.run());
+            if let Some(window) = app.get_webview_window("main") {
+                fit_to_monitor(&window);
+            }
             tracing::info!(version = commands::version().app, "Cartload started");
             Ok(())
         })
@@ -212,4 +216,37 @@ pub fn run() {
         eprintln!("error while running Cartload: {err}");
         std::process::exit(1);
     }
+}
+
+/// Keeps the window inside the monitor it opens on. The window-state plugin restores the
+/// last size and position, and a size saved on a larger display (or by a compositor that
+/// reported more than the screen) would otherwise hang off the bottom of a 1080p screen.
+fn fit_to_monitor(window: &tauri::WebviewWindow) {
+    let Ok(Some(monitor)) = window.current_monitor() else {
+        return;
+    };
+    let Ok(size) = window.outer_size() else {
+        return;
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.size();
+    // Room for the title bar and a desktop panel.
+    let margin = |logical: f64| (logical * scale).round() as u32;
+    let max_width = area.width.saturating_sub(margin(24.0)).max(1);
+    let max_height = area.height.saturating_sub(margin(72.0)).max(1);
+    if size.width <= max_width && size.height <= max_height {
+        return;
+    }
+    let width = size.width.min(max_width);
+    let height = size.height.min(max_height);
+    tracing::info!(
+        from = format!("{}×{}", size.width, size.height),
+        to = format!("{width}×{height}"),
+        "window shrunk to fit the monitor"
+    );
+    let _ = window.set_size(tauri::PhysicalSize::new(width, height));
+    let origin = monitor.position();
+    let x = origin.x + i32::try_from((area.width - width) / 2).unwrap_or(0);
+    let y = origin.y + i32::try_from((area.height - height) / 2).unwrap_or(0);
+    let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
 }
