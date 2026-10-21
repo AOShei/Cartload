@@ -1,19 +1,17 @@
 //! `cartload-fel`: probe a console in FEL mode or memboot a hakchi kernel, without the UI.
 
 use std::{
-    fs::File,
-    io::{BufReader, Read},
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use cartload_fel::{
     Device, DeviceInfo, Error, MembootEvent, MembootOptions, MembootStage, ShellOverride,
     UbootImage, UbootVariant, find_devices, memboot, wait_for_device,
 };
+use cartload_hmod::Package;
 use clap::{Parser, Subcommand, ValueEnum};
-use flate2::read::GzDecoder;
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -40,15 +38,12 @@ enum Command {
         #[arg(long, value_name = "SECS")]
         wait: Option<u64>,
     },
-    /// Boot the hakchi kernel from RAM. Nothing is written to the console's NAND.
+    /// Boot the hakchi kernel from RAM. Nothing is written to the console's NAND. The DRAM init
+    /// binary (fes1.bin) is built in.
     Memboot {
         /// hakchi.hmod (gzip tar) providing boot/boot.img and boot/uboot.bin.
         #[arg(long, value_name = "PATH")]
         hmod: PathBuf,
-
-        /// fes1.bin, the DRAM init binary shipped with hakchi2 CE (hakchi_gui/data/fes1.bin).
-        #[arg(long, value_name = "PATH")]
-        fes1: PathBuf,
 
         /// Keep polling for up to this many seconds for a FEL device to appear.
         #[arg(long, value_name = "SECS")]
@@ -119,7 +114,6 @@ async fn main() -> Result<()> {
         Command::Probe { wait } => probe(wait).await,
         Command::Memboot {
             hmod,
-            fes1,
             wait,
             shell,
             uboot,
@@ -129,7 +123,7 @@ async fn main() -> Result<()> {
                 shell: shell.into(),
                 uboot: uboot.into(),
             };
-            run_memboot(&hmod, &fes1, wait, options, dry_run).await
+            run_memboot(&hmod, wait, options, dry_run).await
         }
     }
 }
@@ -182,70 +176,30 @@ async fn probe(wait: Option<u64>) -> Result<()> {
     Ok(())
 }
 
-/// The files memboot needs out of `hakchi.hmod`.
-struct HmodBootFiles {
-    boot_img: Vec<u8>,
-    uboot: Vec<u8>,
-    version: Option<String>,
-}
-
-fn read_hmod_boot_files(path: &Path) -> Result<HmodBootFiles> {
-    let file = File::open(path).with_context(|| format!("opening {}", path.display()))?;
-    let mut archive = tar::Archive::new(GzDecoder::new(BufReader::new(file)));
-    let mut boot_img = None;
-    let mut uboot = None;
-    let mut version = None;
-    for entry in archive.entries().context("reading hmod archive")? {
-        let mut entry = entry.context("reading hmod entry")?;
-        let name = entry.path().context("reading hmod entry name")?;
-        let name = name.to_string_lossy().trim_start_matches("./").to_string();
-        let target = match name.as_str() {
-            "boot/boot.img" => &mut boot_img,
-            "boot/uboot.bin" => &mut uboot,
-            "var/version" => &mut version,
-            _ => continue,
-        };
-        let mut data = Vec::new();
-        entry
-            .read_to_end(&mut data)
-            .with_context(|| format!("extracting {name}"))?;
-        info!(entry = name, len = data.len(), "extracted from hmod");
-        *target = Some(data);
-    }
-    let Some(boot_img) = boot_img else {
-        bail!("{} has no boot/boot.img", path.display())
-    };
-    let Some(uboot) = uboot else {
-        bail!("{} has no boot/uboot.bin", path.display())
-    };
-    let version = version.map(|v| String::from_utf8_lossy(&v).trim().replace('\n', ", "));
-    Ok(HmodBootFiles {
-        boot_img,
-        uboot,
-        version,
-    })
-}
-
 async fn run_memboot(
     hmod: &Path,
-    fes1: &Path,
     wait: Option<u64>,
     options: MembootOptions,
     dry_run: bool,
 ) -> Result<()> {
-    let fes1_bytes = std::fs::read(fes1).with_context(|| format!("reading {}", fes1.display()))?;
-    let files = read_hmod_boot_files(hmod)?;
+    let fes1_bytes = cartload_hmod::fes1();
+    let files = Package::open(hmod)
+        .and_then(|package| package.boot_files())
+        .with_context(|| format!("reading {}", hmod.display()))?;
+    info!(
+        boot_img = files.boot_image.len(),
+        uboot = files.uboot.len(),
+        version = %files.version,
+        "read boot files from hmod"
+    );
 
     // Validate everything before looking for the device, and describe what will happen.
     let uboot = UbootImage::new(&files.uboot, options.uboot)?;
-    let header = cartload_fel::memboot::BootImageHeader::parse(&files.boot_img)?;
-    let prepared = cartload_fel::memboot::prepare_boot_image(&files.boot_img, options.shell)?;
-    println!(
-        "hmod:      {} ({})",
-        hmod.display(),
-        files.version.as_deref().unwrap_or("no var/version")
-    );
-    println!("fes1.bin:  {} bytes", fes1_bytes.len());
+    let header = cartload_fel::memboot::BootImageHeader::parse(&files.boot_image)?;
+    let prepared = cartload_fel::memboot::prepare_boot_image(&files.boot_image, options.shell)?;
+    println!("hmod:      {}", hmod.display());
+    println!("version:   {}", files.version);
+    println!("fes1.bin:  {} bytes, built in", fes1_bytes.len());
     println!(
         "uboot.bin: {} bytes, {:?} variant, bootcmd value at offset {:#x}",
         uboot.data().len(),
@@ -254,7 +208,7 @@ async fn run_memboot(
     );
     println!(
         "boot.img:  {} bytes on disk, {} declared (kernel {} + ramdisk {}, page {}), {} uploaded",
-        files.boot_img.len(),
+        files.boot_image.len(),
         header.image_size()?,
         header.kernel_size,
         header.ramdisk_size,
@@ -278,9 +232,9 @@ async fn run_memboot(
     let mut last_percent = 0;
     let report = memboot(
         &mut device,
-        &fes1_bytes,
+        fes1_bytes,
         &files.uboot,
-        &files.boot_img,
+        &files.boot_image,
         &options,
         |event| match event {
             MembootEvent::Stage(stage) => info!(

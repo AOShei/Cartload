@@ -26,6 +26,7 @@ implementation, not its code or its UI patterns.
 - `crates/library`: games on disk, launch entries, art, folder tree, sync diff.
 - `src-tauri`: the Tauri shell; thin commands over the crates.
 - `src`: Svelte frontend.
+- `data/`: binary blobs embedded at build time (`fes1.bin`; origin and license in `data/README.md`).
 - `.agent/`: the autonomous-agent driver and task briefs. Never edit files under `.agent/`
   except to write your report to `.agent/reports/`.
 

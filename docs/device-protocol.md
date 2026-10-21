@@ -61,8 +61,16 @@ The kernel package. A gzip tar with: `boot/boot.img`, `boot/uboot.bin`, `bin/` (
 sunxi-* tools, xdelta3), `etc/preinit.d/`, `install`, `uninstall`, `var/version`.
 hakchi2 CE ships v1.0.4-126 from
 `https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod`
-and also knows `https://hakchi.net/hakchi/hmods/hakchi-latest.hmod`. `fes1.bin` ships with the
-hakchi2 CE source tree (`hakchi_gui/data/fes1.bin`), not in the hmod. Source for the kernel side: madmonkey1907/hakchi (GPL-3).
+and also knows `https://hakchi.net/hakchi/hmods/hakchi-latest.hmod` ("Download latest hakchi"
+menu) and `https://hakchi.net/hakchi/hakchi.hmod` (its `HakchiUpdateURL` config default). On
+2026-10-21 all three answered 200 (GitHub redirects to `release-assets.githubusercontent.com`,
+hakchi.net to `static.hakchi.net`) and the first two delivered the same 9 340 382-byte file,
+md5 `2e163a25c98b4c05bed274817abb38da`, identical to the copy in the CE build tree. Entry names
+inside the tar carry no `./` prefix in that file, but CE accepts both forms and so does Cartload.
+`var/version` is a shell fragment: `bootVersion='1.0.3'`, `hakchiVersion='v1.0.4-126'`,
+`kernelVersion='3.4.113.29-madmonkey'`. `fes1.bin` ships with the hakchi2 CE source tree
+(`hakchi_gui/data/fes1.bin`, 14 048 bytes, starts with the Allwinner `eGON.BT0` header), not in
+the hmod; Cartload embeds it from `data/fes1.bin`. Source for the kernel side: madmonkey1907/hakchi (GPL-3).
 
 ## Device-side `hakchi` script
 

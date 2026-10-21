@@ -13,10 +13,36 @@ name = "cartload_hmod"
 [[bin]]
 name = "cartload-hmod"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["fetch", "cli"]
+# Downloading the package over HTTPS (reqwest on rustls with the ring provider).
+fetch = ["dep:reqwest", "dep:rustls", "dep:tokio"]
+# Command-line binary and its dependencies (argument parsing, log output).
+cli = ["fetch", "dep:anyhow", "dep:clap", "dep:tracing-subscriber"]
 
 [dependencies]
+flate2 = "1"
+tar = "0.4"
 thiserror.workspace = true
 tracing.workspace = true
+
+# fetch only. reqwest is built without a crypto provider so that rustls uses ring, the backend
+# cartload-console's SSH stack already builds, instead of adding aws-lc-rs and its C toolchain
+# requirements.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2", "system-proxy"], optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
+tokio = { workspace = true, features = ["fs", "io-util"], optional = true }
+
+# CLI only.
+anyhow = { workspace = true, optional = true }
+clap = { version = "4", features = ["derive"], optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["fs", "io-util", "net", "rt-multi-thread", "macros"] }
 
 [lints]
 workspace = true

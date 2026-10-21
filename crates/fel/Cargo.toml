@@ -17,8 +17,8 @@ required-features = ["cli"]
 
 [features]
 default = ["cli"]
-# Command-line binary and its dependencies (argument parsing, log output, hmod extraction).
-cli = ["dep:anyhow", "dep:clap", "dep:flate2", "dep:tar", "dep:tracing-subscriber"]
+# Command-line binary and its dependencies (argument parsing, log output, hmod reading).
+cli = ["dep:anyhow", "dep:cartload-hmod", "dep:clap", "dep:tracing-subscriber"]
 
 [dependencies]
 nusb = "0.2"
@@ -26,11 +26,10 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
-# CLI only.
+# CLI only. cartload-hmod without its default features: package reading and fes1.bin, no HTTP.
 anyhow = { workspace = true, optional = true }
+cartload-hmod = { path = "../hmod", default-features = false, optional = true }
 clap = { version = "4", features = ["derive"], optional = true }
-flate2 = { version = "1", optional = true }
-tar = { version = "0.4", optional = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 
 [lints]

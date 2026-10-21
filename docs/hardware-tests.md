@@ -32,20 +32,22 @@ to NAND, so a failed run is recovered by power-cycling the console.
   then `sudo udevadm control --reload-rules`. A NetworkManager profile that gives `hakchi0` a
   link-local address (`ipv4.method=link-local`) is needed for the SSH check at the end.
 - `hakchi.hmod` (hakchi2 CE build tree: `hakchi_gui/bin/Release/net48/mods/hmods/hakchi.hmod`,
-  v1.0.4-126) and `fes1.bin` (`hakchi_gui/data/fes1.bin` in the hakchi2 CE source tree,
-  14048 bytes, md5 `2d1c7b3b9fe5f88bc93aef662abe5cfe`).
+  v1.0.4-126, or `cargo run -p cartload-hmod -- fetch --dest hakchi.hmod`, which downloads the
+  same file: md5 `2e163a25c98b4c05bed274817abb38da`). `fes1.bin` (14048 bytes, md5
+  `2d1c7b3b9fe5f88bc93aef662abe5cfe`) is built into the binaries from `data/fes1.bin`.
 - Console connected over USB, powered off. Any console state is fine: memboot does not depend on
   hakchi being installed.
 
-Set `HMOD` and `FES1` to those two paths for the commands below.
+Set `HMOD` to the package path for the commands below.
 
 ### 1. Dry run (no console needed)
 
 ```
-cargo run -p cartload-fel -- memboot --hmod "$HMOD" --fes1 "$FES1" --dry-run
+cargo run -p cartload-fel -- memboot --hmod "$HMOD" --dry-run
 ```
 
-Expected: five summary lines and `dry run: images are valid, not touching USB`. For v1.0.4-126:
+Expected: six summary lines and `dry run: images are valid, not touching USB`. For v1.0.4-126:
+`version:   v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey)`, `fes1.bin:  14048 bytes, built in`,
 `uboot.bin: 761856 bytes, Sd variant, bootcmd value at offset 0x6a54b`,
 `boot.img: 4585472 bytes on disk, 4585472 declared (kernel 1968736 + ramdisk 2612272, page 2048),
 4587520 uploaded`, and a `cmdline:` line ending in `hakchi-shell`.
@@ -76,16 +78,15 @@ unexpected endpoints. Exit code 0.
 Leave the console in FEL mode after step 2 (probe does not change its state) and run:
 
 ```
-cargo run -p cartload-fel -- memboot --hmod "$HMOD" --fes1 "$FES1"
+cargo run -p cartload-fel -- memboot --hmod "$HMOD"
 ```
 
 Expected log sequence (timestamps omitted):
 
 ```
-INFO extracted from hmod entry="boot/boot.img" len=4585472
-INFO extracted from hmod entry="boot/uboot.bin" len=761856
-INFO extracted from hmod entry="var/version" len=84
-hmod: ... (bootVersion='1.0.3', hakchiVersion='v1.0.4-126', kernelVersion='3.4.113.29-madmonkey')
+INFO read boot files from hmod boot_img=4585472 uboot=761856 version=v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey)
+hmod:      ...
+version:   v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey)
 ...
 FEL device 1f3a:efe8: ...
 INFO preparing images
