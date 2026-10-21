@@ -5,7 +5,7 @@
   import type { FlowKind } from "../api/types";
   import Dialog from "../components/Dialog.svelte";
   import FailureCard from "../components/FailureCard.svelte";
-  import FelIllustration from "../components/FelIllustration.svelte";
+  import ConsoleTopView from "../components/ConsoleTopView.svelte";
   import FlowLog from "../components/FlowLog.svelte";
   import Icon from "../components/Icon.svelte";
   import StepList from "../components/StepList.svelte";
@@ -27,6 +27,18 @@
 
   const report = $derived(consoleStore.report);
   const status = $derived(report?.status ?? null);
+
+  /* The drawing follows the console that is connected, and keeps showing the last one seen
+     while it is off or in FEL mode. `?model=` picks one in the browser preview. */
+  let lastModel = $state(
+    (!inTauri && typeof location !== "undefined" && new URLSearchParams(location.search).get("model")) || "SnesEur",
+  );
+  $effect(() => {
+    if (status?.state === "connected" && status.info.console !== "Unknown") {
+      lastModel = status.info.console;
+    }
+  });
+  const consoleModel = $derived(lastModel);
   const snapshot = $derived(flowStore.snapshot);
   const running = $derived(flowStore.running);
   const pkg = $derived(packageStore.status?.package ?? null);
@@ -235,7 +247,7 @@
       <div class="body card">
         <h2>Put the console in FEL mode</h2>
         <div class="fel">
-          <FelIllustration width={300} />
+          <ConsoleTopView model={consoleModel} width={320} />
           <ol class="howto">
             <li>Connect the console to this computer with its USB cable and switch POWER off.</li>
             <li>Hold RESET down and switch POWER on.</li>
