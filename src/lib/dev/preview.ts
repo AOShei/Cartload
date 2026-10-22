@@ -142,7 +142,7 @@ const INSTALL_STEPS: [string, string, string][] = [
   ["memboot", "Boot from memory", "Boot the hakchi kernel from RAM, through FEL or kexec"],
   ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
   ["detect", "Identify the console", "Check the console is in the memboot shell"],
-  ["check-md", "Compatibility check", "Refuse to install on a Mega Drive Mini, which Cartload does not support"],
+  ["check-md", "Compatibility check", "Check that the console is one Cartload supports"],
   ["grow", "Grow the data partition", "Merge the unused UDISK partition into the data partition"],
   ["reboot-grown", "Reboot into the grown partition", "Reboot into the memboot shell with the new partition table"],
   ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
