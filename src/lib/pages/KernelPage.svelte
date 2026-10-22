@@ -489,7 +489,7 @@
           </div>
           <button type="button" class="btn" disabled={!canStart} onclick={() => void dumpKernel()}>
             <Icon name="save" size={16} />
-            Save…
+            Save
           </button>
         </li>
         <li>
@@ -499,7 +499,7 @@
           </div>
           <button type="button" class="btn" disabled={!canStart} onclick={() => (confirmUninstall = true)}>
             <Icon name="undo" size={16} />
-            Reset…
+            Reset
           </button>
         </li>
       </ul>
