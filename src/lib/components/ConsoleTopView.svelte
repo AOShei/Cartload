@@ -60,7 +60,7 @@
   const reset = $derived.by(() => {
     switch (shape) {
       case "snes-usa":
-        return { x: 108, y: 204, w: 44, h: 16, from: "right" as const };
+        return { x: 168, y: 176, w: 70, h: 22, from: "right" as const };
       case "nes":
         return { x: 96, y: 268, w: 30, h: 14, from: "right" as const };
       case "famicom":
@@ -116,26 +116,41 @@
     <!-- the LED on the light front -->
     <rect x="214" y="274" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "snes-usa"}
-    <!-- SNES Classic (North America): a boxy grey body, the raised deck with the slot and the
-         purple eject button, Power and Reset as purple slide switches at the front left. -->
-    <rect class="usa-body" x="40" y="28" width="220" height="268" rx="10" />
-    <line class="vents" x1="72" y1="37" x2="228" y2="37" />
-    <rect class="usa-deck" x="52" y="46" width="196" height="144" rx="6" />
-    <rect class="usa-dark" x="78" y="92" width="116" height="16" rx="4" />
-    <rect x="206" y="84" width="18" height="32" rx="4" fill="#7f74c8" stroke="#5f55a8" />
-    <text class="lbl on-light" x="215" y="128" text-anchor="middle">EJECT</text>
-    <!-- power slide -->
-    <rect class="usa-dark" x="56" y="204" width="44" height="16" rx="8" />
-    <circle cx="66" cy="212" r="6" fill="#7f74c8" />
-    <text class="lbl on-light" x="78" y="234" text-anchor="middle">POWER</text>
-    <!-- reset slide -->
-    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="13" />
-    <rect class="usa-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="8" />
-    <circle cx={reset.x + 10} cy={reset.y + 8} r="6" fill="#7f74c8" />
-    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="234" text-anchor="middle">RESET</text>
-    <!-- front band -->
-    <path class="usa-band" d="M40 246h220v40q0 10-10 10H50q-10 0-10-10z" />
-    <rect x="214" y="268" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
+    <!-- SNES Classic (North America): one grey, defined by its contours. The raised
+         cartridge block at the back with its slot band, then Power and Reset as purple bars
+         that slide towards and away from you, the grey Eject button standing between them,
+         and the controller-port blocks stepping out of the front edge in line with the bars. -->
+    <rect class="usa-body" x="40" y="28" width="220" height="252" rx="8" />
+    <rect class="usa-body" x="50" y="262" width="88" height="34" rx="4" />
+    <rect class="usa-body" x="162" y="262" width="88" height="34" rx="4" />
+    <rect class="usa-body" x="52" y="266" width="84" height="26" rx="4" />
+    <rect class="usa-body" x="164" y="266" width="84" height="26" rx="4" />
+    <!-- raised cartridge block -->
+    <rect class="usa-raised" x="62" y="48" width="176" height="110" rx="4" />
+    <line class="usa-line" x1="72" y1="68" x2="228" y2="68" />
+    <line class="usa-line" x1="72" y1="92" x2="228" y2="92" />
+    <line class="usa-line" x1="84" y1="68" x2="84" y2="92" />
+    <line class="usa-line" x1="216" y1="68" x2="216" y2="92" />
+    <line class="usa-line" x1="72" y1="112" x2="228" y2="112" />
+    <!-- grooves across the front -->
+    <line class="usa-line" x1="56" y1="240" x2="134" y2="240" />
+    <line class="usa-line" x1="166" y1="240" x2="244" y2="240" />
+    <line class="usa-line" x1="56" y1="252" x2="134" y2="252" />
+    <line class="usa-line" x1="166" y1="252" x2="244" y2="252" />
+    <!-- power bar and its lights -->
+    <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
+    <circle cx="52" cy="191" r="1.8" fill="#8a8a8e" />
+    <rect x="62" y="176" width="70" height="22" rx="4" fill="#5a4a9c" stroke="#3f3374" />
+    <line x1="68" y1="181" x2="126" y2="181" stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
+    <text class="lbl on-light" x="97" y="214" text-anchor="middle">POWER</text>
+    <!-- eject -->
+    <rect x="138" y="170" width="24" height="56" rx="3" fill="#c4c4c7" stroke="#a0a0a6" />
+    <text class="lbl on-light" x="150" y="240" text-anchor="middle">EJECT</text>
+    <!-- reset bar -->
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="9" />
+    <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="4" fill="#5a4a9c" stroke="#3f3374" />
+    <line x1={reset.x + 6} y1={reset.y + 5} x2={reset.x + reset.w - 6} y2={reset.y + 5} stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
+    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="214" text-anchor="middle">RESET</text>
   {:else if shape === "nes"}
     <!-- NES Classic Mini: the vent lines at the back, the lower front with the cartridge
          door, Power with its red light and Reset on the front face at the left. -->
@@ -244,18 +259,15 @@
     stroke-width: 1.5;
   }
 
-  .usa-deck {
-    fill: #c6c6ca;
-    stroke: #a0a0a6;
+  .usa-raised {
+    fill: #d2d2d5;
+    stroke: #a4a4a8;
   }
 
-  .usa-dark {
-    fill: #4a4a50;
-    stroke: #35353a;
-  }
-
-  .usa-band {
-    fill: #e6e6e8;
+  .usa-line {
+    stroke: #aeaeb2;
+    stroke-width: 1.5;
+    stroke-linecap: round;
   }
 
   .nes-body {
