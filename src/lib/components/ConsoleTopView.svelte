@@ -74,7 +74,7 @@
       case "famicom":
         return { x: 200, y: 214, w: 24, h: 24, from: "right" };
       case "md":
-        return { x: 66, y: 204, w: 34, h: 22, from: "below" };
+        return { x: 62, y: 204, w: 28, h: 18, from: "below" };
       default:
         return { x: 194, y: 164, w: 34, h: 48, from: "right" };
     }
@@ -202,8 +202,8 @@
          little right of centre, nearly as tall as the body, with the slot above the ring's
          centre line; the vent grooves run off the left edge above the control cluster at
          the bottom left: the volume slider, the Power slide above the Reset button beside it. -->
-    <rect class="md-body" x="30" y="50" width="280" height="196" rx="16" />
-    {#each [60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155] as y (y)}
+    <path class="md-body" d="M44 50h252l14 14v166q0 16-16 16H46q-16 0-16-16V64z" />
+    {#each [68, 73, 78, 83, 88, 93, 98, 103, 108, 113, 118, 123, 128, 133, 138, 143, 148, 153, 158, 163] as y (y)}
       <line x1="31" y1={y} x2="70" y2={y} stroke="#3e3e40" stroke-width="2.4" />
     {/each}
     <circle cx="200" cy="136" r="82" fill="#222224" stroke="#4e4e50" stroke-width="2" />
@@ -213,17 +213,17 @@
     <rect x="176" y="174" width="48" height="22" rx="2" fill="#2a2a2c" stroke="#4e4e50" />
     <rect x="150" y="104" width="100" height="14" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
     <!-- volume -->
-    <rect x="46" y="172" width="10" height="56" rx="5" fill="#0f0f10" stroke="#3a3a3c" />
-    <rect x="43" y="196" width="16" height="8" rx="2" fill="#6b6b6d" />
-    <text class="lbl on-md" x="51" y="241" text-anchor="middle">VOL</text>
+    <rect x="46" y="180" width="8" height="42" rx="4" fill="#0f0f10" stroke="#3a3a3c" />
+    <rect x="43" y="198" width="14" height="7" rx="2" fill="#6b6b6d" />
+    <text class="lbl on-md" x="50" y="236" text-anchor="middle">VOL</text>
     <!-- power slide -->
-    <rect x="66" y="172" width="34" height="22" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
-    <rect x="70" y="176" width="12" height="14" rx="2" fill="#6b6b6d" />
-    <text class="lbl on-md" x="106" y="187">POWER</text>
+    <rect x="62" y="180" width="28" height="18" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
+    <rect x="65" y="183" width="10" height="12" rx="2" fill="#6b6b6d" />
+    <text class="lbl on-md" x="96" y="193">POWER</text>
     <!-- reset -->
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#4a4a4c" stroke="#6b6b6d" />
-    <text class="lbl reset-on-dark" x={reset.x + reset.w + 6} y={reset.y + 15}>RESET</text>
+    <text class="lbl reset-on-dark" x={reset.x + reset.w + 6} y={reset.y + 13}>RESET</text>
   {/if}
 
   <!-- "hold" pointer at the Reset control -->
