@@ -45,12 +45,12 @@
     <text x="320" y="232" font-size="26" fill="#d9d5ce">Install hakchi. Manage your games.</text>
     <text x="320" y="268" font-size="18" fill="#a8a298">For the NES, SNES and Famicom Classic Mini consoles.</text>
     <g font-size="13" font-weight="600" fill="#b8b0ff">
-      <rect x="320" y="296" width="120" height="30" rx="15" fill="#2b284a"/>
-      <text x="380" y="316" text-anchor="middle">Tauri · Rust · Svelte</text>
-      <rect x="452" y="296" width="178" height="30" rx="15" fill="#2b284a"/>
-      <text x="541" y="316" text-anchor="middle">Linux · macOS · Windows</text>
-      <rect x="642" y="296" width="72" height="30" rx="15" fill="#2b284a"/>
-      <text x="678" y="316" text-anchor="middle">GPL-3</text>
+      <rect x="320" y="296" width="148" height="30" rx="15" fill="#2b284a"/>
+      <text x="394" y="316" text-anchor="middle">Tauri · Rust · Svelte</text>
+      <rect x="480" y="296" width="190" height="30" rx="15" fill="#2b284a"/>
+      <text x="575" y="316" text-anchor="middle">Linux · macOS · Windows</text>
+      <rect x="682" y="296" width="72" height="30" rx="15" fill="#2b284a"/>
+      <text x="718" y="316" text-anchor="middle">GPL-3</text>
     </g>
   </g>
 

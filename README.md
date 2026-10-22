@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/readme-banner.svg?v=3" alt="Cartload: install hakchi and manage games on the NES, SNES and Famicom Classic Mini" width="100%">
+  <img src="docs/readme-banner.svg?v=4" alt="Cartload: install hakchi and manage games on the NES, SNES and Famicom Classic Mini" width="100%">
 </p>
 
 # Cartload
