@@ -64,10 +64,10 @@
     <line x1="46" y1="98" x2="46" y2="110" stroke="#8e8f93" stroke-width="1.5"/>
     <line x1="174" y1="98" x2="174" y2="110" stroke="#8e8f93" stroke-width="1.5"/>
     <path d="M104 99h12l-6 7z" fill="#8e8f93"/>
-    <rect x="32" y="162" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
-    <rect x="36" y="166" width="26" height="14" rx="3" fill="#6b6c70"/>
-    <rect x="80" y="162" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f"/>
-    <rect x="154" y="162" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
+    <rect x="32" y="172" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
+    <rect x="36" y="175" width="26" height="12" rx="3" fill="#6b6c70"/>
+    <rect x="80" y="172" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f"/>
+    <rect x="154" y="172" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
     <rect x="174" y="246" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f"/>
   </g>
 </svg>
