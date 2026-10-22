@@ -57,18 +57,26 @@
 
   /* The Reset control's box per shape, for the halo, and where the "hold" pointer comes
      from: the right, or below when the right side is taken. */
-  const reset = $derived.by(() => {
+  interface ResetBox {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    from: "right" | "below";
+  }
+
+  const reset = $derived.by((): ResetBox => {
     switch (shape) {
       case "snes-usa":
-        return { x: 168, y: 176, w: 70, h: 22, from: "right" as const };
+        return { x: 168, y: 176, w: 70, h: 22, from: "right" };
       case "nes":
-        return { x: 96, y: 268, w: 30, h: 14, from: "right" as const };
+        return { x: 96, y: 268, w: 30, h: 14, from: "right" };
       case "famicom":
-        return { x: 140, y: 170, w: 28, h: 14, from: "below" as const };
+        return { x: 198, y: 214, w: 28, h: 24, from: "right" };
       case "md":
-        return { x: 212, y: 86, w: 30, h: 16, from: "right" as const };
+        return { x: 212, y: 86, w: 30, h: 16, from: "right" };
       default:
-        return { x: 194, y: 164, w: 34, h: 48, from: "right" as const };
+        return { x: 194, y: 164, w: 34, h: 48, from: "right" };
     }
   });
 
@@ -163,31 +171,29 @@
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="6" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="2" fill="#5f5f63" stroke="#4a4a4e" />
   {:else if shape === "famicom"}
-    <!-- Famicom Mini: cream body, the two red controllers docked at the sides, the slot
-         between them with its red eject lever, Power and Reset at the front left, the red
-         front band. -->
-    <rect class="fc-body" x="40" y="28" width="220" height="268" rx="12" />
-    <rect x="48" y="60" width="44" height="150" rx="4" fill="#b8382f" />
-    <rect x="54" y="70" width="32" height="130" rx="3" fill="#c94a40" stroke="#8f2a23" />
-    <rect x="208" y="60" width="44" height="150" rx="4" fill="#b8382f" />
-    <rect x="214" y="70" width="32" height="130" rx="3" fill="#c94a40" stroke="#8f2a23" />
-    {#each [60, 70, 80, 90] as cy (cy)}
-      <rect x="62" y={cy + 20} width="16" height="7" rx="2" fill="#e9d9b5" />
-      <circle cx="224" cy={cy + 24} r="3.5" fill="#e9d9b5" />
-      <circle cx="236" cy={cy + 24} r="3.5" fill="#e9d9b5" />
-    {/each}
-    <rect x="104" y="60" width="92" height="80" rx="4" fill="#e3d9c4" stroke="#c8bca5" />
-    <rect x="116" y="86" width="68" height="14" rx="3" fill="#3f3a35" />
-    <rect x="186" y="96" width="10" height="36" rx="3" fill="#b8382f" />
+    <!-- Famicom Mini: cream body with the two red controllers lying along its edges, the
+         dark red cartridge cover across the upper middle, the raised block with the eject
+         slider below it, then the red Power slide at the front left and the red Reset
+         button at the front right, and the dark red band across the front. -->
+    <rect class="fc-body" x="44" y="28" width="212" height="268" rx="10" />
+    <rect x="100" y="36" width="100" height="10" rx="2" fill="#e6dcc7" stroke="#c8bca5" />
+    <rect x="36" y="46" width="22" height="150" rx="4" fill="#b8382f" stroke="#8f2a23" />
+    <rect x="242" y="46" width="22" height="150" rx="4" fill="#b8382f" stroke="#8f2a23" />
+    <rect x="66" y="78" width="168" height="40" rx="3" fill="#a3272a" stroke="#7d1c1f" />
+    <!-- eject slider on its raised block -->
+    <rect x="118" y="134" width="64" height="76" rx="4" fill="#e6dcc7" stroke="#c8bca5" />
+    <rect x="146" y="146" width="8" height="52" rx="3" fill="#d6cdb9" stroke="#b7ab94" />
+    <rect x="130" y="176" width="40" height="18" rx="3" fill="#b8382f" stroke="#8f2a23" />
+    <text class="lbl on-cream" x="150" y="224" text-anchor="middle">EJECT</text>
     <!-- power slide -->
-    <rect x="104" y="170" width="28" height="14" rx="3" fill="#3f3a35" />
-    <rect x="107" y="173" width="10" height="8" rx="2" fill="#d6cdb9" />
-    <text class="lbl on-cream" x="118" y="163" text-anchor="middle">POWER</text>
+    <rect x="66" y="214" width="36" height="22" rx="3" fill="#d6cdb9" stroke="#b7ab94" />
+    <rect x="70" y="218" width="18" height="14" rx="2" fill="#b8382f" stroke="#8f2a23" />
+    <text class="lbl on-cream" x="84" y="250" text-anchor="middle">POWER</text>
     <!-- reset -->
-    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="7" />
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#b8382f" stroke="#8f2a23" />
-    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="163" text-anchor="middle">RESET</text>
-    <path class="fc-band" d="M40 238h220v46q0 12-12 12H52q-12 0-12-12z" />
+    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="250" text-anchor="middle">RESET</text>
+    <rect x="58" y="262" width="184" height="22" rx="3" fill="#a3272a" stroke="#7d1c1f" />
   {:else}
     <!-- Mega Drive / Genesis Mini: black body, the 16-bit ring around the slot, the volume
          slider at the left, Power at the front left, Reset at the right of the ring. -->
@@ -284,9 +290,6 @@
     stroke-width: 1.5;
   }
 
-  .fc-band {
-    fill: #b8382f;
-  }
 
   .md-body {
     fill: #2a2a2c;
