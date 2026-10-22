@@ -1,8 +1,18 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { setupInstall, setupStatus, tgdbKeyGet, tgdbKeySet } from "../api/commands";
+  import { save } from "@tauri-apps/plugin-dialog";
+  import {
+    diagnosticsReport,
+    diagnosticsSave,
+    logFile,
+    logReveal,
+    setupInstall,
+    setupStatus,
+    tgdbKeyGet,
+    tgdbKeySet,
+  } from "../api/commands";
   import { AppError, inTauri } from "../api/tauri";
-  import type { KeyStatus, SetupStatus } from "../api/types";
+  import type { KeyStatus, LogFileInfo, SetupStatus } from "../api/types";
   import AppMark from "../components/AppMark.svelte";
   import Icon from "../components/Icon.svelte";
   import Wordmark from "../components/Wordmark.svelte";
@@ -16,6 +26,8 @@
   let about: HTMLElement | undefined = $state();
   let setup = $state<SetupStatus | null>(null);
   let setupBusy = $state(false);
+  let log = $state<LogFileInfo | null>(null);
+  let diagnosticsBusy = $state(false);
 
   onMount(() => {
     void libraryStore.start();
@@ -23,6 +35,9 @@
       void setupStatus()
         .then((status) => (setup = status))
         .catch((error: unknown) => toasts.error(`Could not read the system setup: ${AppError.from(error).message}`));
+      void logFile()
+        .then((info) => (log = info))
+        .catch(() => (log = null));
       keyLoading = true;
       void tgdbKeyGet()
         .then((status) => (keyStatus = status))
@@ -55,6 +70,57 @@
     }
   }
 
+  async function copyDiagnostics(): Promise<void> {
+    diagnosticsBusy = true;
+    try {
+      const text = await diagnosticsReport();
+      await navigator.clipboard.writeText(text);
+      toasts.success("Diagnostics copied. Paste them into the bug report.");
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(`Could not copy the diagnostics: ${e.message}`, e.detail);
+    } finally {
+      diagnosticsBusy = false;
+    }
+  }
+
+  async function saveDiagnostics(): Promise<void> {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    let path: string | null;
+    try {
+      path = await save({
+        title: "Save diagnostics",
+        defaultPath: `cartload-diagnostics-${stamp}.txt`,
+        filters: [{ name: "Text", extensions: ["txt"] }],
+      });
+    } catch {
+      toasts.info("The save dialog needs the desktop app.");
+      return;
+    }
+    if (!path) {
+      return;
+    }
+    diagnosticsBusy = true;
+    try {
+      await diagnosticsSave(path);
+      toasts.success("Diagnostics saved.");
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(e.message, e.detail);
+    } finally {
+      diagnosticsBusy = false;
+    }
+  }
+
+  async function revealLog(): Promise<void> {
+    try {
+      await logReveal();
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(e.message, e.detail);
+    }
+  }
+
   async function saveKey(clear: boolean): Promise<void> {
     if (!inTauri) {
       toasts.info("Keys are stored inside the desktop app only.");
@@ -72,6 +138,17 @@
     } finally {
       keyBusy = false;
     }
+  }
+
+  /** `1.2 MB`, `640 KB`. */
+  function humanBytes(bytes: number): string {
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    if (bytes >= 1024) {
+      return `${Math.round(bytes / 1024)} KB`;
+    }
+    return `${bytes} B`;
   }
 
   const themes: { id: Theme; label: string; hint: string }[] = [
@@ -127,6 +204,30 @@
         <span class="muted"> · every command sent to the console and USB events.</span>
       </span>
     </label>
+    <h3>Bug reports</h3>
+    <p class="muted">
+      {#if log?.path}
+        The log is also written to <span class="mono path">{log.path}</span>
+        {#if log.exists}({humanBytes(log.size)}){/if}, with the previous three files kept beside it.
+      {:else}
+        The log is kept in this window only.
+      {/if}
+      A diagnostics report holds the build, the system, the console as last seen (including its
+      serial number and hardware id), the last install and sync, and the recent log. It never
+      contains your TheGamesDB key.
+    </p>
+    <div class="actions">
+      <button type="button" class="btn" onclick={() => void copyDiagnostics()} disabled={diagnosticsBusy || !inTauri}>
+        {#if diagnosticsBusy}<span class="spinner" aria-hidden="true"></span>{/if}
+        Copy diagnostics
+      </button>
+      <button type="button" class="btn btn-quiet" onclick={() => void saveDiagnostics()} disabled={diagnosticsBusy || !inTauri}>
+        Save diagnostics…
+      </button>
+      {#if log?.path}
+        <button type="button" class="btn btn-quiet" onclick={() => void revealLog()}>Open log folder</button>
+      {/if}
+    </div>
   </section>
 
   {#if setup?.applies}
@@ -383,9 +484,11 @@
     margin-top: var(--space-2);
   }
 
-  .key {
+  .key,
+  .actions {
     display: flex;
     gap: var(--space-2);
+    flex-wrap: wrap;
   }
 
   .key input {

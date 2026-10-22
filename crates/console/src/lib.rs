@@ -36,7 +36,10 @@ pub use parse::{
     ConsoleFamily, ConsoleType, DirSize, Firmware, GamesUsage, Region, StorageReport, StorageUsage,
     Version, Versions,
 };
-pub use session::{ExecOutput, HostKey, PASSWORD, Session, SessionOptions, USERNAME};
+pub use session::{
+    ExecOutput, HostKey, LineSplitter, OutputLine, OutputStream, PASSWORD, Session, SessionOptions,
+    USERNAME,
+};
 
 /// Crate name and version, for CLI banners and diagnostics.
 pub const fn version() -> &'static str {

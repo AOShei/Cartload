@@ -5,6 +5,7 @@ import type {
   FelProbe,
   FlowKind,
   FlowSnapshot,
+  LogFileInfo,
   LogLine,
   PackageStatus,
   SetupStatus,
@@ -45,6 +46,26 @@ export function felProbe(): Promise<FelProbe> {
 /** The buffered log lines, oldest first. */
 export function logRecent(): Promise<LogLine[]> {
   return call<LogLine[]>("log_recent");
+}
+
+/** Where the log file is. */
+export function logFile(): Promise<LogFileInfo> {
+  return call<LogFileInfo>("log_file");
+}
+
+/** Opens the log folder in the file manager. */
+export function logReveal(): Promise<void> {
+  return call<void>("log_reveal");
+}
+
+/** The diagnostics report as text. */
+export function diagnosticsReport(): Promise<string> {
+  return call<string>("diagnostics_report");
+}
+
+/** Writes the diagnostics report to a file. */
+export function diagnosticsSave(path: string): Promise<void> {
+  return call<void>("diagnostics_save", { path });
 }
 
 /** Runs a shell line on the console. Only in builds with the `dev-exec` feature. */

@@ -495,6 +495,16 @@ impl SyncRunner {
             }
             Err(error) => {
                 warn!(%error, "sync failed");
+                let error = if error.message.ends_with("try again.") {
+                    error
+                } else {
+                    let message = format!(
+                        "{} Run the sync again once the console is back: games already copied \
+                         are kept and only the rest is transferred.",
+                        error.message
+                    );
+                    error.with_message(message)
+                };
                 self.publish(|s| {
                     s.state = SyncState::Failed;
                     s.finished_at = Some(now);

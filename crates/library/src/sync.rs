@@ -461,6 +461,10 @@ pub mod commands {
     pub const MODTIME_SCRIPT: &str = "modtime.sh";
     /// Name of the link script.
     pub const LINK_SCRIPT: &str = "linkgamessync.sh";
+    /// A file is uploaded under its name plus this suffix and renamed when complete, so an
+    /// interrupted transfer never leaves a truncated game under its final name. Leftovers
+    /// show up as stale files and are removed by the next sync.
+    pub const PART_SUFFIX: &str = ".cartload-part";
 }
 
 /// What a sync will do.
@@ -784,6 +788,7 @@ impl Transport for Session {
             let mut overall_done = 0u64;
             for file in files {
                 let remote = file.remote_path(upload_path);
+                let part = format!("{remote}{}", commands::PART_SUFFIX);
                 let mut report = |done: u64| {
                     progress(SyncEvent::Upload {
                         path: file.path.clone(),
@@ -794,11 +799,10 @@ impl Transport for Session {
                     });
                 };
                 let sent = match &file.source {
-                    Source::Path(path) => {
-                        ftp.upload_file(path, &remote, |p| report(p.done)).await?
-                    }
-                    Source::Bytes(bytes) => ftp.upload(&remote, bytes, |p| report(p.done)).await?,
+                    Source::Path(path) => ftp.upload_file(path, &part, |p| report(p.done)).await?,
+                    Source::Bytes(bytes) => ftp.upload(&part, bytes, |p| report(p.done)).await?,
                 };
+                ftp.rename(&part, &remote).await?;
                 overall_done += sent;
             }
             if let Err(error) = ftp.quit().await {
@@ -819,6 +823,12 @@ pub const STEPS: [&str; 9] = [
 /// modification times, runs the link script, writes the config, then `overmount_games` and
 /// `uistart`. Refuses to start when the collection does not fit, or when it has compressed
 /// games and the console has no `tiny7zx` (nothing is touched in either case).
+///
+/// A failure after the UI was stopped (a dropped cable, a full flash) is followed by a
+/// best-effort `overmount_games; uistart` so the console is not left on a black screen; when
+/// the console is already gone it comes back on its own at the next power cycle. Files are
+/// uploaded under a temporary name and renamed once complete, so a rerun of the sync keeps
+/// what was fully copied and only transfers the rest.
 pub async fn sync<T: Transport>(
     target: &T,
     plan: &SyncPlan,
@@ -843,8 +853,36 @@ pub async fn sync<T: Transport>(
             which.stdout_trimmed()
         )));
     }
+    match sync_steps(target, plan, &mut progress).await {
+        Ok(report) => Ok(report),
+        Err(error) => {
+            progress(SyncEvent::Log(format!(
+                "sync failed ({error}); restarting the console's menu"
+            )));
+            match target.exec(commands::FINISH, None).await {
+                Ok(_) => progress(SyncEvent::Log("console menu restarted".into())),
+                Err(recovery) => {
+                    debug!(%recovery, "could not restart the menu after the failed sync");
+                    progress(SyncEvent::Log(
+                        "the console did not answer; it will start normally when powered on \
+                         again"
+                            .into(),
+                    ));
+                }
+            }
+            Err(error)
+        }
+    }
+}
+
+/// The steps of [`sync`], without the recovery.
+async fn sync_steps<T: Transport>(
+    target: &T,
+    plan: &SyncPlan,
+    progress: &mut (impl FnMut(SyncEvent) + Send),
+) -> Result<SyncReport> {
     let total = STEPS.len();
-    let step = |index: usize, detail: String, progress: &mut dyn FnMut(SyncEvent)| {
+    let step = |index: usize, detail: String, progress: &mut (dyn FnMut(SyncEvent) + Send)| {
         progress(SyncEvent::Step {
             index: index + 1,
             total,
@@ -855,13 +893,13 @@ pub async fn sync<T: Transport>(
     let upload_path = plan.paths.upload_path();
     let mut report = SyncReport::default();
 
-    step(0, "stopping the console's menu".into(), &mut progress);
+    step(0, "stopping the console's menu".into(), progress);
     ignore_status(target, commands::UI_STOP).await?;
 
-    step(1, "unmounting the games overlay".into(), &mut progress);
+    step(1, "unmounting the games overlay".into(), progress);
     ignore_status(target, commands::UMOUNT_GAMES).await?;
 
-    step(2, format!("listing {upload_path}"), &mut progress);
+    step(2, format!("listing {upload_path}"), progress);
     let links = target
         .exec(&commands::list_links(&upload_path), None)
         .await?;
@@ -887,7 +925,7 @@ pub async fn sync<T: Transport>(
             plan.link_deletions.len(),
             plan.empty_dirs.len()
         ),
-        &mut progress,
+        progress,
     );
     run_script(
         target,
@@ -906,14 +944,14 @@ pub async fn sync<T: Transport>(
             plan.uploads.len(),
             plan.upload_size()
         ),
-        &mut progress,
+        progress,
     );
     if plan.uploads.is_empty() {
         progress(SyncEvent::Log("nothing to upload".into()));
     } else {
         let directories = plan.directories();
         report.uploaded_bytes = target
-            .upload(&upload_path, &directories, &plan.uploads, &mut progress)
+            .upload(&upload_path, &directories, &plan.uploads, progress)
             .await?;
         report.uploaded_files = plan.uploads.len();
         run_script(
@@ -927,7 +965,7 @@ pub async fn sync<T: Transport>(
     step(
         5,
         format!("linking {} firmware games", plan.collection.originals),
-        &mut progress,
+        progress,
     );
     run_script(
         target,
@@ -939,7 +977,7 @@ pub async fn sync<T: Transport>(
     step(
         6,
         format!("writing {} config values", plan.config.len()),
-        &mut progress,
+        progress,
     );
     target
         .exec(commands::EVAL_STDIN, Some(plan.config_script().as_bytes()))
@@ -949,7 +987,7 @@ pub async fn sync<T: Transport>(
     step(
         7,
         "mounting the games and restarting the menu".into(),
-        &mut progress,
+        progress,
     );
     let finish = target.exec(commands::FINISH, None).await?;
     report.games_mounted = finish.success();
@@ -957,7 +995,7 @@ pub async fn sync<T: Transport>(
         warn!(exit_code = ?finish.exit_code, "overmount_games reported no games");
     }
 
-    step(8, "sync finished".into(), &mut progress);
+    step(8, "sync finished".into(), progress);
     info!(
         uploaded = report.uploaded_files,
         bytes = report.uploaded_bytes,
@@ -1648,6 +1686,8 @@ mod tests {
     struct Scripted {
         steps: Mutex<VecDeque<Step>>,
         uploads: Mutex<Vec<Uploaded>>,
+        /// The upload fails part way, as when the cable is pulled.
+        fail_upload: bool,
     }
 
     impl Scripted {
@@ -1660,7 +1700,13 @@ mod tests {
                         .collect(),
                 ),
                 uploads: Mutex::new(Vec::new()),
+                fail_upload: false,
             }
+        }
+
+        fn with_failing_upload(mut self) -> Self {
+            self.fail_upload = true;
+            self
         }
     }
 
@@ -1709,6 +1755,16 @@ mod tests {
             progress: &mut (dyn FnMut(SyncEvent) + Send),
         ) -> Result<u64> {
             {
+                if self.fail_upload {
+                    return Err(crate::error::io_error(
+                        "upload",
+                        std::path::Path::new(upload_path),
+                        std::io::Error::new(
+                            std::io::ErrorKind::ConnectionReset,
+                            "connection reset by peer",
+                        ),
+                    ));
+                }
                 self.uploads.lock().unwrap().push((
                     upload_path.to_string(),
                     directories.to_vec(),
@@ -1819,6 +1875,58 @@ mod tests {
         assert_eq!(steps, STEPS);
         assert!(cleanup.contains("rm './001/CLV-S-00000/CLV-S-00000_mdmini.png'\n"));
         assert!(cleanup.contains("rm './000/CLV-P-SAAAE/autoplay'\n"));
+    }
+
+    #[tokio::test]
+    async fn sync_restarts_the_menu_when_the_upload_fails() {
+        let (_dir, library, menus, paths) = trace_library();
+        let collection = collect(&library, &menus, &paths).unwrap();
+        let plan = sync_plan(collection, &[], &[], paths.clone(), Some(1 << 30));
+        let upload_path = paths.upload_path();
+        // A leftover of an interrupted upload is a stale file: the next sync removes it.
+        let listing =
+            "./000/CLV-P-SAAAE/x.sfrom.cartload-part 1234 2026-10-21 09:02:47.000000000\n";
+        let refreshed = plan.refresh(&parse_listing(listing), &[]);
+        assert_eq!(
+            refreshed.deletions,
+            ["./000/CLV-P-SAAAE/x.sfrom.cartload-part"]
+        );
+        let scripted = Scripted::new(vec![
+            (commands::WHICH_EXTRACTOR, None, ok("/bin/tiny7zx")),
+            (commands::UI_STOP, None, ok("")),
+            (commands::UMOUNT_GAMES, None, code(1)),
+            (&commands::list_links(&upload_path), None, ok("")),
+            (&commands::list_files(&upload_path), None, ok(listing)),
+            (
+                &commands::write_script(commands::CLEANUP_SCRIPT),
+                None,
+                ok(""),
+            ),
+            (
+                &commands::run_script(commands::CLEANUP_SCRIPT),
+                None,
+                ok(""),
+            ),
+            (
+                &commands::remove_script(commands::CLEANUP_SCRIPT),
+                None,
+                ok(""),
+            ),
+            // The upload fails here; the menu is restarted and the error reported.
+            (commands::FINISH, None, ok("")),
+        ])
+        .with_failing_upload();
+        let mut events = Vec::new();
+        let error = sync(&scripted, &plan, |e| events.push(e))
+            .await
+            .expect_err("the upload fails");
+        assert!(error.to_string().contains("connection reset"), "{error}");
+        assert!(scripted.steps.lock().unwrap().is_empty(), "FINISH was sent");
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, SyncEvent::Log(m) if m == "console menu restarted"))
+        );
     }
 
     #[tokio::test]

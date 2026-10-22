@@ -2,7 +2,7 @@
 
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-use cartload_console::{ExecOutput, Hakchi};
+use cartload_console::{ExecOutput, Hakchi, OutputLine};
 use cartload_fel::MembootOptions;
 use cartload_hmod::{BootFiles, Package, basemods::LoadedMod};
 use tracing::debug;
@@ -257,6 +257,20 @@ impl Context {
         timeout: Duration,
     ) -> Result<ExecOutput> {
         Ok(self.console()?.exec(command, stdin, timeout).await?)
+    }
+
+    /// Runs a command with a time limit, handing every line of output to `on_line` as it
+    /// arrives.
+    pub async fn exec_streaming(
+        &self,
+        command: &str,
+        timeout: Duration,
+        on_line: &mut (dyn FnMut(OutputLine) + Send),
+    ) -> Result<ExecOutput> {
+        Ok(self
+            .console()?
+            .exec_streaming(command, None, timeout, on_line)
+            .await?)
     }
 
     /// Runs a command and turns a non-zero exit into [`Error::Device`] carrying the command,

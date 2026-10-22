@@ -88,8 +88,9 @@ impl Step<Context> for UploadHmod {
 }
 
 /// Runs `boot`, the device-side installer: it backs up the stock kernel, flashes u-boot and
-/// the hakchi kernel, copies the rootfs to the data partition and reboots. The SSH connection
-/// drops when the console reboots, so the command ends without an exit code.
+/// the hakchi kernel, copies the rootfs to the data partition and reboots. Its output is
+/// reported line by line as it arrives. The SSH connection drops when the console reboots,
+/// so the command ends without an exit code.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RunInstaller;
 
@@ -109,7 +110,22 @@ impl Step<Context> for RunInstaller {
             "running the installer on the console; it takes a few minutes and the connection \
              drops when the console reboots",
         );
-        let output = match ctx.exec_with(commands::BOOT, None, timeout).await {
+        let reporter = ctx.reporter.clone();
+        let mut failure: Option<String> = None;
+        let mut on_line = |line: cartload_console::OutputLine| {
+            let text = line.text.trim_end();
+            if text.is_empty() {
+                return;
+            }
+            reporter.info(format!("console: {text}"));
+            if failure.is_none() && commands::FAILURE_MARKERS.iter().any(|m| text.contains(m)) {
+                failure = Some(text.to_string());
+            }
+        };
+        let output = match ctx
+            .exec_streaming(commands::BOOT, timeout, &mut on_line)
+            .await
+        {
             Ok(output) => output,
             Err(Error::Console(cartload_console::Error::CommandTimeout { .. })) => {
                 return Err(Error::Timeout {
@@ -128,17 +144,8 @@ impl Step<Context> for RunInstaller {
             }
             Err(error) => return Err(error),
         };
-        let stdout = output.stdout_lossy();
-        let stderr = output.stderr_lossy();
-        for line in stdout.lines().chain(stderr.lines()) {
-            let line = line.trim_end();
-            if line.is_empty() {
-                continue;
-            }
-            ctx.reporter.info(format!("console: {line}"));
-            if commands::FAILURE_MARKERS.iter().any(|m| line.contains(m)) {
-                return Err(Error::Device(format!("the installer reported: {line}")));
-            }
+        if let Some(line) = failure {
+            return Err(Error::Device(format!("the installer reported: {line}")));
         }
         if matches!(output.exit_code, Some(code) if code != 0) {
             return Err(device_failure(commands::BOOT, &output));

@@ -140,6 +140,12 @@ export interface SetupStatus {
   complete: boolean;
 }
 
+export interface LogFileInfo {
+  path: string | null;
+  exists: boolean;
+  size: number;
+}
+
 export interface FelProbe {
   device: UsbDevice;
   check: FelCheck;

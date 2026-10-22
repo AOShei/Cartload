@@ -181,6 +181,11 @@ impl Ftp {
         Ok(self.stream.pwd().await?)
     }
 
+    /// Renames a remote file (`RNFR` / `RNTO`), replacing `to` if it exists.
+    pub async fn rename(&mut self, from: &str, to: &str) -> Result<()> {
+        Ok(self.stream.rename(from, to).await?)
+    }
+
     /// Deletes a remote file.
     pub async fn remove_file(&mut self, path: &str) -> Result<()> {
         Ok(self.stream.rm(path).await?)

@@ -108,6 +108,63 @@ pub async fn log_recent(state: State<'_, Arc<AppState>>) -> Result<Vec<LogLine>,
     Ok(state.log.recent())
 }
 
+/// Where the log file is, and whether it exists.
+#[tauri::command]
+pub fn log_file() -> crate::diagnostics::LogFileInfo {
+    crate::diagnostics::log_file_info()
+}
+
+/// Opens the log folder in the desktop's file manager.
+#[tauri::command]
+pub async fn log_reveal() -> Result<(), CommandError> {
+    let dir = crate::logging::log_dir()
+        .ok_or_else(|| CommandError::new("This system has no application data folder."))?;
+    std::fs::create_dir_all(&dir).map_err(|e| {
+        CommandError::new("Could not create the log folder.").with_detail(e.to_string())
+    })?;
+    tracing::info!(dir = %dir.display(), "log_reveal");
+    crate::diagnostics::reveal(&dir)
+}
+
+/// A text report for a bug report: version, system, setup, console status, the last flow and
+/// sync, and the recent log lines.
+#[tauri::command]
+pub async fn diagnostics_report(
+    state: State<'_, Arc<AppState>>,
+    runner: State<'_, Arc<FlowRunner>>,
+    sync_runner: State<'_, Arc<SyncRunner>>,
+    library: State<'_, Arc<LibraryState>>,
+) -> Result<String, CommandError> {
+    tracing::info!("diagnostics_report");
+    Ok(crate::diagnostics::report(
+        &state,
+        &runner.snapshot(),
+        &sync_runner.snapshot(),
+        library.key_status().ok().as_ref(),
+    ))
+}
+
+/// Writes the diagnostics report to `path` (chosen with a save dialog).
+#[tauri::command]
+pub async fn diagnostics_save(
+    state: State<'_, Arc<AppState>>,
+    runner: State<'_, Arc<FlowRunner>>,
+    sync_runner: State<'_, Arc<SyncRunner>>,
+    library: State<'_, Arc<LibraryState>>,
+    path: PathBuf,
+) -> Result<(), CommandError> {
+    tracing::info!(path = %path.display(), "diagnostics_save");
+    let report = crate::diagnostics::report(
+        &state,
+        &runner.snapshot(),
+        &sync_runner.snapshot(),
+        library.key_status().ok().as_ref(),
+    );
+    std::fs::write(&path, report).map_err(|e| {
+        CommandError::new(format!("Could not write {}.", path.display())).with_detail(e.to_string())
+    })
+}
+
 /// Starts a flow. The kernel package is attached when one is usable; flows that need it are
 /// refused without it. Progress arrives as `flow-progress` events; the returned snapshot is
 /// the first of them.

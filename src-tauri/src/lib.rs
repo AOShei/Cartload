@@ -8,6 +8,7 @@
 //! answer direct questions.
 
 pub mod commands;
+pub mod diagnostics;
 pub mod error;
 pub mod failure;
 pub mod flow;
@@ -91,6 +92,10 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             commands::console_info,
             commands::fel_probe,
             commands::log_recent,
+            commands::log_file,
+            commands::log_reveal,
+            commands::diagnostics_report,
+            commands::diagnostics_save,
             commands::flow_start,
             commands::flow_cancel,
             commands::flow_status,
@@ -125,6 +130,10 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             commands::console_info,
             commands::fel_probe,
             commands::log_recent,
+            commands::log_file,
+            commands::log_reveal,
+            commands::diagnostics_report,
+            commands::diagnostics_save,
             commands::flow_start,
             commands::flow_cancel,
             commands::flow_status,
@@ -214,7 +223,13 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 fit_to_monitor(&window);
             }
-            tracing::info!(version = commands::version().app, "Cartload started");
+            tracing::info!(
+                version = commands::version().app,
+                os = std::env::consts::OS,
+                arch = std::env::consts::ARCH,
+                log = %logging::log_path().map(|p| p.display().to_string()).unwrap_or_default(),
+                "Cartload started"
+            );
             Ok(())
         })
         .invoke_handler(handler())

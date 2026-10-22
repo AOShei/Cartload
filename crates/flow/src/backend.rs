@@ -7,7 +7,9 @@
 use std::{net::SocketAddr, time::Duration};
 
 use async_trait::async_trait;
-use cartload_console::{DiscoverOptions, ExecOutput, Session, SessionOptions, Shell, discover};
+use cartload_console::{
+    DiscoverOptions, ExecOutput, OutputLine, OutputStream, Session, SessionOptions, Shell, discover,
+};
 use cartload_fel::{
     Device, MembootEvent, MembootOptions, MembootReport, MembootStage, find_devices, memboot,
 };
@@ -31,6 +33,31 @@ pub trait Console: Send + Sync {
         stdin: Option<&[u8]>,
         timeout: Duration,
     ) -> cartload_console::Result<ExecOutput>;
+
+    /// Like [`Console::exec`], but hands every complete line of output to `on_line` as it
+    /// arrives. The default runs the command to the end and replays its lines; a real
+    /// session streams them.
+    async fn exec_streaming(
+        &self,
+        command: &str,
+        stdin: Option<&[u8]>,
+        timeout: Duration,
+        on_line: &mut (dyn FnMut(OutputLine) + Send),
+    ) -> cartload_console::Result<ExecOutput> {
+        let output = self.exec(command, stdin, timeout).await?;
+        for (stream, bytes) in [
+            (OutputStream::Stdout, &output.stdout),
+            (OutputStream::Stderr, &output.stderr),
+        ] {
+            for text in String::from_utf8_lossy(bytes).lines() {
+                on_line(OutputLine {
+                    stream,
+                    text: text.trim_end_matches('\r').to_string(),
+                });
+            }
+        }
+        Ok(output)
+    }
 
     /// Closes the session. Best effort: the console may already be gone.
     async fn close(self: Box<Self>);
@@ -128,6 +155,24 @@ impl Console for SessionConsole {
                 command: command.to_string(),
                 timeout,
             })?
+    }
+
+    async fn exec_streaming(
+        &self,
+        command: &str,
+        stdin: Option<&[u8]>,
+        timeout: Duration,
+        on_line: &mut (dyn FnMut(OutputLine) + Send),
+    ) -> cartload_console::Result<ExecOutput> {
+        tokio::time::timeout(
+            timeout,
+            self.session.exec_streaming(command, stdin, on_line),
+        )
+        .await
+        .map_err(|_| cartload_console::Error::CommandTimeout {
+            command: command.to_string(),
+            timeout,
+        })?
     }
 
     async fn close(self: Box<Self>) {

@@ -51,6 +51,54 @@ impl Default for SessionOptions {
     }
 }
 
+/// Which stream a line of command output came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutputStream {
+    /// Standard output.
+    Stdout,
+    /// Standard error.
+    Stderr,
+}
+
+/// One complete line of command output, as it arrives (see [`Session::exec_streaming`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OutputLine {
+    /// Where it came from.
+    pub stream: OutputStream,
+    /// The line without its newline, lossy UTF-8.
+    pub text: String,
+}
+
+/// Turns a byte stream into complete lines; a trailing partial line is flushed at the end.
+#[derive(Debug, Default)]
+pub struct LineSplitter {
+    pending: Vec<u8>,
+}
+
+impl LineSplitter {
+    /// Feeds bytes and hands every completed line (without its `\n`, with a `\r` before it
+    /// dropped) to `emit`.
+    pub fn push(&mut self, data: &[u8], mut emit: impl FnMut(String)) {
+        self.pending.extend_from_slice(data);
+        while let Some(end) = self.pending.iter().position(|&b| b == b'\n') {
+            let mut line: Vec<u8> = self.pending.drain(..=end).collect();
+            line.pop();
+            if line.last() == Some(&b'\r') {
+                line.pop();
+            }
+            emit(String::from_utf8_lossy(&line).into_owned());
+        }
+    }
+
+    /// Hands out what is left without a newline, if anything.
+    pub fn finish(&mut self, mut emit: impl FnMut(String)) {
+        if !self.pending.is_empty() {
+            let line = std::mem::take(&mut self.pending);
+            emit(String::from_utf8_lossy(&line).into_owned());
+        }
+    }
+}
+
 /// What a remote command produced.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ExecOutput {
@@ -280,10 +328,22 @@ impl Session {
     /// Runs a shell command, feeding `stdin` to it (then EOF), and collects the result. With
     /// `None` the command gets an immediate EOF on stdin.
     pub async fn exec_with_stdin(&self, command: &str, stdin: Option<&[u8]>) -> Result<ExecOutput> {
+        self.exec_streaming(command, stdin, &mut |_| {}).await
+    }
+
+    /// Like [`Session::exec_with_stdin`], but also hands every complete line of output to
+    /// `on_line` as it arrives, so a long-running command (the device-side installer) can be
+    /// followed. The collected output is still returned at the end.
+    pub async fn exec_streaming(
+        &self,
+        command: &str,
+        stdin: Option<&[u8]>,
+        on_line: &mut (dyn FnMut(OutputLine) + Send),
+    ) -> Result<ExecOutput> {
         if self.handle.is_closed() {
             return Err(Error::Closed);
         }
-        let run = self.run(command, stdin);
+        let run = self.run(command, stdin, on_line);
         let output = match self.options.command_timeout {
             Some(limit) => timeout(limit, run)
                 .await
@@ -303,7 +363,12 @@ impl Session {
         Ok(output)
     }
 
-    async fn run(&self, command: &str, stdin: Option<&[u8]>) -> Result<ExecOutput> {
+    async fn run(
+        &self,
+        command: &str,
+        stdin: Option<&[u8]>,
+        on_line: &mut (dyn FnMut(OutputLine) + Send),
+    ) -> Result<ExecOutput> {
         let channel = self.handle.channel_open_session().await?;
         channel.exec(true, command).await?;
         let (mut reader, writer) = channel.split();
@@ -315,11 +380,27 @@ impl Session {
         };
         let receive = async {
             let mut output = ExecOutput::default();
+            let mut stdout_lines = LineSplitter::default();
+            let mut stderr_lines = LineSplitter::default();
             while let Some(message) = reader.wait().await {
                 match message {
-                    ChannelMsg::Data { data } => output.stdout.extend_from_slice(&data),
+                    ChannelMsg::Data { data } => {
+                        output.stdout.extend_from_slice(&data);
+                        stdout_lines.push(&data, |text| {
+                            on_line(OutputLine {
+                                stream: OutputStream::Stdout,
+                                text,
+                            });
+                        });
+                    }
                     ChannelMsg::ExtendedData { data, ext: 1 } => {
                         output.stderr.extend_from_slice(&data);
+                        stderr_lines.push(&data, |text| {
+                            on_line(OutputLine {
+                                stream: OutputStream::Stderr,
+                                text,
+                            });
+                        });
                     }
                     ChannelMsg::ExitStatus { exit_status } => {
                         output.exit_code = Some(exit_status);
@@ -328,6 +409,18 @@ impl Session {
                     _ => {}
                 }
             }
+            stdout_lines.finish(|text| {
+                on_line(OutputLine {
+                    stream: OutputStream::Stdout,
+                    text,
+                });
+            });
+            stderr_lines.finish(|text| {
+                on_line(OutputLine {
+                    stream: OutputStream::Stderr,
+                    text,
+                });
+            });
             output
         };
         let (sent, output) = tokio::join!(send, receive);
@@ -421,6 +514,23 @@ mod tests {
             stdout: stdout.as_bytes().to_vec(),
             stderr: stderr.as_bytes().to_vec(),
         }
+    }
+
+    #[test]
+    fn line_splitter_yields_complete_lines_then_the_rest() {
+        let mut lines = Vec::new();
+        let mut splitter = LineSplitter::default();
+        splitter.push(b"first\r\nsec", |l| lines.push(l));
+        assert_eq!(lines, ["first"]);
+        splitter.push(b"ond\nthird", |l| lines.push(l));
+        assert_eq!(lines, ["first", "second"]);
+        splitter.finish(|l| lines.push(l));
+        assert_eq!(lines, ["first", "second", "third"]);
+        splitter.finish(|l| lines.push(l));
+        assert_eq!(lines.len(), 3);
+        let mut empty = Vec::new();
+        splitter.push(b"\n\n", |l| empty.push(l));
+        assert_eq!(empty, ["", ""]);
     }
 
     #[test]
