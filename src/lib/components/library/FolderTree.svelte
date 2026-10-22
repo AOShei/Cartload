@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
+  import Dialog from "../Dialog.svelte";
   import Icon from "../Icon.svelte";
   import TreeNode from "./TreeNode.svelte";
   import type { MenuOptions, Structure } from "../../api/types";
@@ -20,7 +21,6 @@
 
   /* Structure popover */
   let structureOpen = $state(false);
-  let popover: HTMLDetailsElement | undefined = $state();
   let kind = $state<Structure["kind"]>("count");
   let max = $state(30);
   let originalsAtRoot = $state(true);
@@ -178,17 +178,13 @@
     node.focus();
   }
 
-  function onwindowclick(event: MouseEvent): void {
-    if (structureOpen && popover && !popover.contains(event.target as Node)) {
-      structureOpen = false;
-      confirmApply = false;
-    }
+  function closeStructure(): void {
+    structureOpen = false;
+    confirmApply = false;
   }
 
   function onwindowkeydown(event: KeyboardEvent): void {
     if (event.key === "Escape") {
-      structureOpen = false;
-      confirmApply = false;
       creating = false;
       renaming = false;
       confirmingRemove = false;
@@ -196,7 +192,7 @@
   }
 </script>
 
-<svelte:window onclick={onwindowclick} onkeydown={onwindowkeydown} />
+<svelte:window onkeydown={onwindowkeydown} />
 
 <div class="pane">
   <header>
@@ -208,47 +204,9 @@
       <button type="button" class="icon-btn" aria-label="New folder" title="New folder in the selected folder" onclick={startCreate} disabled={libraryStore.menuBusy}>
         <Icon name="folderPlus" size={18} />
       </button>
-      <details class="popover" bind:this={popover} bind:open={structureOpen}>
-        <summary class="icon-btn" aria-label="Automatic folder structure" title="Automatic folder structure">
-          <Icon name="settings" size={18} />
-        </summary>
-        <div class="popover-body">
-          <h4>Folder structure</h4>
-          <p class="muted">How the console groups the games.</p>
-          <fieldset>
-            <legend class="visually-hidden">Structure</legend>
-            <label><input type="radio" name="structure" value="flat" bind:group={kind} /> One list</label>
-            <label><input type="radio" name="structure" value="letters" bind:group={kind} /> Folders A to Z</label>
-            <label>
-              <input type="radio" name="structure" value="count" bind:group={kind} />
-              Folders of
-              <input type="number" class="num small" min="1" max="999" bind:value={max} aria-label="Games per folder" disabled={kind !== "count"} />
-              games
-            </label>
-          </fieldset>
-          <label class="check">
-            <input type="checkbox" bind:checked={originalsAtRoot} />
-            <span>Keep the console's own games in the main menu, with the library in “More games…”</span>
-          </label>
-          {#if confirmApply}
-            <div class="confirm" role="group" aria-label="Confirm replacing the folders">
-              <p>This replaces the folders you arranged by hand. The games themselves stay.</p>
-              <div class="confirm-actions">
-                <button type="button" class="btn btn-danger btn-sm" onclick={applyStructure} disabled={libraryStore.menuBusy}>Replace the folders</button>
-                <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmApply = false)}>Keep them</button>
-              </div>
-            </div>
-          {:else}
-            <div class="popover-actions">
-              <button type="button" class="btn" onclick={applyStructure} disabled={libraryStore.menuBusy}>
-                {#if libraryStore.menuBusy}<span class="spinner" aria-hidden="true"></span>{/if}
-                Apply
-              </button>
-              <button type="button" class="btn btn-quiet" onclick={() => (structureOpen = false)}>Close</button>
-            </div>
-          {/if}
-        </div>
-      </details>
+      <button type="button" class="icon-btn" aria-label="Automatic folder structure" title="Automatic folder structure" onclick={() => (structureOpen = true)}>
+        <Icon name="settings" size={18} />
+      </button>
     </div>
   </header>
   <p class="structure muted">{describe(menu?.options, menu?.custom ?? false)}</p>
@@ -298,6 +256,42 @@
     {/if}
   </footer>
 </div>
+
+<Dialog open={structureOpen} title="Folder structure" width="460px" onclose={closeStructure}>
+  <p class="muted">How the console groups the games. Applying replaces folders arranged by hand; the games themselves stay.</p>
+  <fieldset>
+    <legend class="visually-hidden">Structure</legend>
+    <label><input type="radio" name="structure" value="flat" bind:group={kind} data-autofocus /> One list</label>
+    <label><input type="radio" name="structure" value="letters" bind:group={kind} /> Folders A to Z</label>
+    <label>
+      <input type="radio" name="structure" value="count" bind:group={kind} />
+      Folders of
+      <input type="number" class="num small" min="1" max="999" bind:value={max} aria-label="Games per folder" disabled={kind !== "count"} />
+      games
+    </label>
+  </fieldset>
+  <label class="check">
+    <input type="checkbox" bind:checked={originalsAtRoot} />
+    <span>Keep the console's own games in the main menu, with the library in “More games…”</span>
+  </label>
+  {#if confirmApply}
+    <div class="confirm" role="group" aria-label="Confirm replacing the folders">
+      <p>This replaces the folders you arranged by hand. The games themselves stay.</p>
+    </div>
+  {/if}
+  {#snippet actions()}
+    {#if confirmApply}
+      <button type="button" class="btn btn-danger" onclick={applyStructure} disabled={libraryStore.menuBusy}>Replace the folders</button>
+      <button type="button" class="btn btn-quiet" onclick={() => (confirmApply = false)}>Keep them</button>
+    {:else}
+      <button type="button" class="btn btn-primary" onclick={applyStructure} disabled={libraryStore.menuBusy}>
+        {#if libraryStore.menuBusy}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+        Apply
+      </button>
+      <button type="button" class="btn btn-quiet" onclick={closeStructure}>Cancel</button>
+    {/if}
+  {/snippet}
+</Dialog>
 
 <style>
   .pane {
@@ -371,52 +365,6 @@
     font-size: var(--text-sm);
   }
 
-  .popover {
-    position: relative;
-  }
-
-  .popover > summary {
-    list-style: none;
-  }
-
-  .popover > summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .popover-body {
-    position: absolute;
-    top: calc(100% + var(--space-1));
-    left: 0;
-    z-index: 20;
-    width: 320px;
-    padding: var(--space-3) var(--space-4);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-m);
-    box-shadow: var(--shadow-float);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    font-size: var(--text-md);
-    animation: popover-in var(--motion-fast) var(--ease-out);
-  }
-
-  @keyframes popover-in {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  .popover-body h4 {
-    font-size: var(--text-base);
-    font-weight: var(--weight-semibold);
-  }
-
   fieldset {
     display: flex;
     flex-direction: column;
@@ -443,9 +391,4 @@
     padding: 0 var(--space-1);
   }
 
-  .popover-actions {
-    display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
-  }
 </style>

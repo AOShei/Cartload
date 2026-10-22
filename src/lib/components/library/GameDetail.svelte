@@ -48,6 +48,23 @@
     libraryStore.removePrompt = false;
   });
 
+  /* Folder rename, from the folder's detail panel. */
+  let folderName = $state("");
+  $effect(() => {
+    const tile = folderTile(single);
+    untrack(() => {
+      folderName = tile ? tile.folder.name : "";
+    });
+  });
+
+  async function renameFolder(path: MenuPath): Promise<void> {
+    const name = folderName.trim();
+    if (!name) {
+      return;
+    }
+    await libraryStore.edit({ op: "rename_folder", path, name });
+  }
+
   async function save(): Promise<void> {
     if (!form || !dirty) {
       return;
@@ -216,7 +233,7 @@
           <input type="text" class="num" bind:value={form.release_date} placeholder="YYYY-MM-DD" pattern="\d{'{'}4{'}'}-\d{'{'}2{'}'}-\d{'{'}2{'}'}" />
         </label>
         <div class="row">
-          <label>
+          <label class="players">
             <span>Players</span>
             <select bind:value={form.players}>
               <option value={1}>1</option>
@@ -248,11 +265,10 @@
         {/if}
 
         <div class="advanced-row">
-          <button type="button" class="btn btn-quiet btn-sm" onclick={openAdvanced}>
-            <Icon name="more" size={14} />
+          <button type="button" class="btn" onclick={openAdvanced}>
+            <Icon name="settings" size={16} />
             <span>Advanced…</span>
           </button>
-          <span class="muted small mono">{game.game.code}{form.compress ? " · compressed" : ""}</span>
         </div>
       </form>
 
@@ -334,7 +350,21 @@
           </button>
         {/if}
       </div>
-      <h3>{tile.folder.name}</h3>
+      <form class="fields" onsubmit={(e) => { e.preventDefault(); void renameFolder(tile.path); }}>
+        <label>
+          <span>Name</span>
+          <input type="text" bind:value={folderName} required />
+        </label>
+        {#if folderName.trim() !== "" && folderName !== tile.folder.name}
+          <div class="save-row">
+            <button type="submit" class="btn btn-primary" disabled={libraryStore.menuBusy}>
+              {#if libraryStore.menuBusy}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+              Rename
+            </button>
+            <button type="button" class="btn btn-quiet" onclick={() => (folderName = tile.folder.name)} disabled={libraryStore.menuBusy}>Revert</button>
+          </div>
+        {/if}
+      </form>
       <p class="muted">{tile.games} game{tile.games === 1 ? "" : "s"} inside. The picture shows on the console's menu, like a game's cover. Double-click the folder, or press Enter, to open it.</p>
       <button type="button" class="btn" onclick={() => libraryStore.openFolder(tile.path)}>Open folder</button>
     </div>
@@ -501,8 +531,20 @@
     align-items: flex-end;
   }
 
-  .row label:first-child {
-    width: 80px;
+  /* "Players [1]  [ ] At the same time" on one line. */
+  .row {
+    align-items: center;
+    min-height: var(--control);
+  }
+
+  .players {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .players select {
+    width: 64px;
   }
 
   .check {
@@ -584,9 +626,8 @@
   .advanced-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-2);
-    margin-top: var(--space-1);
+    margin-top: var(--space-2);
   }
 
   .editor {

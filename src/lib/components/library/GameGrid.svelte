@@ -399,20 +399,6 @@
                   {#if tile.view.game.placeholder_art && !selectedSet.has(tile.id)}
                     <span class="noart">No art yet</span>
                   {/if}
-                  {#if selectedSet.has(tile.id)}
-                    <button
-                      type="button"
-                      class="tile-remove"
-                      aria-label="Remove {tile.view.game.name} from the library"
-                      title="Remove from the library (Delete)"
-                      tabindex="-1"
-                      onclick={(e) => { e.stopPropagation(); libraryStore.removePrompt = true; }}
-                      ondblclick={(e) => e.stopPropagation()}
-                      onpointerdown={(e) => e.stopPropagation()}
-                    >
-                      <Icon name="trash" size={14} />
-                    </button>
-                  {/if}
                 {:else if tile.kind === "original"}
                   {#if tile.cover}
                     <img src={tile.cover} alt="" loading="lazy" decoding="async" draggable="false" crossorigin="anonymous" />
@@ -429,6 +415,20 @@
               </div>
               <span class="title">{title(tile)}</span>
               <span class="sub muted">{subtitle(tile)}</span>
+              {#if tile.kind === "game" && selectedSet.has(tile.id)}
+                <button
+                  type="button"
+                  class="tile-remove"
+                  aria-label="Remove {tile.view.game.name} from the library"
+                  title="Remove from the library (Delete)"
+                  tabindex="-1"
+                  onclick={(e) => { e.stopPropagation(); libraryStore.removePrompt = true; }}
+                  ondblclick={(e) => e.stopPropagation()}
+                  onpointerdown={(e) => e.stopPropagation()}
+                >
+                  <Icon name="trash" size={14} />
+                </button>
+              {/if}
             </div>
           {/each}
         </div>
@@ -607,6 +607,7 @@
   }
 
   .tile {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
@@ -667,8 +668,8 @@
 
   .tile-remove {
     position: absolute;
-    right: var(--space-1);
-    bottom: var(--space-1);
+    right: var(--space-2);
+    bottom: var(--space-2);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -716,6 +717,11 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* Room for the remove button in the corner of a selected game tile. */
+  .tile.selected.kind-game .sub {
+    padding-right: 32px;
   }
 
   .list-wrap {
