@@ -470,8 +470,7 @@
       {/if}
     </section>
 
-    <section class="card tools" aria-labelledby="tools-heading">
-      <h2 id="tools-heading">Other actions</h2>
+    <section class="card tools" aria-label="Other actions">
       <ul class="tools-list">
         <li>
           <div class="tool-text">
@@ -577,10 +576,6 @@
     padding: var(--space-3) var(--space-5);
   }
 
-  .tools h2 {
-    margin-bottom: var(--space-1);
-    font-size: var(--text-md);
-  }
 
   .tools-list {
     margin: 0;
