@@ -1,7 +1,7 @@
 <script lang="ts">
   /** A Classic Mini console seen straight from above, the front edge at the bottom, drawn
    *  for the model that is (or was last) detected, in the console's own colours. The Reset
-   *  control is highlighted and the USB cable leaves the back towards this computer. Inline
+   *  control is highlighted. Inline
    *  SVG, no assets. */
   interface Props {
     /** `ConsoleType` as the backend names it: `SnesEur`, `SnesUsa`, `Nes`, `MdEur`… */
@@ -89,14 +89,8 @@
   {width}
   viewBox="0 0 340 320"
   role="img"
-  aria-label="{caption} seen from above. The Reset control is highlighted: hold it while switching Power on, with the USB cable at the back connected to this computer."
+  aria-label="{caption} seen from above. The Reset control is highlighted: hold it while switching Power on."
 >
-  <!-- cable from the back of the console to the computer -->
-  <path class="cable" d="M236 28V14h46" />
-  <rect class="plug" x="282" y="6" width="22" height="16" rx="3" />
-  <text class="caption" x="293" y="38" text-anchor="middle">USB</text>
-  <text class="caption" x="293" y="50" text-anchor="middle">to this computer</text>
-
   {#if shape === "sfc"}
     <!-- SNES Classic Mini (Europe) / Super Famicom Mini: light grey body, a dark grey plate
          with the four-colour mark, the slot with its centre notch, then Power, Eject and
@@ -364,18 +358,7 @@
     stroke-linejoin: round;
   }
 
-  .cable {
-    fill: none;
-    stroke: var(--border-strong);
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
 
-  .plug {
-    fill: var(--surface-hover);
-    stroke: var(--border-strong);
-  }
 
   .caption {
     font-size: 8px;
