@@ -119,24 +119,17 @@
     <!-- SNES Classic (North America): one grey, defined by its contours. The raised
          cartridge block at the back with its slot band, then Power and Reset as purple bars
          that slide towards and away from you, the grey Eject button standing between them,
-         and the controller-port blocks stepping out of the front edge in line with the bars. -->
+         and the controller-port blocks running from the bars past the front edge. -->
     <rect class="usa-body" x="40" y="28" width="220" height="252" rx="8" />
-    <rect class="usa-body" x="50" y="262" width="88" height="34" rx="4" />
-    <rect class="usa-body" x="162" y="262" width="88" height="34" rx="4" />
-    <rect class="usa-body" x="52" y="266" width="84" height="26" rx="4" />
-    <rect class="usa-body" x="164" y="266" width="84" height="26" rx="4" />
-    <!-- raised cartridge block -->
-    <rect class="usa-raised" x="62" y="48" width="176" height="110" rx="4" />
-    <line class="usa-line" x1="72" y1="68" x2="228" y2="68" />
-    <line class="usa-line" x1="72" y1="92" x2="228" y2="92" />
-    <line class="usa-line" x1="84" y1="68" x2="84" y2="92" />
-    <line class="usa-line" x1="216" y1="68" x2="216" y2="92" />
-    <line class="usa-line" x1="72" y1="112" x2="228" y2="112" />
-    <!-- grooves across the front -->
-    <line class="usa-line" x1="56" y1="240" x2="134" y2="240" />
-    <line class="usa-line" x1="166" y1="240" x2="244" y2="240" />
-    <line class="usa-line" x1="56" y1="252" x2="134" y2="252" />
-    <line class="usa-line" x1="166" y1="252" x2="244" y2="252" />
+    <!-- the controller-port blocks run from the bars to a little past the front edge -->
+    <rect class="usa-body" x="62" y="176" width="70" height="120" rx="4" />
+    <rect class="usa-body" x="168" y="176" width="70" height="120" rx="4" />
+    <!-- raised cartridge block with the slot flap across its middle -->
+    <rect class="usa-raised" x="62" y="48" width="176" height="74" rx="4" />
+    <line class="usa-line" x1="72" y1="75" x2="228" y2="75" />
+    <line class="usa-line" x1="72" y1="95" x2="228" y2="95" />
+    <line class="usa-line" x1="84" y1="75" x2="84" y2="95" />
+    <line class="usa-line" x1="216" y1="75" x2="216" y2="95" />
     <!-- power bar and its lights -->
     <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
     <circle cx="52" cy="191" r="1.8" fill="#8a8a8e" />
