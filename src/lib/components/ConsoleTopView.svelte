@@ -71,7 +71,7 @@
       case "snes-usa":
         return { x: 168, y: 176, w: 70, h: 22, from: "right" };
       case "nes":
-        return { x: 110, y: 158, w: 40, h: 22, from: "below" };
+        return { x: 102, y: 158, w: 34, h: 18, from: "below" };
       case "famicom":
         return { x: 200, y: 214, w: 24, h: 24, from: "right" };
       case "md":
@@ -158,27 +158,28 @@
          the light grey top whose cartridge cover forms the top edge, the black band
          running from top to bottom at the right with the two controller ports in it, the
          darker front face cutting in at the sides with the light, Power and Reset at the
-         left, the dark base below. -->
-    <rect class="nes-top" x="30" y="62" width="280" height="64" rx="3" />
-    <!-- the front face cuts in at the sides; the dark base follows its bottom edge -->
-    <path class="nes-face" d="M30 126h280l-18 88H48z" />
-    <rect x="48" y="214" width="244" height="10" rx="2" fill="#4a4a4e" />
+         left, two small feet below. -->
+    <rect class="nes-top" x="30" y="100" width="280" height="46" rx="3" />
+    <!-- the front face cuts in at the sides; two small feet under it -->
+    <path class="nes-face" d="M30 146h280l-12 48H42z" />
+    <rect x="58" y="194" width="22" height="5" rx="1" fill="#4a4a4e" />
+    <rect x="248" y="194" width="22" height="5" rx="1" fill="#4a4a4e" />
     <!-- the cartridge cover is the top edge itself, from the black band to the left -->
-    <rect x="60" y="62" width="172" height="56" rx="2" fill="#e3e3e3" stroke="#c4c4c4" />
+    <rect x="64" y="100" width="162" height="40" rx="2" fill="#e3e3e3" stroke="#c4c4c4" />
     <!-- the black band runs from the top edge to the bottom -->
-    <rect x="232" y="62" width="60" height="152" rx="2" fill="#1e1e1f" />
+    <rect x="226" y="100" width="52" height="94" rx="2" fill="#1e1e1f" />
     <!-- light, power, reset -->
-    <rect x="46" y="166" width="7" height="7" rx="1" fill="#e03a2f" />
-    <rect x="62" y="158" width="40" height="22" rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
-    <text class="lbl on-light" x="82" y="172" text-anchor="middle">POWER</text>
+    <rect x="46" y="164" width="6" height="6" rx="1" fill="#e03a2f" />
+    <rect x="60" y="158" width="34" height="18" rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
+    <text class="lbl on-light" x="77" y="170" text-anchor="middle">POWER</text>
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
-    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y={reset.y + 13} text-anchor="middle">RESET</text>
+    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y={reset.y + 12} text-anchor="middle">RESET</text>
     <!-- controller ports -->
-    <rect x="236" y="140" width="24" height="50" rx="4" fill="#111112" stroke="#3a3a3c" />
-    <rect x="242" y="152" width="12" height="26" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
-    <rect x="264" y="140" width="24" height="50" rx="4" fill="#111112" stroke="#3a3a3c" />
-    <rect x="270" y="152" width="12" height="26" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
+    <rect x="231" y="152" width="20" height="36" rx="3" fill="#111112" stroke="#3a3a3c" />
+    <rect x="236" y="160" width="10" height="20" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
+    <rect x="255" y="152" width="20" height="36" rx="3" fill="#111112" stroke="#3a3a3c" />
+    <rect x="260" y="160" width="10" height="20" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
   {:else if shape === "famicom"}
     <!-- Famicom Mini: cream body with the two red controllers lying along its edges, the
          dark red cartridge cover across the upper middle, the raised block with the eject
