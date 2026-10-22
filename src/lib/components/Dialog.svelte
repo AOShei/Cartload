@@ -26,8 +26,15 @@
     }
     if (open && !element.open) {
       element.showModal();
-      // The browser focuses the first control; an editor marks the one that should take it.
-      element.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+      // An editor marks the control that should take focus; otherwise the first control of
+      // the body or the actions does, so a screen reader lands on the content rather than on
+      // the header's close button (which the browser would focus first).
+      const first =
+        element.querySelector<HTMLElement>("[data-autofocus]") ??
+        element.querySelector<HTMLElement>(
+          ".content button:not([disabled]), .content input:not([disabled]), .content select:not([disabled]), .content textarea:not([disabled]), .content [tabindex='0'], footer button:not([disabled]):not(.btn-danger), footer button:not([disabled])",
+        );
+      first?.focus();
     } else if (!open && element.open) {
       element.close();
     }

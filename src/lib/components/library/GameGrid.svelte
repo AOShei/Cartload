@@ -134,6 +134,18 @@
     return `${tile.games} game${tile.games === 1 ? "" : "s"}`;
   }
 
+  /** The accessible name of a tile: what it shows, without the remove button's label. */
+  function tileLabel(tile: Tile): string {
+    if (tile.kind === "game") {
+      const game = tile.view.game;
+      return [game.name, tile.view.system_name, game.release_date?.slice(0, 4)].filter(Boolean).join(", ");
+    }
+    if (tile.kind === "original") {
+      return `${tile.name}, built in`;
+    }
+    return `${tile.folder.name}, folder, ${tile.games} ${tile.games === 1 ? "game" : "games"}`;
+  }
+
   function onTileClick(event: MouseEvent, tile: Tile): void {
     libraryStore.select(tile.id, { toggle: event.ctrlKey || event.metaKey, range: event.shiftKey });
     focusId = tile.id;
@@ -367,6 +379,7 @@
               data-id={tile.id}
               tabindex={tile.id === tabTarget ? 0 : -1}
               aria-selected={selectedSet.has(tile.id)}
+              aria-label={tileLabel(tile)}
               aria-posinset={windowStart + i + 1}
               aria-setsize={tiles.length}
               draggable="true"

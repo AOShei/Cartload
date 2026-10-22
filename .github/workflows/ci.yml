@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -53,6 +54,9 @@ jobs:
       - name: pnpm install
         run: pnpm install --frozen-lockfile
 
+      - name: Versions agree
+        run: scripts/version.sh
+
       - name: cargo fmt
         run: cargo fmt --all --check
 
@@ -67,3 +71,45 @@ jobs:
 
       - name: Frontend build
         run: pnpm build
+
+  # The app must at least compile and lint on the other desktops; the installers are built by
+  # the release workflow.
+  cross:
+    name: clippy on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      # tauri::generate_context! needs the frontend build output.
+      - name: Frontend build
+        run: pnpm build
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace

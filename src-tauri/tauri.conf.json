@@ -35,6 +35,29 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
-  }
+    ],
+    "linux": {
+      "deb": {
+        "section": "utils",
+        "files": {
+          "/usr/lib/udev/rules.d/70-cartload.rules": "linux/70-cartload.rules"
+        }
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "copyright": "GPL-3.0-or-later",
+    "homepage": "https://github.com/AOShei/Cartload",
+    "publisher": "Andrew O'Shei"
+  },
+  "mainBinaryName": "cartload"
 }

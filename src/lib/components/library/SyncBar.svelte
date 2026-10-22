@@ -122,7 +122,7 @@
   {/if}
 {/snippet}
 
-<footer class="sync card" aria-label="Sync">
+<section class="sync card" aria-label="Sync">
   {#if syncStore.reviewing && plan}
     <section class="panel" aria-label="Sync plan" transition:slide={{ duration: ms(NORMAL) }}>
       <div class="panel-head">
@@ -194,7 +194,7 @@
     <div class="block">
       <span class="caps">Console</span>
       {#if storage}
-        <div class="meter" title="Used, planned, total">
+        <div class="meter" role="img" aria-label="Storage used, planned and total">
           <span class="planned" style:width="{plannedPercent}%"></span>
           <span class="used" style:width="{consolePercent}%"></span>
         </div>
@@ -230,7 +230,7 @@
       <span>{syncStore.starting ? "Starting…" : syncLabel}</span>
     </button>
   </div>
-</footer>
+</section>
 
 {#if plan}
   <Dialog open={changesOpen} title="What the sync will change" width="760px" onclose={() => (changesOpen = false)}>

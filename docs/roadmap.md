@@ -1,11 +1,16 @@
 # Roadmap
 
-1. Scaffold: Tauri 2 + Svelte 5 + TypeScript frontend, Rust workspace of small crates.
-2. FEL crate: Allwinner USB boot protocol over nusb; CLI memboot of the console with no UI.
-3. Console crate: discovery by direct probe of 169.254.13.37 (mDNS second), SSH session,
-   FTP transfer, typed wrappers for the device-side `hakchi` script.
-4. Hmod crate: parse hakchi.hmod, extract boot.img and u-boot, fetch the latest package.
-5. Kernel flow: memboot, grow partition, install hmod, reboot, reconnect. Guided, resumable.
-6. Library: games on disk, per-core launch entries, art from TheGamesDB plus a hash index,
-   visible folder tree, sync as a diff.
-7. Ship: AppImage and AUR, macOS bundle, Windows with the WinUSB driver step.
+Done: the Tauri shell, the FEL, console, hmod, library and flow crates, the guided and
+resumable kernel install, the library with folders, art and a diff-based sync, the Linux
+setup installer, a log file with a diagnostics report, and the release workflow
+(`.github/workflows/release.yml`).
+
+Next, in order:
+
+1. First sync from the app on hardware, then the base mods flow and an install on a unit
+   hakchi never touched (`docs/hardware-tests.md`).
+2. macOS run on hardware (the universal build comes from the release workflow).
+3. Windows run on hardware, with the WinUSB (Zadig) and RNDIS driver steps written up from
+   a real machine.
+4. Signing and notarisation, once the builds are known to work.
+5. An update check against the GitHub releases.

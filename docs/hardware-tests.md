@@ -873,3 +873,49 @@ scrollbars are the ones listed.
 | --- | --- | --- | --- | --- |
 | 2026-10-21 | 33242c5+task 11, debug | Arch, GNOME 51 Wayland, WebKitGTK | partial | Native Wayland start without `GDK_BACKEND`: no DMA-BUF protocol error, console identified in 2.5 s (the app sets the variable itself). Window state, motion and keyboard checks not driven by hand (no input tool); layout at 900 × 600 checked in the browser preview only. |
 | 2026-10-22 | 11acb49+task 14, preview | Arch, headless Chrome on the preview fixtures | partial | Section 4 checked in the browser preview: every page at 900 × 600, 1280 × 800 and 1990 × 1017, log open and closed (24 combinations measured: the document and the page area never overflow; the only scrolling elements are the listed lists, columns and panels), light and dark. Dialog focus path checked by script: focus lands in the editor, the page behind is inert, cancel closes and returns focus to the preview. Real WebKitGTK window (XWayland capture, 2560 × 1051, SNES Classic Mini attached, read only): the Console page's two columns render, the data panel scrolls inside itself. Not driven in the window: the other pages, the keyboard paths and the live step list and log during a run. |
+
+## Installer output and interrupted sync (desktop app)
+
+Added 2026-10-22 with the streaming installer output and the crash-safe sync. Not yet run on
+hardware.
+
+### 1. Installer lines appear as they happen
+
+1. Kernel page, console in FEL mode, press **Install hakchi**.
+2. During the step "Run the installer" the flow log must show the `console:` lines one by
+   one over the minutes the installer runs (backing up, flashing, copying the rootfs), not
+   all at once when the console reboots.
+3. The install still verifies at the end.
+
+### 2. Sync interrupted by a pulled cable
+
+1. Library with at least three games not yet on the console. Press **Sync**.
+2. While the upload bar moves, pull the USB cable.
+3. Expected: the sync fails with a message that ends with "Run the sync again once the
+   console is back: games already copied are kept and only the rest is transferred." The log
+   says the console did not answer. The console shows a black screen (its menu was stopped).
+4. Power-cycle the console. It must boot normally with the games it had before plus the
+   games that were fully copied.
+5. Reconnect and press **Sync** again. The plan must list only the games not yet copied, plus
+   one stale `*.cartload-part` file to remove if the cable was pulled mid-file. After the
+   sync the console shows every game.
+
+### 3. Sync failing with the console still connected
+
+1. Make a step fail without losing the link: for example, make a game file unreadable on
+   this machine (`chmod 000` on it under the library directory) after the plan is shown,
+   then press **Sync**.
+2. Expected: the error is shown, the log says "console menu restarted", and the console's
+   menu is back on screen without a power cycle.
+
+### 4. Diagnostics
+
+1. Settings → Activity log → **Copy diagnostics**. Paste into a text editor: the report must
+   have the sections "Linux setup", "Console status", "Last kernel flow", "Last sync" and
+   "Recent log", and no TheGamesDB key anywhere.
+2. **Save diagnostics…** writes the same text to the chosen file.
+3. **Open log folder** opens `~/.local/share/cartload/logs/` in the file manager;
+   `cartload.log` holds the lines of this run (and previous ones, until 2 MB when it is
+   rotated to `cartload.log.1`).
+4. `RUST_LOG=debug` is not needed: the file is written at debug level for the cartload
+   crates.

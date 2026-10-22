@@ -18,34 +18,11 @@ pub const PROFILE_PATH: &str = "/etc/NetworkManager/system-connections/cartload-
 
 /// The udev rule: USB access to the console in FEL mode (and the legacy clovershell, same
 /// id) for the logged-in user, and the fixed interface name for the hakchi network gadget.
-pub const RULE: &str = "# Cartload: Classic Mini consoles over USB.\n\
-# Lets the logged-in user open the console in FEL mode (Allwinner boot ROM, 1f3a:efe8)\n\
-# and names the hakchi network gadget (04e8:6863) hakchi0 for the NetworkManager profile.\n\
-SUBSYSTEM==\"usb\", ATTR{idVendor}==\"1f3a\", ATTR{idProduct}==\"efe8\", MODE=\"0666\", TAG+=\"uaccess\"\n\
-SUBSYSTEM==\"net\", ACTION==\"add\", ATTRS{idVendor}==\"04e8\", ATTRS{idProduct}==\"6863\", ATTRS{manufacturer}==\"hakchi\", NAME=\"hakchi0\"\n";
+pub const RULE: &str = include_str!("../linux/70-cartload.rules");
 
 /// The NetworkManager profile: a link-local address on `hakchi0` (the console sits at
 /// 169.254.13.37 and runs no DHCP server), trusted so mDNS answers are not dropped.
-pub const PROFILE: &str = "# Cartload: the console's USB network link (interface hakchi0, named by\n\
-# 70-cartload.rules). The console uses 169.254.13.37/16 and runs no DHCP server.\n\
-[connection]\n\
-id=Cartload USB\n\
-uuid=4b1f0b1e-9c7a-4a2e-9d3f-2c6d7a1e5b10\n\
-type=ethernet\n\
-autoconnect-priority=100\n\
-interface-name=hakchi0\n\
-zone=trusted\n\
-\n\
-[ethernet]\n\
-\n\
-[ipv4]\n\
-method=link-local\n\
-\n\
-[ipv6]\n\
-addr-gen-mode=default\n\
-method=link-local\n\
-\n\
-[proxy]\n";
+pub const PROFILE: &str = include_str!("../linux/cartload-usb.nmconnection");
 
 /// What is in place on this machine.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
@@ -77,7 +54,9 @@ pub fn status() -> SetupStatus {
             ..SetupStatus::default()
         };
     }
-    let rules = read_rules_dir(Path::new("/etc/udev/rules.d"));
+    // The admin directory and the package directory (the .deb puts the rule in the latter).
+    let mut rules = read_rules_dir(Path::new("/etc/udev/rules.d"));
+    rules.extend(read_rules_dir(Path::new("/usr/lib/udev/rules.d")));
     let (usb_rule, name_rule) = rules_present(&rules);
     let network_manager = which("nmcli");
     let network_profile = network_manager && profile_present(&nmcli_profiles());

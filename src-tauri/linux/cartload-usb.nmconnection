@@ -1,0 +1,20 @@
+# Cartload: the console's USB network link (interface hakchi0, named by
+# 70-cartload.rules). The console uses 169.254.13.37/16 and runs no DHCP server.
+[connection]
+id=Cartload USB
+uuid=4b1f0b1e-9c7a-4a2e-9d3f-2c6d7a1e5b10
+type=ethernet
+autoconnect-priority=100
+interface-name=hakchi0
+zone=trusted
+
+[ethernet]
+
+[ipv4]
+method=link-local
+
+[ipv6]
+addr-gen-mode=default
+method=link-local
+
+[proxy]

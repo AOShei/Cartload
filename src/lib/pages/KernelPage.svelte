@@ -487,30 +487,30 @@
       <ul class="tools-list">
         <li>
           <div class="tool-text">
-            <strong>Boot from memory only</strong>
-            <span class="muted">Nothing is written.</span>
+            <strong id="tool-boot">Boot from memory only</strong>
+            <span class="muted" id="tool-boot-hint">Nothing is written.</span>
           </div>
-          <button type="button" class="btn" disabled={!canStart} onclick={() => void begin({ kind: "memboot" })}>
+          <button type="button" class="btn" disabled={!canStart} aria-labelledby="tool-boot" aria-describedby="tool-boot-hint" onclick={() => void begin({ kind: "memboot" })}>
             <Icon name="play" size={16} />
             Boot
           </button>
         </li>
         <li>
           <div class="tool-text">
-            <strong>Save the stock kernel</strong>
-            <span class="muted">Backup to a file.</span>
+            <strong id="tool-save">Save the stock kernel</strong>
+            <span class="muted" id="tool-save-hint">Backup to a file.</span>
           </div>
-          <button type="button" class="btn" disabled={!canStart} onclick={() => void dumpKernel()}>
+          <button type="button" class="btn" disabled={!canStart} aria-labelledby="tool-save" aria-describedby="tool-save-hint" onclick={() => void dumpKernel()}>
             <Icon name="save" size={16} />
             Save
           </button>
         </li>
         <li>
           <div class="tool-text">
-            <strong>Factory reset</strong>
-            <span class="muted">Remove hakchi, restore the console.</span>
+            <strong id="tool-reset">Factory reset</strong>
+            <span class="muted" id="tool-reset-hint">Remove hakchi, restore the console.</span>
           </div>
-          <button type="button" class="btn" disabled={!canStart} onclick={() => (confirmUninstall = true)}>
+          <button type="button" class="btn" disabled={!canStart} aria-labelledby="tool-reset" aria-describedby="tool-reset-hint" onclick={() => (confirmUninstall = true)}>
             <Icon name="undo" size={16} />
             Reset
           </button>

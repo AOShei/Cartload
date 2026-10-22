@@ -1,0 +1,5 @@
+# Cartload: Classic Mini consoles over USB.
+# Lets the logged-in user open the console in FEL mode (Allwinner boot ROM, 1f3a:efe8)
+# and names the hakchi network gadget (04e8:6863) hakchi0 for the NetworkManager profile.
+SUBSYSTEM=="usb", ATTR{idVendor}=="1f3a", ATTR{idProduct}=="efe8", MODE="0666", TAG+="uaccess"
+SUBSYSTEM=="net", ACTION=="add", ATTRS{idVendor}=="04e8", ATTRS{idProduct}=="6863", ATTRS{manufacturer}=="hakchi", NAME="hakchi0"

@@ -11,6 +11,11 @@ rust-version.workspace = true
 name = "cartload_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# The executable is `cartload`, not `cartload-app` (tauri.conf.json `mainBinaryName` agrees).
+[[bin]]
+name = "cartload"
+path = "src/main.rs"
+
 [features]
 default = []
 # Exposes the `console_exec` command, which runs any shell line on the console. Development
