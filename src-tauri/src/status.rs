@@ -405,7 +405,10 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
             Some(model) => details.push(Detail::new("Model", model.to_string())),
             // The Mega Drive Mini is the one console whose string the table does not hold.
             None if !product.trim().is_empty() => {
-                details.push(Detail::new("Model", "Mega Drive Mini (assumed)".to_string()));
+                details.push(Detail::new(
+                    "Model",
+                    "Mega Drive Mini (assumed)".to_string(),
+                ));
             }
             None => {}
         }
