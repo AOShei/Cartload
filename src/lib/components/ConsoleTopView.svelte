@@ -350,7 +350,7 @@
   .hint {
     font-size: 17px;
     font-weight: 700;
-    fill: #4b3fd0;
+    fill: var(--accent-strong);
     paint-order: stroke;
     stroke: var(--surface);
     stroke-width: 4px;
