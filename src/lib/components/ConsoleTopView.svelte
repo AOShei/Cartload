@@ -95,7 +95,7 @@
 <svg
   class="view"
   {width}
-  viewBox="0 0 340 320"
+  viewBox="0 0 340 300"
   role="img"
   aria-label="{caption} seen from above. The Reset control is highlighted: hold it while switching Power on."
 >
@@ -204,11 +204,14 @@
          the bottom left: the volume slider, the Power slide above the Reset button beside it. -->
     <rect class="md-body" x="30" y="50" width="280" height="196" rx="16" />
     {#each [60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155] as y (y)}
-      <line x1="31" y1={y} x2="108" y2={y} stroke="#3e3e40" stroke-width="2.4" />
+      <line x1="31" y1={y} x2="70" y2={y} stroke="#3e3e40" stroke-width="2.4" />
     {/each}
-    <circle cx="200" cy="148" r="86" fill="#222224" stroke="#4e4e50" stroke-width="2" />
-    <circle cx="200" cy="148" r="70" fill="none" stroke="#4e4e50" />
-    <rect x="150" y="114" width="100" height="14" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
+    <circle cx="200" cy="136" r="82" fill="#222224" stroke="#4e4e50" stroke-width="2" />
+    <!-- the dark magenta section of the ring at the bottom, and the smooth patch above it -->
+    <path d="M241 207A82 82 0 0 1 159 207L167 193.2A66 66 0 0 0 233 193.2Z" fill="#5a1f3f" stroke="#4e4e50" />
+    <circle cx="200" cy="136" r="66" fill="none" stroke="#4e4e50" />
+    <rect x="176" y="174" width="48" height="22" rx="2" fill="#2a2a2c" stroke="#4e4e50" />
+    <rect x="150" y="104" width="100" height="14" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
     <!-- volume -->
     <rect x="46" y="172" width="10" height="56" rx="5" fill="#0f0f10" stroke="#3a3a3c" />
     <rect x="43" y="196" width="16" height="8" rx="2" fill="#6b6b6d" />
@@ -227,7 +230,6 @@
   <path class="arrow" d={pointer.path} />
   <text class="hint" x={pointer.tx} y={pointer.ty} text-anchor="start">hold</text>
 
-  <text class="caption model" x="150" y="314" text-anchor="middle">{caption}</text>
 </svg>
 
 <style>
@@ -376,14 +378,7 @@
 
 
 
-  .caption {
-    font-size: 8px;
-    fill: var(--text-muted);
-  }
 
-  .caption.model {
-    font-size: 9px;
-  }
 
   @keyframes halo {
     0%,
