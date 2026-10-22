@@ -1,6 +1,4 @@
-# Files embedded into the app or uploaded to the console must keep their bytes on every
-# platform: git on Windows would otherwise check them out with CRLF line endings.
-data/** -text
-src-tauri/linux/** text eol=lf
-*.sh text eol=lf
-docs/reference/** -text
+# No line-ending conversion anywhere: embedded blobs, device scripts and the byte-for-byte
+# test fixtures (reference .desktop files and sync traces) must have the same bytes on every
+# platform. Source files are committed with LF.
+* -text
