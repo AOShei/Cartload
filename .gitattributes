@@ -1,0 +1,6 @@
+# Files embedded into the app or uploaded to the console must keep their bytes on every
+# platform: git on Windows would otherwise check them out with CRLF line endings.
+data/** -text
+src-tauri/linux/** text eol=lf
+*.sh text eol=lf
+docs/reference/** -text
