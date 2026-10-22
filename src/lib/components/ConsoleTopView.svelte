@@ -14,6 +14,17 @@
 
   type Shape = "sfc" | "snes-usa" | "nes" | "famicom";
 
+  /* The Famicom Mini's shell colours: cream for the standard model, gold for the Shonen Jump
+     edition. The red parts are the same on both. */
+  const famicomShell = $derived(
+    model === "ShonenJump"
+      ? { body: "#d9b74a", bodyStroke: "#a8882a", raised: "#e4c766", raisedStroke: "#b5942f", groove: "#b5942f", label: "#5a4610" }
+      : { body: "#efe6d5", bodyStroke: "#c8bca5", raised: "#e6dcc7", raisedStroke: "#c8bca5", groove: "#c8bca5", label: "#6e5f48" },
+  );
+  const famicomControl = $derived(
+    model === "ShonenJump" ? { fill: "#d0ad3f", stroke: "#a8882a" } : { fill: "#d6cdb9", stroke: "#b7ab94" },
+  );
+
   const shape = $derived.by((): Shape => {
     switch (model) {
       case "SnesUsa":
@@ -173,24 +184,24 @@
          dark red cartridge cover across the upper middle, the raised block with the eject
          slider below it, then the red Power slide at the front left and the red Reset
          button at the front right, and the dark red band across the front. -->
-    <rect class="fc-body" x="44" y="28" width="212" height="268" rx="10" />
+    <rect class="fc-body" x="44" y="28" width="212" height="268" rx="10" fill={famicomShell.body} stroke={famicomShell.bodyStroke} />
     {#each [108, 120, 132, 144, 156, 168, 180, 192] as x (x)}
-      <line x1={x} y1="29" x2={x} y2="54" stroke="#c8bca5" stroke-width="2" stroke-linecap="round" />
+      <line x1={x} y1="29" x2={x} y2="54" stroke={famicomShell.groove} stroke-width="2" stroke-linecap="round" />
     {/each}
     <rect x="36" y="46" width="22" height="150" rx="4" fill="#b8382f" stroke="#8f2a23" />
     <rect x="242" y="46" width="22" height="150" rx="4" fill="#b8382f" stroke="#8f2a23" />
     <rect x="66" y="92" width="168" height="40" rx="3" fill="#a3272a" stroke="#7d1c1f" />
     <!-- eject slider on its raised block -->
-    <rect x="118" y="153" width="64" height="76" rx="4" fill="#e6dcc7" stroke="#c8bca5" />
-    <rect x="146" y="165" width="8" height="52" rx="3" fill="#d6cdb9" stroke="#b7ab94" />
+    <rect x="118" y="153" width="64" height="76" rx="4" fill={famicomShell.raised} stroke={famicomShell.raisedStroke} />
+    <rect x="146" y="165" width="8" height="52" rx="3" fill={famicomControl.fill} stroke={famicomControl.stroke} />
     <rect x="124" y="201" width="52" height="18" rx="3" fill="#b8382f" stroke="#8f2a23" />
-    <text class="lbl on-cream" x="150" y="243" text-anchor="middle">EJECT</text>
+    <text class="lbl" fill={famicomShell.label} x="150" y="243" text-anchor="middle">EJECT</text>
     <!-- power slide -->
-    <rect x="56" y="210" width="48" height="32" rx="3" fill="#d6cdb9" stroke="#b7ab94" />
+    <rect x="56" y="210" width="48" height="32" rx="3" fill={famicomControl.fill} stroke={famicomControl.stroke} />
     <rect x="76" y="214" width="24" height="24" rx="3" fill="#b8382f" stroke="#8f2a23" />
-    <text class="lbl on-cream" x="80" y="254" text-anchor="middle">POWER</text>
+    <text class="lbl" fill={famicomShell.label} x="80" y="254" text-anchor="middle">POWER</text>
     <!-- reset -->
-    <rect x="196" y="210" width="48" height="32" rx="3" fill="#d6cdb9" stroke="#b7ab94" />
+    <rect x="196" y="210" width="48" height="32" rx="3" fill={famicomControl.fill} stroke={famicomControl.stroke} />
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#b8382f" stroke="#8f2a23" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="254" text-anchor="middle">RESET</text>
@@ -263,8 +274,6 @@
   }
 
   .fc-body {
-    fill: #efe6d5;
-    stroke: #c8bca5;
     stroke-width: 1.5;
   }
 
@@ -289,10 +298,6 @@
 
   .on-light {
     fill: #4a4a4e;
-  }
-
-  .on-cream {
-    fill: #6e5f48;
   }
 
 
