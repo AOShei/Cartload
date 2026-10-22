@@ -100,9 +100,9 @@
     <line class="vents" x1="72" y1="37" x2="228" y2="37" />
     <rect class="sfc-plate" x="52" y="48" width="196" height="208" rx="14" />
     <!-- cartridge slot, centred, with the end marks and the centre notch -->
-    <rect class="sfc-dark" x="84" y="104" width="132" height="24" rx="7" />
-    <line class="sfc-tick" x1="98" y1="110" x2="98" y2="122" />
-    <line class="sfc-tick" x1="202" y1="110" x2="202" y2="122" />
+    <rect class="sfc-dark" x="72" y="104" width="156" height="24" rx="7" />
+    <line class="sfc-tick" x1="86" y1="110" x2="86" y2="122" />
+    <line class="sfc-tick" x1="214" y1="110" x2="214" y2="122" />
     <path d="M144 111h12l-6 7z" fill="#8e8f93" />
     <!-- power slide, eject, reset: one centred row -->
     <rect class="sfc-dark" x="72" y="164" width="34" height="48" rx="5" />
