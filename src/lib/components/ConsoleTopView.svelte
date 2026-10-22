@@ -76,11 +76,11 @@
     const cx = reset.x + reset.w / 2;
     const cy = reset.y + reset.h / 2;
     if (reset.from === "below") {
-      const tip = reset.y + reset.h + 6;
-      return { path: `M${cx} ${tip + 32}V${tip}M${cx - 6} ${tip + 6}l6-6 6 6`, tx: cx + 10, ty: tip + 34 };
+      const tip = reset.y + reset.h + 8;
+      return { path: `M${cx} ${tip + 40}V${tip}M${cx - 9} ${tip + 9}l9-9 9 9`, tx: cx + 14, ty: tip + 44 };
     }
-    const tip = reset.x + reset.w + 6;
-    return { path: `M${tip + 36} ${cy}H${tip}M${tip + 6} ${cy - 6}l-6 6 6 6`, tx: tip + 42, ty: cy + 4 };
+    const tip = reset.x + reset.w + 8;
+    return { path: `M${tip + 44} ${cy}H${tip}M${tip + 9} ${cy - 9}l-9 9 9 9`, tx: tip + 50, ty: cy + 6 };
   });
 </script>
 
@@ -117,7 +117,7 @@
     <rect x="134" y="156" width="48" height="38" rx="5" fill="#a9aaad" stroke="#8a8b8f" />
     <text class="lbl on-dark" x="158" y="206" text-anchor="middle">EJECT</text>
     <!-- reset -->
-    <rect class="halo" x={reset.x - 5} y={reset.y - 5} width={reset.w + 10} height={reset.h + 10} rx="8" />
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
     <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="4" />
     <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="206" text-anchor="middle">RESET</text>
     <!-- front -->
@@ -136,7 +136,7 @@
     <circle cx="66" cy="212" r="6" fill="#7f74c8" />
     <text class="lbl on-light" x="78" y="234" text-anchor="middle">POWER</text>
     <!-- reset slide -->
-    <rect class="halo" x={reset.x - 5} y={reset.y - 5} width={reset.w + 10} height={reset.h + 10} rx="13" />
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="13" />
     <rect class="usa-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="8" />
     <circle cx={reset.x + 10} cy={reset.y + 8} r="6" fill="#7f74c8" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="234" text-anchor="middle">RESET</text>
@@ -159,7 +159,7 @@
     <rect x="58" y="268" width="30" height="14" rx="2" fill="#5f5f63" stroke="#4a4a4e" />
     <!-- reset -->
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="262" text-anchor="middle">RESET</text>
-    <rect class="halo" x={reset.x - 5} y={reset.y - 5} width={reset.w + 10} height={reset.h + 10} rx="6" />
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="6" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="2" fill="#5f5f63" stroke="#4a4a4e" />
   {:else if shape === "famicom"}
     <!-- Famicom Mini: cream body, the two red controllers docked at the sides, the slot
@@ -183,7 +183,7 @@
     <rect x="107" y="173" width="10" height="8" rx="2" fill="#d6cdb9" />
     <text class="lbl on-cream" x="118" y="163" text-anchor="middle">POWER</text>
     <!-- reset -->
-    <rect class="halo" x={reset.x - 5} y={reset.y - 5} width={reset.w + 10} height={reset.h + 10} rx="7" />
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="7" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#b8382f" stroke="#8f2a23" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="163" text-anchor="middle">RESET</text>
     <path class="fc-band" d="M40 238h220v46q0 12-12 12H52q-12 0-12-12z" />
@@ -203,7 +203,7 @@
     <text class="lbl on-md" x="76" y="282" text-anchor="middle">POWER</text>
     <!-- reset -->
     <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="76" text-anchor="middle">RESET</text>
-    <rect class="halo" x={reset.x - 5} y={reset.y - 5} width={reset.w + 10} height={reset.h + 10} rx="9" />
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="9" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="5" fill="#4a4a4c" stroke="#6b6b6d" />
   {/if}
 
@@ -340,24 +340,28 @@
 
   /* the highlight and the pointer use the app's accent */
   .halo {
-    fill: none;
+    fill: color-mix(in srgb, var(--accent) 22%, transparent);
     stroke: var(--accent);
-    stroke-width: 2;
-    animation: halo 1.8s ease-in-out infinite;
+    stroke-width: 3.5;
+    animation: halo 1.6s ease-in-out infinite;
   }
 
   .arrow {
     fill: none;
     stroke: var(--accent);
-    stroke-width: 2;
+    stroke-width: 4;
     stroke-linecap: round;
     stroke-linejoin: round;
   }
 
   .hint {
-    font-size: 9px;
-    font-weight: 600;
-    fill: var(--accent-strong);
+    font-size: 17px;
+    font-weight: 700;
+    fill: var(--accent);
+    paint-order: stroke;
+    stroke: var(--surface);
+    stroke-width: 4px;
+    stroke-linejoin: round;
   }
 
   .cable {
