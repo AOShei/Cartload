@@ -202,6 +202,10 @@ pub struct StatusReport {
     pub next: String,
     /// The detected details, in display order.
     pub details: Vec<Detail>,
+    /// Whether Cartload supports the connected console. The Mega Drive Mini is recognised
+    /// but not supported: it uses another emulator and menu format, and Project Lunar
+    /// serves it; the app does nothing to it.
+    pub supported: bool,
     /// Unix time in milliseconds when this report was produced.
     pub changed_at: u64,
 }
@@ -312,12 +316,27 @@ impl ConsoleStatus {
                 total,
             } => describe_working(flow, title, step.as_deref(), *index, *total),
         };
+        let unsupported = self.info().is_some_and(|info| {
+            info.console.family() == cartload_console::ConsoleFamily::MegaDrive
+        });
+        let (tone, title, next) = if unsupported {
+            (
+                Tone::Warning,
+                format!("{} connected: not supported by Cartload.", model_name(self.info().map_or(ConsoleType::Unknown, |i| i.console))),
+                "Cartload supports the NES, SNES and Famicom Classic Mini consoles. For the Mega \
+                 Drive Mini use Project Lunar. Nothing will be installed on or synced to this console."
+                    .into(),
+            )
+        } else {
+            (tone, title, next)
+        };
         StatusReport {
             status: self.clone(),
             tone,
             title,
             next,
             details,
+            supported: !unsupported,
             changed_at: now,
         }
     }
@@ -401,16 +420,8 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
     // The USB manufacturer string is not shown: the app names consoles by model only.
     if let Some(product) = &device.product {
         details.push(Detail::new("Product", product.clone()));
-        match cartload_console::ConsoleType::from_usb_product(product) {
-            Some(model) => details.push(Detail::new("Model", model.to_string())),
-            // The Mega Drive Mini is the one console whose string the table does not hold.
-            None if !product.trim().is_empty() => {
-                details.push(Detail::new(
-                    "Model",
-                    "Mega Drive Mini (assumed)".to_string(),
-                ));
-            }
-            None => {}
+        if let Some(model) = cartload_console::ConsoleType::from_usb_product(product) {
+            details.push(Detail::new("Model", model.to_string()));
         }
     }
     match check {

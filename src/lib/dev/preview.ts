@@ -13,6 +13,7 @@ const fixtures: Record<string, () => StatusReport> = {
     next:
       "A console with hakchi installed shows up a few seconds after power-on. To install hakchi, hold Reset while turning the console on so it starts in FEL mode.",
     details: [],
+    supported: true,
     changed_at: Date.now(),
   }),
   fel: () => ({
@@ -37,6 +38,7 @@ const fixtures: Record<string, () => StatusReport> = {
       { label: "USB id", value: "1f3a:efe8" },
       { label: "Chip", value: "Allwinner R16" },
     ],
+    supported: true,
     changed_at: Date.now(),
   }),
   booting: () => ({
@@ -45,6 +47,7 @@ const fixtures: Record<string, () => StatusReport> = {
     title: "hakchi kernel found on USB: waiting for its network link…",
     next: "This usually takes a few seconds.",
     details: [{ label: "Waiting for", value: "4 s" }],
+    supported: true,
     changed_at: Date.now(),
   }),
   connected: () => ({
@@ -96,6 +99,7 @@ const fixtures: Record<string, () => StatusReport> = {
       { label: "Address", value: "169.254.13.37:22" },
       { label: "Link", value: "USB (hakchi0, host 169.254.68.74)" },
     ],
+    supported: true,
     changed_at: Date.now(),
   }),
   stock: () => ({
@@ -121,6 +125,7 @@ const fixtures: Record<string, () => StatusReport> = {
       { label: "Product", value: "CLV-S-SNPY" },
       { label: "Error", value: "the device did not answer within 1s (verify device)" },
     ],
+    supported: true,
     changed_at: Date.now(),
   }),
 };
@@ -137,7 +142,7 @@ const INSTALL_STEPS: [string, string, string][] = [
   ["memboot", "Boot from memory", "Boot the hakchi kernel from RAM, through FEL or kexec"],
   ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
   ["detect", "Identify the console", "Check the console is in the memboot shell"],
-  ["check-md", "Mega Drive check", "Refuse to install over Project Lunar on a Mega Drive"],
+  ["check-md", "Compatibility check", "Refuse to install on a Mega Drive Mini, which Cartload does not support"],
   ["grow", "Grow the data partition", "Merge the unused UDISK partition into the data partition"],
   ["reboot-grown", "Reboot into the grown partition", "Reboot into the memboot shell with the new partition table"],
   ["wait-console", "Wait for the console", "Wait for the console on the USB network"],

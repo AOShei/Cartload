@@ -19,7 +19,7 @@ impl Step<Context> for CheckMegaDrive {
     }
 
     fn description(&self) -> &str {
-        "Refuse to install over Project Lunar on a Mega Drive"
+        "Refuse to install on a Mega Drive Mini, which Cartload does not support"
     }
 
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {

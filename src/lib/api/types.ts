@@ -105,6 +105,8 @@ export interface StatusReport {
   title: string;
   next: string;
   details: Detail[];
+  /** False for a recognised but unsupported console (Mega Drive Mini). */
+  supported: boolean;
   changed_at: number;
 }
 

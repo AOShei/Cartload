@@ -115,6 +115,9 @@
             return { tone: "busy", text: "Checking the attached console…", ready: false, installed: false };
         }
       case "connected":
+        if (report && !report.supported) {
+          return { tone: "warning", text: report.title, ready: false, installed: false };
+        }
         if (status.info.minimal_memboot) {
           return {
             tone: "ready",
@@ -295,11 +298,7 @@
         <div class="fel">
           <ConsoleTopView model={consoleModel} width={250} />
           <ol class="howto">
-            {#if consoleModel.startsWith("Md")}
-              <li>Connect controller port 2 to this computer with a USB A-to-A cable (the socket at the back is power only) and switch POWER off.</li>
-            {:else}
-              <li>Connect the console to this computer with its USB cable and switch POWER off.</li>
-            {/if}
+            <li>Connect the console to this computer with its USB cable and switch POWER off.</li>
             <li>Hold RESET down and switch POWER on.</li>
             <li>Keep RESET held for two seconds, then release it. The screen stays black: that is FEL mode.</li>
           </ol>

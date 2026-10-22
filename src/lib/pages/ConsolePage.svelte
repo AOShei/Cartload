@@ -17,6 +17,9 @@
     }
     switch (status.state) {
       case "connected":
+        if (!report?.supported) {
+          return null;
+        }
         if (status.info.minimal_memboot || !status.info.can_interact) {
           return { label: "Open Kernel", run: () => navigation.go("kernel") };
         }

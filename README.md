@@ -1,6 +1,6 @@
 # Cartload
 
-A desktop tool for the NES, SNES and Mega Drive Classic Mini consoles: install the
+A desktop tool for the NES, SNES and Famicom Classic Mini consoles: install the
 hakchi kernel, manage a games library, and sync it to the console. Linux, macOS and
 Windows, built with Tauri 2, Rust and Svelte.
 

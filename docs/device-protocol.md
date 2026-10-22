@@ -25,12 +25,12 @@ kernel images; `CLV-S-SNPY` verified on a European SNES Classic Mini):
 | `CLV-S-SNPY` | SNES Classic Mini, Europe |
 | `CLV-S-SNSY` | SNES Classic, North America |
 
-The Mega Drive Mini is not in that table, so Cartload takes any other product string for a
-Mega Drive Mini, and the Shonen Jump edition for a Famicom Mini in a different shell. In FEL
+The Shonen Jump edition reports as a Famicom Mini, which it is in a different shell. In FEL
 mode no model is reported at all: the boot ROM is the same chip in every console.
-On the Mega Drive Mini the computer is connected to controller port 2 with a USB A-to-A
-cable; its rear USB socket carries power only. The Reset-while-powering-on sequence is the
-same.
+
+The Mega Drive Mini is recognised by its system code but not supported: it uses another
+emulator and menu format and is served by Project Lunar. Cartload says so when one is
+connected and starts no flow or sync on it.
 
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.

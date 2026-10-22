@@ -245,7 +245,7 @@
       </div>
     </div>
     <p>
-      Installs the hakchi kernel on NES, SNES and Mega Drive Classic Mini consoles and keeps a
+      Installs the hakchi kernel on NES, SNES and Famicom Classic Mini consoles and keeps a
       games library in sync with them.
     </p>
     <p class="muted">

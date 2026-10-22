@@ -8,8 +8,9 @@
   import { NORMAL, ms } from "../../motion";
   import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore } from "../../state";
 
-  const status = $derived(consoleStore.report?.status ?? null);
-  const connected = $derived(status?.state === "connected");
+  const report = $derived(consoleStore.report);
+  const status = $derived(report?.status ?? null);
+  const connected = $derived(status?.state === "connected" && (report?.supported ?? true));
   const storage = $derived(
     syncStore.plan?.storage ?? (status?.state === "connected" && status.info.storage ? status.info.storage.usage : null),
   );

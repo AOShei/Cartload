@@ -5,14 +5,14 @@
    *  control is highlighted. Inline
    *  SVG, no assets. */
   interface Props {
-    /** `ConsoleType` as the backend names it: `SnesEur`, `SnesUsa`, `Nes`, `MdEur`… */
+    /** `ConsoleType` as the backend names it: `SnesEur`, `SnesUsa`, `Nes`… */
     model?: string;
     width?: number;
   }
 
   let { model = "SnesEur", width = 250 }: Props = $props();
 
-  type Shape = "sfc" | "snes-usa" | "nes" | "famicom" | "md";
+  type Shape = "sfc" | "snes-usa" | "nes" | "famicom";
 
   const shape = $derived.by((): Shape => {
     switch (model) {
@@ -23,11 +23,6 @@
       case "Famicom":
       case "ShonenJump":
         return "famicom";
-      case "MdJpn":
-      case "MdUsa":
-      case "MdEur":
-      case "MdAsia":
-        return "md";
       default:
         return "sfc";
     }
@@ -45,12 +40,6 @@
         return "Famicom Mini";
       case "ShonenJump":
         return "Famicom Mini (Shonen Jump edition)";
-      case "MdUsa":
-        return "Mega Drive Mini (North America)";
-      case "MdJpn":
-      case "MdEur":
-      case "MdAsia":
-        return "Mega Drive Mini";
       default:
         return "SNES Classic Mini (Europe)";
     }
@@ -74,8 +63,6 @@
         return { x: 102, y: 158, w: 34, h: 18, from: "below" };
       case "famicom":
         return { x: 200, y: 214, w: 24, h: 24, from: "right" };
-      case "md":
-        return { x: 62, y: 204, w: 28, h: 18, from: "below" };
       default:
         return { x: 194, y: 164, w: 34, h: 48, from: "right" };
     }
@@ -180,7 +167,7 @@
     <rect x="236" y="160" width="10" height="20" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
     <rect x="255" y="152" width="20" height="36" rx="3" fill="#111112" stroke="#3a3a3c" />
     <rect x="260" y="160" width="10" height="20" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
-  {:else if shape === "famicom"}
+  {:else}
     <!-- Famicom Mini: cream body with the two red controllers lying along its edges, the
          dark red cartridge cover across the upper middle, the raised block with the eject
          slider below it, then the red Power slide at the front left and the red Reset
@@ -207,33 +194,6 @@
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#b8382f" stroke="#8f2a23" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="254" text-anchor="middle">RESET</text>
     <rect x="58" y="262" width="184" height="22" rx="3" fill="#a3272a" stroke="#7d1c1f" />
-  {:else}
-    <!-- Mega Drive / Genesis Mini: a black box wider than it is tall. The big ring sits a
-         little right of centre, nearly as tall as the body, with the slot above the ring's
-         centre line; the vent grooves run off the left edge above the control cluster at
-         the bottom left: the volume slider, the Power slide above the Reset button beside it. -->
-    <path class="md-body" d="M44 50h252l14 14v166q0 16-16 16H46q-16 0-16-16V64z" />
-    {#each [68, 73, 78, 83, 88, 93, 98, 103, 108, 113, 118, 123, 128, 133, 138, 143, 148, 153, 158, 163] as y (y)}
-      <line x1="31" y1={y} x2="70" y2={y} stroke="#3e3e40" stroke-width="2.4" />
-    {/each}
-    <circle cx="200" cy="136" r="82" fill="#222224" stroke="#4e4e50" stroke-width="2" />
-    <!-- the dark magenta section of the ring at the bottom, and the smooth patch above it -->
-    <path d="M241 207A82 82 0 0 1 159 207L167 193.2A66 66 0 0 0 233 193.2Z" fill="#5a1f3f" stroke="#4e4e50" />
-    <circle cx="200" cy="136" r="66" fill="none" stroke="#4e4e50" />
-    <rect x="176" y="174" width="48" height="22" rx="2" fill="#2a2a2c" stroke="#4e4e50" />
-    <rect x="150" y="104" width="100" height="14" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
-    <!-- volume -->
-    <rect x="46" y="180" width="8" height="42" rx="4" fill="#0f0f10" stroke="#3a3a3c" />
-    <rect x="43" y="198" width="14" height="7" rx="2" fill="#6b6b6d" />
-    <text class="lbl on-md" x="50" y="236" text-anchor="middle">VOL</text>
-    <!-- power slide -->
-    <rect x="62" y="180" width="28" height="18" rx="3" fill="#0f0f10" stroke="#3a3a3c" />
-    <rect x="65" y="183" width="10" height="12" rx="2" fill="#6b6b6d" />
-    <text class="lbl on-md" x="96" y="193">POWER</text>
-    <!-- reset -->
-    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
-    <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#4a4a4c" stroke="#6b6b6d" />
-    <text class="lbl reset-on-dark" x={reset.x + reset.w + 6} y={reset.y + 13}>RESET</text>
   {/if}
 
   <!-- "hold" pointer at the Reset control -->
@@ -308,11 +268,6 @@
   }
 
 
-  .md-body {
-    fill: #2a2a2c;
-    stroke: #6b6b6d;
-    stroke-width: 1.5;
-  }
 
   .vents {
     stroke: #b9b7b3;
@@ -339,9 +294,6 @@
     fill: #6e5f48;
   }
 
-  .on-md {
-    fill: #9a9a9c;
-  }
 
   .reset-on-dark {
     fill: #c9c3ff;

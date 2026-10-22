@@ -116,7 +116,7 @@ pub fn step_label(name: &str) -> &str {
         "memboot" => "Boot from memory",
         "wait-console" => "Wait for the console",
         "detect" => "Identify the console",
-        "check-md" => "Mega Drive check",
+        "check-md" => "Compatibility check",
         "grow" => "Grow the data partition",
         "reboot-grown" => "Reboot into the grown partition",
         "prepare" => "Prepare the install",
