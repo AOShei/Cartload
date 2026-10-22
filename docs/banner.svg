@@ -11,9 +11,9 @@
 
   <!-- warm grey page with a soft card on the right -->
   <g clip-path="url(#frame)">
-    <rect width="1280" height="400" fill="#f7f5f2"/>
-    <rect x="800" y="-40" width="580" height="480" rx="40" fill="#f1eee9"/>
-    <rect x="0" y="392" width="1280" height="8" fill="#5546d4"/>
+    <rect width="1280" height="400" fill="#1a1917"/>
+    <rect x="800" y="-40" width="580" height="480" rx="40" fill="#242220"/>
+    <rect x="0" y="392" width="1280" height="8" fill="#9b90ff"/>
   </g>
 
   <!-- the mark -->
@@ -26,7 +26,7 @@
   </g>
 
   <!-- the wordmark -->
-  <g transform="translate(318 118) scale(3.4)" fill="none" stroke="#1f1d1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="translate(318 118) scale(3.4)" fill="none" stroke="#ece9e3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14.64 4.37A8 8 0 1 0 14.64 16.63"/>
     <circle cx="25.3" cy="13.5" r="5.2"/>
     <path d="M30.5 8.5V18.5"/>
@@ -42,21 +42,21 @@
 
   <!-- the line -->
   <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
-    <text x="320" y="232" font-size="26" fill="#625d55">Install hakchi. Manage your games. Sync.</text>
-    <text x="320" y="268" font-size="18" fill="#837d73">For the NES, SNES and Famicom Classic Mini consoles.</text>
-    <g font-size="13" font-weight="600" fill="#5546d4">
-      <rect x="320" y="296" width="120" height="30" rx="15" fill="#ebe8fb"/>
+    <text x="320" y="232" font-size="26" fill="#d9d5ce">Install hakchi. Manage your games. Sync.</text>
+    <text x="320" y="268" font-size="18" fill="#a8a298">For the NES, SNES and Famicom Classic Mini consoles.</text>
+    <g font-size="13" font-weight="600" fill="#b8b0ff">
+      <rect x="320" y="296" width="120" height="30" rx="15" fill="#2b284a"/>
       <text x="380" y="316" text-anchor="middle">Tauri · Rust · Svelte</text>
-      <rect x="452" y="296" width="178" height="30" rx="15" fill="#ebe8fb"/>
+      <rect x="452" y="296" width="178" height="30" rx="15" fill="#2b284a"/>
       <text x="541" y="316" text-anchor="middle">Linux · macOS · Windows</text>
-      <rect x="642" y="296" width="72" height="30" rx="15" fill="#ebe8fb"/>
+      <rect x="642" y="296" width="72" height="30" rx="15" fill="#2b284a"/>
       <text x="678" y="316" text-anchor="middle">GPL-3</text>
     </g>
   </g>
 
   <!-- the console, seen from above, with three game tiles -->
   <g transform="translate(868 64)">
-    <rect x="0" y="0" width="220" height="268" rx="20" fill="#d7d5d1" stroke="#a9a7a3" stroke-width="1.5"/>
+    <rect x="0" y="0" width="220" height="268" rx="20" fill="#d7d5d1" stroke="#8d8a85" stroke-width="1.5"/>
     <line x1="32" y1="9" x2="188" y2="9" stroke="#b9b7b3" stroke-width="3" stroke-dasharray="2 4"/>
     <rect x="12" y="20" width="196" height="208" rx="14" fill="#8e8f93" stroke="#6f7074"/>
     <rect x="32" y="76" width="156" height="24" rx="7" fill="#44454a" stroke="#2f3034"/>
@@ -72,9 +72,9 @@
   <g transform="translate(1124 96)">
     <rect x="0" y="0" width="92" height="82" rx="10" fill="#5546d4"/>
     <rect x="0" y="100" width="92" height="82" rx="10" fill="#7a6ee3"/>
-    <rect x="0" y="200" width="92" height="82" rx="10" fill="#ebe8fb" stroke="#c4bdb2"/>
+    <rect x="0" y="200" width="92" height="82" rx="10" fill="#2b284a" stroke="#3d3a36"/>
     <rect x="14" y="14" width="64" height="12" rx="6" fill="#ffffff" opacity="0.55"/>
     <rect x="14" y="114" width="64" height="12" rx="6" fill="#ffffff" opacity="0.55"/>
-    <rect x="14" y="214" width="64" height="12" rx="6" fill="#5546d4" opacity="0.35"/>
+    <rect x="14" y="214" width="64" height="12" rx="6" fill="#9b90ff" opacity="0.45"/>
   </g>
 </svg>
