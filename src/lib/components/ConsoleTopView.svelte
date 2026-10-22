@@ -97,10 +97,10 @@
     <rect class="sfc-plate" x="52" y="48" width="196" height="208" rx="14" />
     <ellipse cx="220" cy="74" rx="17" ry="11" transform="rotate(-18 220 74)" fill="#7e7f84" stroke="#6f7074" />
     <!-- cartridge slot, centred, with the end marks and the centre notch -->
-    <rect class="sfc-dark" x="72" y="104" width="156" height="24" rx="7" />
-    <line class="sfc-tick" x1="86" y1="110" x2="86" y2="122" />
-    <line class="sfc-tick" x1="214" y1="110" x2="214" y2="122" />
-    <path d="M144 111h12l-6 7z" fill="#8e8f93" />
+    <rect class="sfc-dark" x="72" y="126" width="156" height="24" rx="7" />
+    <line class="sfc-tick" x1="86" y1="132" x2="86" y2="144" />
+    <line class="sfc-tick" x1="214" y1="132" x2="214" y2="144" />
+    <path d="M144 133h12l-6 7z" fill="#8e8f93" />
     <!-- power slide, eject, reset: one centred row -->
     <rect class="sfc-dark" x="72" y="190" width="34" height="36" rx="5" />
     <rect x="76" y="194" width="26" height="14" rx="3" fill="#6b6c70" />
