@@ -14,6 +14,7 @@ pub mod flow;
 pub mod library;
 pub mod logging;
 pub mod package;
+pub mod setup;
 pub mod state;
 pub mod status;
 pub mod sync;
@@ -84,6 +85,8 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     {
         tauri::generate_handler![
             commands::app_version,
+            commands::setup_status,
+            commands::setup_install,
             commands::console_status,
             commands::console_info,
             commands::fel_probe,
@@ -116,6 +119,8 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     {
         tauri::generate_handler![
             commands::app_version,
+            commands::setup_status,
+            commands::setup_install,
             commands::console_status,
             commands::console_info,
             commands::fel_probe,

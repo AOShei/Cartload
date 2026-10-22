@@ -126,6 +126,18 @@ export interface AppVersion {
   debug: boolean;
 }
 
+/** The Linux system setup: udev rule and NetworkManager profile. */
+export interface SetupStatus {
+  platform: string;
+  applies: boolean;
+  usb_rule: boolean;
+  name_rule: boolean;
+  network_manager: boolean;
+  network_profile: boolean;
+  can_install: boolean;
+  complete: boolean;
+}
+
 export interface FelProbe {
   device: UsbDevice;
   check: FelCheck;

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { tgdbKeyGet, tgdbKeySet } from "../api/commands";
+  import { setupInstall, setupStatus, tgdbKeyGet, tgdbKeySet } from "../api/commands";
   import { AppError, inTauri } from "../api/tauri";
-  import type { KeyStatus } from "../api/types";
+  import type { KeyStatus, SetupStatus } from "../api/types";
   import AppMark from "../components/AppMark.svelte";
   import Icon from "../components/Icon.svelte";
   import Wordmark from "../components/Wordmark.svelte";
@@ -14,10 +14,15 @@
   let keyBusy = $state(false);
   let confirmKeyRemoval = $state(false);
   let about: HTMLElement | undefined = $state();
+  let setup = $state<SetupStatus | null>(null);
+  let setupBusy = $state(false);
 
   onMount(() => {
     void libraryStore.start();
     if (inTauri) {
+      void setupStatus()
+        .then((status) => (setup = status))
+        .catch((error: unknown) => toasts.error(`Could not read the system setup: ${AppError.from(error).message}`));
       keyLoading = true;
       void tgdbKeyGet()
         .then((status) => (keyStatus = status))
@@ -36,6 +41,19 @@
       });
     }
   });
+
+  async function installSetup(): Promise<void> {
+    setupBusy = true;
+    try {
+      setup = await setupInstall();
+      toasts.success(setup.complete ? "Linux setup installed. Reconnect the console." : "Installed what could be installed.");
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(e.message, e.detail);
+    } finally {
+      setupBusy = false;
+    }
+  }
 
   async function saveKey(clear: boolean): Promise<void> {
     if (!inTauri) {
@@ -110,6 +128,51 @@
       </span>
     </label>
   </section>
+
+  {#if setup?.applies}
+    <section class="card" aria-labelledby="setup-heading">
+      <h2 id="setup-heading">Linux setup</h2>
+      <p class="muted">
+        Two system files let the app reach the console without root: a udev rule for USB
+        access and the hakchi0 interface name, and a NetworkManager profile that gives that
+        interface a link-local address. Installing asks for your password.
+      </p>
+      <ul class="checks">
+        <li class:ok={setup.usb_rule}>
+          <Icon name={setup.usb_rule ? "check" : "dash"} size={16} />
+          <span>USB access rule {setup.usb_rule ? "installed" : "missing"}</span>
+        </li>
+        <li class:ok={setup.name_rule}>
+          <Icon name={setup.name_rule ? "check" : "dash"} size={16} />
+          <span>hakchi0 interface name {setup.name_rule ? "installed" : "missing"}</span>
+        </li>
+        {#if setup.network_manager}
+          <li class:ok={setup.network_profile}>
+            <Icon name={setup.network_profile ? "check" : "dash"} size={16} />
+            <span>Link-local network profile {setup.network_profile ? "installed" : "missing"}</span>
+          </li>
+        {:else}
+          <li>
+            <Icon name="dash" size={16} />
+            <span class="muted">NetworkManager not found: give hakchi0 a link-local address yourself when the console is connected.</span>
+          </li>
+        {/if}
+      </ul>
+      {#if setup.complete}
+        <p class="muted">Everything is in place.</p>
+      {:else}
+        <div>
+          <button type="button" class="btn btn-primary" onclick={() => void installSetup()} disabled={setupBusy || !setup.can_install}>
+            {#if setupBusy}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+            {setupBusy ? "Installing…" : "Install"}
+          </button>
+          {#if !setup.can_install}
+            <p class="muted">pkexec was not found, so the app cannot ask for administrator rights. See docs/hardware-tests.md for the files to install by hand.</p>
+          {/if}
+        </div>
+      {/if}
+    </section>
+  {/if}
 
   <section class="card" aria-labelledby="library-heading">
     <h2 id="library-heading">Library</h2>
@@ -264,6 +327,30 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+  }
+
+  .checks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .checks li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+  }
+
+  .checks li.ok {
+    color: var(--text);
+  }
+
+  .checks li.ok :global(svg) {
+    color: var(--ok);
   }
 
   fieldset {

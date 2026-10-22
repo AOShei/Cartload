@@ -7,6 +7,7 @@ import type {
   FlowSnapshot,
   LogLine,
   PackageStatus,
+  SetupStatus,
   StatusReport,
   StepSnapshot,
 } from "./types";
@@ -14,6 +15,16 @@ import type {
 /** Version of the Rust side and the crates linked into it. */
 export function fetchAppVersion(): Promise<AppVersion> {
   return call<AppVersion>("app_version");
+}
+
+/** The Linux system setup on this machine. */
+export function setupStatus(): Promise<SetupStatus> {
+  return call<SetupStatus>("setup_status");
+}
+
+/** Installs the missing pieces of the Linux system setup; the desktop asks for the password. */
+export function setupInstall(): Promise<SetupStatus> {
+  return call<SetupStatus>("setup_install");
 }
 
 /** The latest status report. */

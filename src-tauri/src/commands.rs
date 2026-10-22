@@ -69,6 +69,20 @@ pub fn app_version() -> AppVersion {
     version()
 }
 
+/// What the Linux system setup (udev rule, network profile) looks like on this machine.
+#[tauri::command]
+pub fn setup_status() -> crate::setup::SetupStatus {
+    crate::setup::status()
+}
+
+/// Installs the missing pieces of the Linux system setup, asking for administrator rights.
+#[tauri::command]
+pub async fn setup_install() -> Result<crate::setup::SetupStatus, CommandError> {
+    tauri::async_runtime::spawn_blocking(crate::setup::install)
+        .await
+        .map_err(|e| CommandError::new("The setup task failed.").with_detail(e.to_string()))?
+}
+
 /// The latest status report, as last emitted with the `console-status` event.
 #[tauri::command]
 pub async fn console_status(state: State<'_, Arc<AppState>>) -> Result<StatusReport, CommandError> {

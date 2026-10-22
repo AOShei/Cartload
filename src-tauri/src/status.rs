@@ -470,8 +470,8 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
             (
                 Tone::Error,
                 "Console attached in FEL mode, but Cartload may not open it.".into(),
-                "On Linux, install the udev rule from docs/hardware-tests.md and reconnect the \
-                 console. On Windows, bind the WinUSB driver to it with Zadig."
+                "On Linux, open Settings and press Install under \"Linux setup\", then reconnect \
+                 the console. On Windows, bind the WinUSB driver to it with Zadig."
                     .into(),
                 details,
             )
