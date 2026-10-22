@@ -284,7 +284,11 @@
         <div class="fel">
           <ConsoleTopView model={consoleModel} width={250} />
           <ol class="howto">
-            <li>Connect the console to this computer with its USB cable and switch POWER off.</li>
+            {#if consoleModel.startsWith("Md")}
+              <li>Connect controller port 2 to this computer with a USB A-to-A cable (the socket at the back is power only) and switch POWER off.</li>
+            {:else}
+              <li>Connect the console to this computer with its USB cable and switch POWER off.</li>
+            {/if}
             <li>Hold RESET down and switch POWER on.</li>
             <li>Keep RESET held for two seconds, then release it. The screen stays black: that is FEL mode.</li>
           </ol>

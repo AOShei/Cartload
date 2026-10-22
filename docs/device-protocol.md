@@ -28,6 +28,9 @@ kernel images; `CLV-S-SNPY` verified on a European SNES Classic Mini):
 The Mega Drive Mini is not in that table, so Cartload takes any other product string for a
 Mega Drive Mini, and the Shonen Jump edition for a Famicom Mini in a different shell. In FEL
 mode no model is reported at all: the boot ROM is the same chip in every console.
+On the Mega Drive Mini the computer is connected to controller port 2 with a USB A-to-A
+cable; its rear USB socket carries power only. The Reset-while-powering-on sequence is the
+same.
 
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.
