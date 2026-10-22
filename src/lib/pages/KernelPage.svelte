@@ -52,16 +52,22 @@
     }
     return null;
   });
-  /* The drawing switches to the detected model whenever the page is opened and whenever the
-     detection changes; the choice stays free in between, as a fallback for a wrong guess. */
+  /* The drawing switches to the detected model when the page opens and when the detection
+     changes to another model; in between the choice is free, as a fallback for a wrong
+     guess. The detection is applied once per value, so the status refreshing every few
+     seconds cannot undo a manual choice. */
+  let appliedDetection: string | null = null;
   onMount(() => {
     if (detectedModel) {
+      appliedDetection = detectedModel;
       preferences.setConsoleModel(detectedModel);
     }
   });
   $effect(() => {
-    if (detectedModel) {
-      preferences.setConsoleModel(detectedModel);
+    const detected = detectedModel;
+    if (detected && detected !== appliedDetection) {
+      appliedDetection = detected;
+      preferences.setConsoleModel(detected);
     }
   });
   const consoleModel = $derived(isKnownModel(preferences.consoleModel) ? preferences.consoleModel : DEFAULT_MODEL);
@@ -278,18 +284,15 @@
           <h2>Put the console in FEL mode</h2>
           <span class="spacer"></span>
           <div class="model-pick">
-            <label>
-              <span class="muted">Model</span>
-              <select
-                value={consoleModel}
-                aria-label="Console model"
-                onchange={(e) => preferences.setConsoleModel(e.currentTarget.value)}
-              >
-                {#each CONSOLE_MODELS as m (m.id)}
-                  <option value={m.id}>{m.label}</option>
-                {/each}
-              </select>
-            </label>
+            <select
+              value={consoleModel}
+              aria-label="Console model"
+              onchange={(e) => preferences.setConsoleModel(e.currentTarget.value)}
+            >
+              {#each CONSOLE_MODELS as m (m.id)}
+                <option value={m.id} selected={m.id === consoleModel}>{m.label}</option>
+              {/each}
+            </select>
             {#if detectedModel}
               <span class="muted detected">Detected: {CONSOLE_MODELS.find((m) => m.id === detectedModel)?.label ?? detectedModel}</span>
             {/if}
@@ -793,24 +796,20 @@
   .model-pick {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
     gap: 2px;
     margin-left: auto;
     font-size: var(--text-md);
   }
 
-  .model-pick label {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+  .model-pick select {
+    width: 270px;
+    max-width: 270px;
   }
 
   .model-pick .detected {
     font-size: var(--text-sm);
-  }
-
-  .model-pick select {
-    max-width: 240px;
+    text-align: center;
   }
 
   .row:has(.model-pick) {
