@@ -9,6 +9,7 @@ interface Stored {
   theme?: Theme;
   showDebugLog?: boolean;
   logOpen?: boolean;
+  consoleModel?: string;
 }
 
 function isTheme(value: unknown): value is Theme {
@@ -32,6 +33,8 @@ class Preferences {
   theme = $state<Theme>("system");
   showDebugLog = $state(false);
   logOpen = $state(false);
+  /** The console model the Kernel page draws: chosen by hand, or the last one detected. */
+  consoleModel = $state<string | null>(null);
 
   /** Reads the stored values and applies the theme. Safe to call more than once. */
   load(): void {
@@ -47,6 +50,9 @@ class Preferences {
         }
         if (typeof stored.logOpen === "boolean") {
           this.logOpen = stored.logOpen;
+        }
+        if (typeof stored.consoleModel === "string") {
+          this.consoleModel = stored.consoleModel;
         }
       }
     } catch {
@@ -82,11 +88,19 @@ class Preferences {
     this.save();
   }
 
+  setConsoleModel(value: string): void {
+    if (this.consoleModel !== value) {
+      this.consoleModel = value;
+      this.save();
+    }
+  }
+
   private save(): void {
     const stored: Stored = {
       theme: this.theme,
       showDebugLog: this.showDebugLog,
       logOpen: this.logOpen,
+      consoleModel: this.consoleModel ?? undefined,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));

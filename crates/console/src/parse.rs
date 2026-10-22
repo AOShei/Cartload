@@ -85,6 +85,21 @@ pub const SYSTEM_CODES: [(&str, ConsoleType); 10] = [
 ];
 
 impl ConsoleType {
+    /// The model behind the USB product string a console in normal boot on stock firmware
+    /// reports (`CLV-S-SNPY` for the European SNES). The strings come from the gadget
+    /// driver of the stock kernel, which carries one per model. The Mega Drive Mini is not
+    /// in that table, and the Shonen Jump edition reports as a Famicom.
+    pub fn from_usb_product(product: &str) -> Option<Self> {
+        match product.trim() {
+            "CLV-S-NESY" => Some(Self::Nes),
+            "CLV-S-HVCY" => Some(Self::Famicom),
+            "CLV-S-SHVY" => Some(Self::SuperFamicom),
+            "CLV-S-SNPY" => Some(Self::SnesEur),
+            "CLV-S-SNSY" => Some(Self::SnesUsa),
+            _ => None,
+        }
+    }
+
     /// Looks up a system code such as `snes-eur` (the output of
     /// `hakchi eval 'echo "$sftype-$sfregion"'`). Unknown codes give [`ConsoleType::Unknown`].
     pub fn from_system_code(code: &str) -> Self {

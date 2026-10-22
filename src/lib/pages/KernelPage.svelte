@@ -9,6 +9,7 @@
   import FlowLog from "../components/FlowLog.svelte";
   import Icon from "../components/Icon.svelte";
   import StepList from "../components/StepList.svelte";
+  import { CONSOLE_MODELS, DEFAULT_MODEL, isKnownModel, modelFromProduct } from "../models";
   import {
     consoleStore,
     flowStore,
@@ -17,6 +18,7 @@
     formatDuration,
     navigation,
     packageStore,
+    preferences,
     toasts,
   } from "../state";
 
@@ -28,17 +30,34 @@
   const report = $derived(consoleStore.report);
   const status = $derived(report?.status ?? null);
 
-  /* The drawing follows the console that is connected, and keeps showing the last one seen
-     while it is off or in FEL mode. `?model=` picks one in the browser preview. */
-  let lastModel = $state(
-    (!inTauri && typeof location !== "undefined" && new URLSearchParams(location.search).get("model")) || "SnesEur",
-  );
+  /* The drawing follows the console: the model is read from the USB product string while
+     a stock console sits in normal boot, from hakchi once it runs, and can be picked by
+     hand until then. The choice is remembered. `?model=` picks one in the browser preview. */
+  const previewModel = !inTauri && typeof location !== "undefined" ? new URLSearchParams(location.search).get("model") : null;
   $effect(() => {
-    if (status?.state === "connected" && status.info.console !== "Unknown") {
-      lastModel = status.info.console;
+    if (isKnownModel(previewModel)) {
+      preferences.setConsoleModel(previewModel);
     }
   });
-  const consoleModel = $derived(lastModel);
+  $effect(() => {
+    if (!status) {
+      return;
+    }
+    const detected =
+      status.state === "connected" && isKnownModel(status.info.console)
+        ? status.info.console
+        : status.state === "fel"
+          ? modelFromProduct(status.device.product)
+          : null;
+    if (detected) {
+      preferences.setConsoleModel(detected);
+    }
+  });
+  const consoleModel = $derived(isKnownModel(preferences.consoleModel) ? preferences.consoleModel : DEFAULT_MODEL);
+  const modelDetected = $derived(
+    (status?.state === "connected" && isKnownModel(status.info.console)) ||
+      (status?.state === "fel" && modelFromProduct(status.device.product) !== null),
+  );
   const snapshot = $derived(flowStore.snapshot);
   const running = $derived(flowStore.running);
   const pkg = $derived(packageStore.status?.package ?? null);
@@ -245,7 +264,23 @@
     <li class="stage" class:complete={watch.ready}>
       <span class="number" aria-hidden="true">{#if watch.ready}<Icon name="check" size={16} />{:else}1{/if}</span>
       <div class="body card">
-        <h2>Put the console in FEL mode</h2>
+        <div class="row">
+          <h2>Put the console in FEL mode</h2>
+          <span class="spacer"></span>
+          <label class="model-pick">
+            <span class="muted">{modelDetected ? "Detected" : "Model"}</span>
+            <select
+              value={consoleModel}
+              disabled={modelDetected}
+              aria-label="Console model"
+              onchange={(e) => preferences.setConsoleModel(e.currentTarget.value)}
+            >
+              {#each CONSOLE_MODELS as m (m.id)}
+                <option value={m.id}>{m.label}</option>
+              {/each}
+            </select>
+          </label>
+        </div>
         <div class="fel">
           <ConsoleTopView model={consoleModel} width={250} />
           <ol class="howto">
@@ -744,6 +779,27 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .model-pick {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+    font-size: var(--text-md);
+  }
+
+  .model-pick select {
+    max-width: 240px;
+  }
+
+  .model-pick + .spacer,
+  .row:has(.model-pick) {
+    flex-wrap: wrap;
+  }
+
+  .row:has(.model-pick) h2 {
+    white-space: nowrap;
   }
 
   .fel {

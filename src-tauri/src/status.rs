@@ -401,6 +401,9 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
     // The USB manufacturer string is not shown: the app names consoles by model only.
     if let Some(product) = &device.product {
         details.push(Detail::new("Product", product.clone()));
+        if let Some(model) = cartload_console::ConsoleType::from_usb_product(product) {
+            details.push(Detail::new("Model", model.to_string()));
+        }
     }
     match check {
         FelCheck::Unchecked => (

@@ -9,9 +9,24 @@ SoC and the same hakchi tooling; the Mega Drive Mini differs in some paths and i
 | State | USB ID | Notes |
 | --- | --- | --- |
 | FEL mode (hold Reset while powering on) | `1f3a:efe8` | Allwinner USB boot. Vendor class, bulk endpoints 0x81 in / 0x01 out |
-| Stock firmware, normal boot | `1f3a:efe8` | Same ID, "Nintendo CLV-S-SNPY". Nothing answers; do not confuse with FEL |
+| Stock firmware, normal boot | `1f3a:efe8` | Same ID, with a product string naming the model (below). Nothing answers; do not confuse with FEL |
 | Legacy hakchi kernel (pre-2018) | `1f3a:efe8` | "clovershell" protocol. Out of scope: memboot and reinstall instead |
 | hakchi kernel or memboot | `04e8:6863`, manufacturer `hakchi` | RNDIS network gadget |
+
+The stock kernel's USB gadget driver carries one product string per model, so a console in
+normal boot names itself before anything is installed (seen in the ramdisks of the stock
+kernel images; `CLV-S-SNPY` verified on a European SNES Classic Mini):
+
+| Product string | Model |
+|---|---|
+| `CLV-S-NESY` | NES Classic Mini |
+| `CLV-S-HVCY` | Famicom Mini (the Shonen Jump edition too, as far as known) |
+| `CLV-S-SHVY` | Super Famicom Mini |
+| `CLV-S-SNPY` | SNES Classic Mini, Europe |
+| `CLV-S-SNSY` | SNES Classic, North America |
+
+The Mega Drive Mini is not in that table. In FEL mode no model is reported at all: the boot
+ROM is the same chip in every console.
 
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.
