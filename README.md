@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.svg" alt="Cartload: install hakchi and manage games on the NES, SNES and Famicom Classic Mini" width="100%">
+</p>
+
 # Cartload
 
 A desktop tool for the NES, SNES and Famicom Classic Mini consoles: install the
