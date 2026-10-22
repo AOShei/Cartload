@@ -638,7 +638,7 @@ a toast.
 
 ## Kernel page (desktop app)
 
-Crate: `src-tauri`, binary `cartload-app`. The Kernel page runs the flows of "Install kernel"
+Crate: `src-tauri`, binary `cartload` (package `cartload-app`). The Kernel page runs the flows of "Install kernel"
 above through the app's `FlowRunner`: the same `cartload-flow` steps, the same time limits,
 observed as a step list with timing, the log of the run beneath, and a failure card with the
 likely cause and the next action. While a flow runs the console watcher is paused and the
