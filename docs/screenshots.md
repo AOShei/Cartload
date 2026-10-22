@@ -82,7 +82,7 @@ google-chrome --headless=new --window-size=1280,800 --hide-scrollbars \
 
 Fixtures: `?preview=disconnected|fel|booting|connected|stock` (Console), `?page=kernel&flow=
 idle|running|failed|done|cancelled&package=cached|none|problem`, `?page=library&library=some|
-empty|many&sync=none|plan|review|running|done|failed`, `?page=settings`. `&theme=light|dark`
+empty|many&sync=none|plan|review|running|done|failed&import=running|done`, `?page=settings`. `&theme=light|dark`
 forces a theme, `&log=open|closed` the activity log panel; on the Library page `&folder=4/1`
 opens a folder of the fixture (index path), `&select=N` selects its first N games (the detail
 panel) and `&dialog=description|advanced|changes` opens one of the editors. These are the
