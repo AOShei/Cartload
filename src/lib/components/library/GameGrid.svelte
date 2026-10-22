@@ -415,14 +415,14 @@
               </div>
               <span class="title">{title(tile)}</span>
               <span class="sub muted">{subtitle(tile)}</span>
-              {#if tile.kind === "game" && selectedSet.has(tile.id)}
+              {#if (tile.kind === "game" || tile.kind === "folder") && selectedSet.has(tile.id)}
                 <button
                   type="button"
                   class="tile-remove"
-                  aria-label="Remove {tile.view.game.name} from the library"
-                  title="Remove from the library (Delete)"
+                  aria-label={tile.kind === "game" ? `Remove ${tile.view.game.name} from the library` : `Remove the folder ${tile.folder.name}`}
+                  title={tile.kind === "game" ? "Remove from the library (Delete)" : "Remove folder (Delete)"}
                   tabindex="-1"
-                  onclick={(e) => { e.stopPropagation(); libraryStore.removePrompt = true; }}
+                  onclick={(e) => { e.stopPropagation(); libraryStore.requestRemove(); }}
                   ondblclick={(e) => e.stopPropagation()}
                   onpointerdown={(e) => e.stopPropagation()}
                 >
@@ -720,7 +720,8 @@
   }
 
   /* Room for the remove button in the corner of a selected game tile. */
-  .tile.selected.kind-game .sub {
+  .tile.selected.kind-game .sub,
+  .tile.selected.kind-folder .sub {
     padding-right: 32px;
   }
 

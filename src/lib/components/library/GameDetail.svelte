@@ -46,6 +46,7 @@
   $effect(() => {
     libraryStore.selected;
     libraryStore.removePrompt = false;
+    libraryStore.removeFolderPrompt = false;
   });
 
   /* Folder rename, from the folder's detail panel. */
@@ -56,6 +57,12 @@
       folderName = tile ? tile.folder.name : "";
     });
   });
+
+  async function removeFolder(path: MenuPath): Promise<void> {
+    if (await libraryStore.edit({ op: "remove_folder", path })) {
+      libraryStore.removeFolderPrompt = false;
+    }
+  }
 
   async function renameFolder(path: MenuPath): Promise<void> {
     const name = folderName.trim();
@@ -366,7 +373,23 @@
         {/if}
       </form>
       <p class="muted">{tile.games} game{tile.games === 1 ? "" : "s"} inside. The picture shows on the console's menu, like a game's cover. Double-click the folder, or press Enter, to open it.</p>
-      <button type="button" class="btn" onclick={() => libraryStore.openFolder(tile.path)}>Open folder</button>
+      <div class="art-actions">
+        <button type="button" class="btn" onclick={() => libraryStore.openFolder(tile.path)}>Open folder</button>
+        <button type="button" class="btn btn-quiet" onclick={() => (libraryStore.removeFolderPrompt = true)} title="Remove folder (Delete)">
+          <Icon name="trash" size={16} />
+          <span>Remove…</span>
+        </button>
+      </div>
+      <Dialog open={libraryStore.removeFolderPrompt} title="Remove this folder?" width="460px" onclose={() => (libraryStore.removeFolderPrompt = false)}>
+        <p>“{tile.folder.name}” goes away; its {tile.games === 1 ? "game moves" : `${tile.games} games move`} up one level. Nothing leaves the library.</p>
+        {#snippet actions()}
+          <button type="button" class="btn btn-danger" onclick={() => void removeFolder(tile.path)} disabled={libraryStore.menuBusy}>
+            {#if libraryStore.menuBusy}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="trash" size={16} />{/if}
+            Remove folder
+          </button>
+          <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (libraryStore.removeFolderPrompt = false)}>Keep</button>
+        {/snippet}
+      </Dialog>
     </div>
   {:else if count > 1}
     <div class="scroll">

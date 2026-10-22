@@ -143,6 +143,8 @@ class LibraryStore {
   removing = $state(false);
   /** The detail panel shows its remove confirmation (Delete in the grid asks for it). */
   removePrompt = $state(false);
+  /** The folder panel shows its removal confirmation. */
+  removeFolderPrompt = $state(false);
   /** A folder edit, move or structure change is on its way to the backend. */
   menuBusy = $state(false);
   /** A cover image is being replaced. */
@@ -352,9 +354,12 @@ class LibraryStore {
     this.selected = this.visibleTiles.map((t) => t.id);
   }
 
-  /** Asks the detail panel to confirm removing the selected games, when there are any. */
+  /** Asks the detail panel to confirm removing the selection: the selected games, or the
+   *  one selected folder. */
   requestRemove(): void {
-    if (this.selectedGames.length > 0) {
+    if (this.single?.kind === "folder") {
+      this.removeFolderPrompt = true;
+    } else if (this.selectedGames.length > 0) {
       this.removePrompt = true;
     }
   }

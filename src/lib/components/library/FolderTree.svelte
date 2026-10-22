@@ -3,11 +3,10 @@
   import Dialog from "../Dialog.svelte";
   import Icon from "../Icon.svelte";
   import TreeNode from "./TreeNode.svelte";
-  import type { MenuOptions, Structure } from "../../api/types";
+  import type { Structure } from "../../api/types";
   import { libraryStore, pathKey } from "../../state";
 
   const menu = $derived(libraryStore.menu);
-  const current = $derived(libraryStore.currentFolder);
   const expanded = new SvelteSet<string>();
   let tree: HTMLElement | undefined = $state();
 
@@ -35,22 +34,6 @@
     }
   });
 
-  function describe(options: MenuOptions | undefined, custom: boolean): string {
-    if (custom) {
-      return "Folders arranged by hand";
-    }
-    switch (options?.structure.kind) {
-      case "flat":
-        return "One list";
-      case "letters":
-        return "Folders A to Z";
-      case "count":
-        return `Folders of ${options.structure.max} games`;
-      default:
-        return "Automatic folders";
-    }
-  }
-
   /** Applying over hand-made folders replaces them: that asks for a confirmation first. */
   async function applyStructure(): Promise<void> {
     if (menu?.custom && !confirmApply) {
@@ -67,14 +50,9 @@
   /* Folder editing */
   let creating = $state(false);
   let newName = $state("");
-  let renaming = $state(false);
-  let renameValue = $state("");
-  let confirmingRemove = $state(false);
 
   function startCreate(): void {
     creating = true;
-    renaming = false;
-    confirmingRemove = false;
     newName = "";
   }
 
@@ -89,34 +67,6 @@
       creating = false;
       newName = "";
     }
-  }
-
-  function startRename(): void {
-    if (!current) {
-      return;
-    }
-    renameValue = current.name;
-    renaming = true;
-    creating = false;
-    confirmingRemove = false;
-  }
-
-  async function commitRename(): Promise<void> {
-    if (!renaming) {
-      return;
-    }
-    if (!renameValue.trim() || renameValue === current?.name) {
-      renaming = false;
-      return;
-    }
-    if (await libraryStore.edit({ op: "rename_folder", path: libraryStore.folder, name: renameValue })) {
-      renaming = false;
-    }
-  }
-
-  async function removeFolder(): Promise<void> {
-    await libraryStore.edit({ op: "remove_folder", path: libraryStore.folder });
-    confirmingRemove = false;
   }
 
   /** Up and Down move between the visible folders, Right expands, Left collapses or goes up. */
@@ -159,14 +109,6 @@
           focusRow(rows.find((r) => (r.dataset["path"] ?? "") === parentKey));
         }
         break;
-      case "F2":
-        startRename();
-        break;
-      case "Delete":
-        if (current) {
-          confirmingRemove = true;
-        }
-        break;
       default:
         return;
     }
@@ -186,8 +128,6 @@
   function onwindowkeydown(event: KeyboardEvent): void {
     if (event.key === "Escape") {
       creating = false;
-      renaming = false;
-      confirmingRemove = false;
     }
   }
 </script>
@@ -209,7 +149,6 @@
       </button>
     </div>
   </header>
-  <p class="structure muted">{describe(menu?.options, menu?.custom ?? false)}</p>
 
   {#if menu}
     <ul class="tree" role="tree" aria-label="Console folders" bind:this={tree} {onkeydown}>
@@ -226,31 +165,6 @@
         <button type="submit" class="btn" disabled={libraryStore.menuBusy}>Add</button>
         <button type="button" class="btn btn-quiet" onclick={() => (creating = false)}>Cancel</button>
       </form>
-    {:else if current}
-      {#if renaming}
-        <form class="inline" onsubmit={(e) => { e.preventDefault(); void commitRename(); }}>
-          <input type="text" bind:value={renameValue} aria-label="Folder name" use:autofocus onblur={commitRename} />
-          <button type="submit" class="btn" disabled={libraryStore.menuBusy}>Rename</button>
-        </form>
-      {:else if confirmingRemove}
-        <div class="confirm" role="group" aria-label="Confirm removing the folder">
-          <p>Remove “{current.name}”? Its games move up one level.</p>
-          <div class="confirm-actions">
-            <button type="button" class="btn btn-danger btn-sm" onclick={removeFolder} disabled={libraryStore.menuBusy}>Remove folder</button>
-            <button type="button" class="btn btn-quiet btn-sm" onclick={() => (confirmingRemove = false)}>Keep</button>
-          </div>
-        </div>
-      {:else}
-        <div class="inline">
-          <span class="folder-name">{current.name}</span>
-          <button type="button" class="icon-btn" aria-label="Rename folder" title="Rename (F2)" onclick={startRename}>
-            <Icon name="edit" size={16} />
-          </button>
-          <button type="button" class="icon-btn" aria-label="Remove folder" title="Remove folder (Delete)" onclick={() => (confirmingRemove = true)}>
-            <Icon name="trash" size={16} />
-          </button>
-        </div>
-      {/if}
     {:else}
       <p class="muted hint">Drag games or folders onto a folder to move them.</p>
     {/if}
@@ -314,11 +228,6 @@
     align-items: center;
   }
 
-  .structure {
-    padding: 0 var(--space-3);
-    font-size: var(--text-sm);
-  }
-
   .tree {
     flex: 1;
     min-height: 0;
@@ -350,15 +259,6 @@
   .inline input[type="text"] {
     flex: 1;
     min-width: 0;
-  }
-
-  .folder-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: var(--weight-semibold);
   }
 
   .hint {
