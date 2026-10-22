@@ -556,7 +556,6 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-1) 0;
-    border-top: 1px solid var(--border);
   }
 
   .tool-text {
