@@ -64,7 +64,7 @@
       case "famicom":
         return { x: 200, y: 214, w: 24, h: 24, from: "right" };
       default:
-        return { x: 194, y: 178, w: 34, h: 36, from: "right" };
+        return { x: 194, y: 190, w: 34, h: 36, from: "right" };
     }
   });
 
@@ -95,20 +95,21 @@
     <rect class="sfc-body" x="40" y="28" width="220" height="268" rx="20" />
     <line class="vents" x1="72" y1="37" x2="228" y2="37" />
     <rect class="sfc-plate" x="52" y="48" width="196" height="208" rx="14" />
+    <ellipse cx="220" cy="74" rx="17" ry="11" transform="rotate(-18 220 74)" fill="#7e7f84" stroke="#6f7074" />
     <!-- cartridge slot, centred, with the end marks and the centre notch -->
     <rect class="sfc-dark" x="72" y="104" width="156" height="24" rx="7" />
     <line class="sfc-tick" x1="86" y1="110" x2="86" y2="122" />
     <line class="sfc-tick" x1="214" y1="110" x2="214" y2="122" />
     <path d="M144 111h12l-6 7z" fill="#8e8f93" />
     <!-- power slide, eject, reset: one centred row -->
-    <rect class="sfc-dark" x="72" y="178" width="34" height="36" rx="5" />
-    <rect x="76" y="182" width="26" height="14" rx="3" fill="#6b6c70" />
-    <text class="lbl on-dark" x="89" y="230" text-anchor="middle">POWER</text>
-    <rect x="120" y="178" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f" />
-    <text class="lbl on-dark" x="150" y="230" text-anchor="middle">EJECT</text>
+    <rect class="sfc-dark" x="72" y="190" width="34" height="36" rx="5" />
+    <rect x="76" y="194" width="26" height="14" rx="3" fill="#6b6c70" />
+    <text class="lbl on-dark" x="89" y="242" text-anchor="middle">POWER</text>
+    <rect x="120" y="190" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f" />
+    <text class="lbl on-dark" x="150" y="242" text-anchor="middle">EJECT</text>
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="10" />
     <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="5" />
-    <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="230" text-anchor="middle">RESET</text>
+    <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="242" text-anchor="middle">RESET</text>
     <!-- the LED on the light front -->
     <rect x="214" y="274" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "snes-usa"}
