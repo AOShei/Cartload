@@ -430,7 +430,7 @@ class LibraryStore {
       toasts.info("Adding games works inside the desktop app only.");
       return;
     }
-    const picked = await open({ directory: true, multiple: true, title: "Add a folder of games" });
+    const picked = await open({ directory: true, multiple: true, title: "Add a folder of ROMs" });
     const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
     if (paths.length > 0) {
       await this.importPaths(paths);

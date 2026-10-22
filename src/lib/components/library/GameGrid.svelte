@@ -332,9 +332,6 @@
       <Icon name="plus" size={16} />
       <span>Add games…</span>
     </button>
-    <button type="button" class="btn btn-quiet" onclick={() => libraryStore.addFolder()} disabled={libraryStore.importing}>
-      Add a folder…
-    </button>
   </div>
 
   {#if tiles.length === 0}
