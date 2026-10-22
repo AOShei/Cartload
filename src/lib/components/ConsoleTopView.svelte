@@ -1,6 +1,7 @@
 <script lang="ts">
-  /** A Classic Mini console seen straight from above, the front edge at the bottom, drawn
-   *  for the model that is (or was last) detected, in the console's own colours. The Reset
+  /** A Classic Mini console drawn for the model that is (or was last) detected, in the
+   *  console's own colours: from above with the front edge at the bottom, or from the front
+   *  for the NES, whose buttons are on the front face. The Reset
    *  control is highlighted. Inline
    *  SVG, no assets. */
   interface Props {
@@ -70,7 +71,7 @@
       case "snes-usa":
         return { x: 168, y: 176, w: 70, h: 22, from: "right" };
       case "nes":
-        return { x: 96, y: 268, w: 30, h: 14, from: "right" };
+        return { x: 110, y: 158, w: 40, h: 22, from: "below" };
       case "famicom":
         return { x: 200, y: 214, w: 24, h: 24, from: "right" };
       case "md":
@@ -97,7 +98,7 @@
   {width}
   viewBox="0 0 340 300"
   role="img"
-  aria-label="{caption} seen from above. The Reset control is highlighted: hold it while switching Power on."
+  aria-label="{caption}{shape === "nes" ? " seen from the front" : " seen from above"}. The Reset control is highlighted: hold it while switching Power on."
 >
   {#if shape === "sfc"}
     <!-- SNES Classic Mini (Europe) / Super Famicom Mini: light grey body, a dark grey
@@ -153,23 +154,27 @@
     <line x1={reset.x + 6} y1={reset.y + 5} x2={reset.x + reset.w - 6} y2={reset.y + 5} stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="214" text-anchor="middle">RESET</text>
   {:else if shape === "nes"}
-    <!-- NES Classic Mini: the vent lines at the back, the lower front with the cartridge
-         door, Power with its red light and Reset on the front face at the left. -->
-    <rect class="nes-body" x="40" y="28" width="220" height="268" rx="8" />
-    {#each [50, 58, 66, 74, 82, 90, 98, 106] as y (y)}
-      <line class="nes-vent" x1="56" y1={y} x2="112" y2={y} />
-      <line class="nes-vent" x1="188" y1={y} x2="244" y2={y} />
-    {/each}
-    <path class="nes-front" d="M40 150h220v138q0 8-8 8H48q-8 0-8-8z" />
-    <rect x="86" y="168" width="128" height="68" rx="4" fill="#5f5f63" stroke="#4a4a4e" />
-    <!-- power with the light -->
-    <text class="lbl on-light" x="73" y="262" text-anchor="middle">POWER</text>
-    <circle cx="50" cy="275" r="3" fill="#e03a2f" />
-    <rect x="58" y="268" width="30" height="14" rx="2" fill="#5f5f63" stroke="#4a4a4e" />
-    <!-- reset -->
-    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="262" text-anchor="middle">RESET</text>
-    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="6" />
-    <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="2" fill="#5f5f63" stroke="#4a4a4e" />
+    <!-- NES Classic Mini, seen from the front, since its buttons are on the front face:
+         the light grey top with its recessed panel and the black block at the right, the
+         darker front face with the light, Power and Reset at the left and the two
+         controller ports at the right, the dark base below. -->
+    <rect class="nes-top" x="30" y="62" width="280" height="64" rx="3" />
+    <rect x="60" y="71" width="160" height="46" rx="2" fill="#e3e3e3" stroke="#c4c4c4" />
+    <rect x="236" y="62" width="62" height="64" rx="2" fill="#1e1e1f" />
+    <rect class="nes-face" x="30" y="126" width="280" height="88" />
+    <rect x="30" y="214" width="280" height="10" rx="2" fill="#4a4a4e" />
+    <!-- light, power, reset -->
+    <rect x="46" y="166" width="7" height="7" rx="1" fill="#e03a2f" />
+    <rect x="62" y="158" width="40" height="22" rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
+    <text class="lbl on-light" x="82" y="172" text-anchor="middle">POWER</text>
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
+    <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
+    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y={reset.y + 13} text-anchor="middle">RESET</text>
+    <!-- controller ports -->
+    <rect x="236" y="138" width="28" height="54" rx="4" fill="#1e1e1f" />
+    <rect x="243" y="150" width="14" height="28" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
+    <rect x="270" y="138" width="28" height="54" rx="4" fill="#1e1e1f" />
+    <rect x="277" y="150" width="14" height="28" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
   {:else if shape === "famicom"}
     <!-- Famicom Mini: cream body with the two red controllers lying along its edges, the
          dark red cartridge cover across the upper middle, the raised block with the eject
@@ -280,19 +285,15 @@
     stroke-linecap: round;
   }
 
-  .nes-body {
-    fill: #d4d4d4;
-    stroke: #a6a6a6;
+  .nes-top {
+    fill: #d7d7d7;
+    stroke: #b3b3b3;
     stroke-width: 1.5;
   }
 
-  .nes-vent {
-    stroke: #b5b5b5;
-    stroke-width: 2;
-  }
-
-  .nes-front {
-    fill: #c2c2c4;
+  .nes-face {
+    fill: #8c8c90;
+    stroke: #6e6e72;
   }
 
   .fc-body {
