@@ -125,11 +125,11 @@
     <rect class="usa-body" x="62" y="176" width="70" height="120" rx="4" />
     <rect class="usa-body" x="168" y="176" width="70" height="120" rx="4" />
     <!-- raised cartridge block with the slot flap across its middle -->
-    <rect class="usa-raised" x="62" y="48" width="176" height="74" rx="4" />
-    <line class="usa-line" x1="72" y1="75" x2="228" y2="75" />
-    <line class="usa-line" x1="72" y1="95" x2="228" y2="95" />
-    <line class="usa-line" x1="84" y1="75" x2="84" y2="95" />
-    <line class="usa-line" x1="216" y1="75" x2="216" y2="95" />
+    <rect class="usa-raised" x="62" y="84" width="176" height="74" rx="4" />
+    <line class="usa-line" x1="72" y1="111" x2="228" y2="111" />
+    <line class="usa-line" x1="72" y1="131" x2="228" y2="131" />
+    <line class="usa-line" x1="84" y1="111" x2="84" y2="131" />
+    <line class="usa-line" x1="216" y1="111" x2="216" y2="131" />
     <!-- power bar and its lights -->
     <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
     <circle cx="52" cy="191" r="1.8" fill="#8a8a8e" />
