@@ -155,14 +155,18 @@
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="214" text-anchor="middle">RESET</text>
   {:else if shape === "nes"}
     <!-- NES Classic Mini, seen from the front, since its buttons are on the front face:
-         the light grey top with its recessed panel and the black block at the right, the
-         darker front face with the light, Power and Reset at the left and the two
-         controller ports at the right, the dark base below. -->
+         the light grey top whose cartridge cover forms the top edge, the black band
+         running from top to bottom at the right with the two controller ports in it, the
+         darker front face cutting in at the sides with the light, Power and Reset at the
+         left, the dark base below. -->
     <rect class="nes-top" x="30" y="62" width="280" height="64" rx="3" />
-    <rect x="60" y="71" width="160" height="46" rx="2" fill="#e3e3e3" stroke="#c4c4c4" />
-    <rect x="236" y="62" width="62" height="64" rx="2" fill="#1e1e1f" />
-    <rect class="nes-face" x="30" y="126" width="280" height="88" />
-    <rect x="30" y="214" width="280" height="10" rx="2" fill="#4a4a4e" />
+    <!-- the front face cuts in at the sides; the dark base follows its bottom edge -->
+    <path class="nes-face" d="M30 126h280l-18 88H48z" />
+    <rect x="48" y="214" width="244" height="10" rx="2" fill="#4a4a4e" />
+    <!-- the cartridge cover is the top edge itself, from the black band to the left -->
+    <rect x="60" y="62" width="172" height="56" rx="2" fill="#e3e3e3" stroke="#c4c4c4" />
+    <!-- the black band runs from the top edge to the bottom -->
+    <rect x="232" y="62" width="60" height="152" rx="2" fill="#1e1e1f" />
     <!-- light, power, reset -->
     <rect x="46" y="166" width="7" height="7" rx="1" fill="#e03a2f" />
     <rect x="62" y="158" width="40" height="22" rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
@@ -171,10 +175,10 @@
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="3" fill="#c8c8cb" stroke="#8a8a8e" />
     <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y={reset.y + 13} text-anchor="middle">RESET</text>
     <!-- controller ports -->
-    <rect x="236" y="138" width="28" height="54" rx="4" fill="#1e1e1f" />
-    <rect x="243" y="150" width="14" height="28" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
-    <rect x="270" y="138" width="28" height="54" rx="4" fill="#1e1e1f" />
-    <rect x="277" y="150" width="14" height="28" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
+    <rect x="236" y="140" width="24" height="50" rx="4" fill="#111112" stroke="#3a3a3c" />
+    <rect x="242" y="152" width="12" height="26" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
+    <rect x="264" y="140" width="24" height="50" rx="4" fill="#111112" stroke="#3a3a3c" />
+    <rect x="270" y="152" width="12" height="26" rx="2" fill="none" stroke="#9a9a9c" stroke-width="1.5" />
   {:else if shape === "famicom"}
     <!-- Famicom Mini: cream body with the two red controllers lying along its edges, the
          dark red cartridge cover across the upper middle, the raised block with the eject
