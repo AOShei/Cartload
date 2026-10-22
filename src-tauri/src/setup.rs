@@ -39,6 +39,12 @@ pub struct SetupStatus {
     pub network_manager: bool,
     /// A NetworkManager profile gives `hakchi0` a link-local address.
     pub network_profile: bool,
+    /// firewalld is installed and running.
+    pub firewalld: bool,
+    /// The firewalld zone `hakchi0` is in, when the interface exists and has one. The
+    /// console's replies may be dropped unless it is `trusted`; the NetworkManager profile
+    /// puts it there.
+    pub firewall_zone: Option<String>,
     /// `pkexec` is available, so the app can ask for root itself.
     pub can_install: bool,
     /// Everything needed is in place.
@@ -60,6 +66,8 @@ pub fn status() -> SetupStatus {
     let (usb_rule, name_rule) = rules_present(&rules);
     let network_manager = which("nmcli");
     let network_profile = network_manager && profile_present(&nmcli_profiles());
+    let firewalld = firewalld_running();
+    let firewall_zone = firewalld.then(firewall_zone).flatten();
     let can_install = which("pkexec");
     SetupStatus {
         platform,
@@ -68,9 +76,42 @@ pub fn status() -> SetupStatus {
         name_rule,
         network_manager,
         network_profile,
+        firewalld,
+        firewall_zone: firewall_zone.clone(),
         can_install,
-        complete: usb_rule && name_rule && (network_profile || !network_manager),
+        complete: usb_rule
+            && name_rule
+            && (network_profile || !network_manager)
+            && !zone_blocks(firewall_zone.as_deref()),
     }
+}
+
+/// Whether a firewalld zone would drop the console's traffic: anything but `trusted`.
+pub fn zone_blocks(zone: Option<&str>) -> bool {
+    zone.is_some_and(|z| z != "trusted")
+}
+
+/// Whether firewalld is active, from systemd (`firewall-cmd --state` would say the same
+/// but takes seconds to answer over D-Bus).
+fn firewalld_running() -> bool {
+    which("firewall-cmd")
+        && std::process::Command::new("systemctl")
+            .args(["is-active", "--quiet", "firewalld"])
+            .status()
+            .is_ok_and(|status| status.success())
+}
+
+/// The zone of `hakchi0`, or `None` when the interface is absent or in no zone.
+fn firewall_zone() -> Option<String> {
+    let output = std::process::Command::new("firewall-cmd")
+        .args(["--get-zone-of-interface", "hakchi0"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let zone = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!zone.is_empty() && zone != "no zone").then_some(zone)
 }
 
 /// Installs what is missing, asking for root through `pkexec`, and reports the new status.
@@ -102,15 +143,18 @@ pub fn install() -> Result<SetupStatus, CommandError> {
     std::fs::write(&profile_src, PROFILE).map_err(|e| {
         CommandError::new("Could not write the profile file.").with_detail(e.to_string())
     })?;
+    let trust = zone_blocks(before.firewall_zone.as_deref());
     let script = install_script(
         &rule_src.to_string_lossy(),
         &profile_src.to_string_lossy(),
         !(before.usb_rule && before.name_rule),
         before.network_manager && !before.network_profile,
+        trust,
     );
     info!(
         rule = !(before.usb_rule && before.name_rule),
         profile = before.network_manager && !before.network_profile,
+        trust,
         "asking for administrator rights to install the Linux setup"
     );
     let output = std::process::Command::new("pkexec")
@@ -140,8 +184,16 @@ pub fn install() -> Result<SetupStatus, CommandError> {
     Ok(status())
 }
 
-/// The shell run as root: copies what is needed into place and reloads the services.
-pub fn install_script(rule_src: &str, profile_src: &str, rule: bool, profile: bool) -> String {
+/// The shell run as root: copies what is needed into place and reloads the services. With
+/// `trust`, moves `hakchi0` into firewalld's trusted zone (firewall-cmd hands the change to
+/// NetworkManager when it manages the interface, so it sticks to the connection).
+pub fn install_script(
+    rule_src: &str,
+    profile_src: &str,
+    rule: bool,
+    profile: bool,
+    trust: bool,
+) -> String {
     let mut script = String::from("set -e\n");
     if rule {
         script.push_str(&format!(
@@ -152,6 +204,12 @@ pub fn install_script(rule_src: &str, profile_src: &str, rule: bool, profile: bo
         script.push_str(&format!(
             "if [ -d /etc/NetworkManager/system-connections ]; then install -m 0600 -o root -g root '{profile_src}' '{PROFILE_PATH}'; nmcli connection reload || true; fi\n"
         ));
+    }
+    if trust {
+        script.push_str(
+            "firewall-cmd --permanent --zone=trusted --change-interface=hakchi0\n\
+             firewall-cmd --zone=trusted --change-interface=hakchi0 || firewall-cmd --reload\n",
+        );
     }
     script
 }
@@ -298,12 +356,23 @@ mod tests {
 
     #[test]
     fn script_installs_only_what_is_missing() {
-        let both = install_script("/tmp/r", "/tmp/p", true, true);
+        let both = install_script("/tmp/r", "/tmp/p", true, true, false);
         assert!(both.contains("udevadm trigger"));
         assert!(both.contains("nmcli connection reload"));
-        let rule_only = install_script("/tmp/r", "/tmp/p", true, false);
+        assert!(!both.contains("firewall-cmd"));
+        let rule_only = install_script("/tmp/r", "/tmp/p", true, false, false);
         assert!(!rule_only.contains("nmcli"));
-        let none = install_script("/tmp/r", "/tmp/p", false, false);
+        let trust_only = install_script("/tmp/r", "/tmp/p", false, false, true);
+        assert!(trust_only.contains("--zone=trusted --change-interface=hakchi0"));
+        let none = install_script("/tmp/r", "/tmp/p", false, false, false);
         assert_eq!(none, "set -e\n");
+    }
+
+    #[test]
+    fn only_the_trusted_zone_passes() {
+        assert!(!zone_blocks(None));
+        assert!(!zone_blocks(Some("trusted")));
+        assert!(zone_blocks(Some("public")));
+        assert!(zone_blocks(Some("home")));
     }
 }

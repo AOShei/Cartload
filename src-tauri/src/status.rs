@@ -322,9 +322,12 @@ impl ConsoleStatus {
         let (tone, title, next) = if unsupported {
             (
                 Tone::Warning,
-                format!("{} connected: not supported by Cartload.", model_name(self.info().map_or(ConsoleType::Unknown, |i| i.console))),
-                "Cartload supports the NES, SNES and Famicom Classic Mini consoles. For the Mega \
-                 Drive Mini use Project Lunar. Nothing will be installed on or synced to this console."
+                format!(
+                    "{} connected: not supported by Cartload.",
+                    model_name(self.info().map_or(ConsoleType::Unknown, |i| i.console))
+                ),
+                "Cartload does not support the Mega Drive Mini. Nothing will be installed on or \
+                 synced to this console."
                     .into(),
             )
         } else {

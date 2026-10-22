@@ -105,7 +105,7 @@ export interface StatusReport {
   title: string;
   next: string;
   details: Detail[];
-  /** False for a recognised but unsupported console (Mega Drive Mini). */
+  /** False for the Mega Drive Mini, which Cartload does not support. */
   supported: boolean;
   changed_at: number;
 }
@@ -136,6 +136,8 @@ export interface SetupStatus {
   name_rule: boolean;
   network_manager: boolean;
   network_profile: boolean;
+  firewalld: boolean;
+  firewall_zone: string | null;
   can_install: boolean;
   complete: boolean;
 }

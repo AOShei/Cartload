@@ -236,7 +236,8 @@
       <p class="muted">
         Two system files let the app reach the console without root: a udev rule for USB
         access and the hakchi0 interface name, and a NetworkManager profile that gives that
-        interface a link-local address. Installing asks for your password.
+        interface a link-local address and trusts it in the firewall. Installing asks for
+        your password.
       </p>
       <ul class="checks">
         <li class:ok={setup.usb_rule}>
@@ -257,6 +258,24 @@
             <Icon name="dash" size={16} />
             <span class="muted">NetworkManager not found: give hakchi0 a link-local address yourself when the console is connected.</span>
           </li>
+        {/if}
+        {#if setup.firewalld}
+          {#if setup.firewall_zone === "trusted"}
+            <li class="ok">
+              <Icon name="check" size={16} />
+              <span>Firewall: hakchi0 is in the trusted zone</span>
+            </li>
+          {:else if setup.firewall_zone}
+            <li>
+              <Icon name="warning" size={16} />
+              <span>Firewall: hakchi0 is in the {setup.firewall_zone} zone, where the console's replies may be dropped. Install moves it to the trusted zone.</span>
+            </li>
+          {:else}
+            <li>
+              <Icon name="dash" size={16} />
+              <span class="muted">Firewall: firewalld is running; hakchi0's zone is checked once the console is connected{setup.network_profile ? " (the profile puts it in the trusted zone)" : ""}.</span>
+            </li>
+          {/if}
         {/if}
       </ul>
       {#if setup.complete}

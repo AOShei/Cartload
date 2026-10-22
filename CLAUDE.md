@@ -1,7 +1,7 @@
 # Cartload
 
 Desktop app (Tauri 2, Rust, Svelte 5 + TypeScript) that installs the hakchi kernel on
-NES / SNES / Famicom Classic Mini consoles and manages and syncs a games library. The Mega Drive Mini is recognised but not supported.
+NES / SNES / Famicom Classic Mini consoles and manages and syncs a games library. Cartload does not support the Mega Drive Mini: it is detected only to be refused.
 Linux first, then macOS and Windows. License GPL-3.0-or-later.
 
 This is a from-scratch implementation. Reuse the *knowledge* in the reference

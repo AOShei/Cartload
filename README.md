@@ -11,8 +11,7 @@ Svelte.
 
 Cartload is a from-scratch implementation. It uses the GPL-3 hakchi kernel package built
 from madmonkey's hakchi sources and the device-side protocol documented in `docs/`, but
-none of the hakchi2 CE application code. The Mega Drive Mini is recognised but not
-supported.
+none of the hakchi2 CE application code. Cartload does not support the Mega Drive Mini.
 
 **Status:** pre-release. The kernel install, kexec reboot, library and art fetching have
 been verified on a SNES Classic Mini (EUR) running Linux. The first sync from the app, the
@@ -22,8 +21,10 @@ macOS build and the Windows build are still to be tested on hardware; see
 ## Install
 
 Builds for each platform are attached to the
-[GitHub releases](https://github.com/AOShei/Cartload/releases). They are not signed, so
-each desktop shows a warning the first time.
+[GitHub releases](https://github.com/AOShei/Cartload/releases). They are not code-signed
+and will not be: a free-software project is not going to pay Apple and a certificate
+authority yearly for the privilege. Each desktop shows a warning the first time; the steps
+below get past it.
 
 ### Linux
 
@@ -34,8 +35,9 @@ each desktop shows a warning the first time.
   installs the udev rule (USB access to the console in FEL mode, and the `hakchi0` name for
   its network interface) and a NetworkManager profile that gives `hakchi0` a link-local
   address. Without NetworkManager, give `hakchi0` an address in 169.254.0.0/16 yourself.
-- A firewall (firewalld, ufw) must allow traffic on `hakchi0`; the console sits at
-  169.254.13.37 and answers SSH and FTP.
+- With firewalld, `hakchi0` must be in the trusted zone. The installed profile puts it
+  there; the Linux setup card shows the zone once the console is connected and can move
+  it. Other firewalls must allow traffic to 169.254.13.37 (SSH and FTP).
 - On Wayland, Cartload sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` at startup because
   WebKitGTK's DMA-BUF renderer crashes on some compositor and driver combinations. Set the
   variable to `0` before starting to turn the renderer back on.

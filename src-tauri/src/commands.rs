@@ -69,10 +69,13 @@ pub fn app_version() -> AppVersion {
     version()
 }
 
-/// What the Linux system setup (udev rule, network profile) looks like on this machine.
+/// What the Linux system setup (udev rule, network profile, firewall zone) looks like on
+/// this machine. Off the main thread: `firewall-cmd` takes a couple of seconds to answer.
 #[tauri::command]
-pub fn setup_status() -> crate::setup::SetupStatus {
-    crate::setup::status()
+pub async fn setup_status() -> Result<crate::setup::SetupStatus, CommandError> {
+    tauri::async_runtime::spawn_blocking(crate::setup::status)
+        .await
+        .map_err(|e| CommandError::new("The setup check failed.").with_detail(e.to_string()))
 }
 
 /// Installs the missing pieces of the Linux system setup, asking for administrator rights.
@@ -136,12 +139,15 @@ pub async fn diagnostics_report(
     library: State<'_, Arc<LibraryState>>,
 ) -> Result<String, CommandError> {
     tracing::info!("diagnostics_report");
-    Ok(crate::diagnostics::report(
-        &state,
-        &runner.snapshot(),
-        &sync_runner.snapshot(),
-        library.key_status().ok().as_ref(),
-    ))
+    let state = Arc::clone(&state);
+    let flow = runner.snapshot();
+    let sync = sync_runner.snapshot();
+    let key = library.key_status().ok();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::diagnostics::report(&state, &flow, &sync, key.as_ref())
+    })
+    .await
+    .map_err(|e| CommandError::new("The diagnostics task failed.").with_detail(e.to_string()))
 }
 
 /// Writes the diagnostics report to `path` (chosen with a save dialog).
@@ -154,15 +160,19 @@ pub async fn diagnostics_save(
     path: PathBuf,
 ) -> Result<(), CommandError> {
     tracing::info!(path = %path.display(), "diagnostics_save");
-    let report = crate::diagnostics::report(
-        &state,
-        &runner.snapshot(),
-        &sync_runner.snapshot(),
-        library.key_status().ok().as_ref(),
-    );
-    std::fs::write(&path, report).map_err(|e| {
-        CommandError::new(format!("Could not write {}.", path.display())).with_detail(e.to_string())
+    let state = Arc::clone(&state);
+    let flow = runner.snapshot();
+    let sync = sync_runner.snapshot();
+    let key = library.key_status().ok();
+    tauri::async_runtime::spawn_blocking(move || {
+        let report = crate::diagnostics::report(&state, &flow, &sync, key.as_ref());
+        std::fs::write(&path, report).map_err(|e| {
+            CommandError::new(format!("Could not write {}.", path.display()))
+                .with_detail(e.to_string())
+        })
     })
+    .await
+    .map_err(|e| CommandError::new("The diagnostics task failed.").with_detail(e.to_string()))?
 }
 
 /// Starts a flow. The kernel package is attached when one is usable; flows that need it are

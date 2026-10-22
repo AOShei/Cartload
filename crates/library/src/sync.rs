@@ -457,8 +457,16 @@ pub mod commands {
     pub const FINISH: &str = "hakchi overmount_games; uistart";
     /// Name of the deletion script.
     pub const CLEANUP_SCRIPT: &str = "cleanup.sh";
-    /// Name of the modification time script.
-    pub const MODTIME_SCRIPT: &str = "modtime.sh";
+    /// Sets a file's modification time right after its upload (`touch -m -t`), so a sync
+    /// that stops part way leaves every completed file in its final state and a rerun skips
+    /// it. hakchi2 CE runs the same `touch` lines in one script after all uploads.
+    pub fn touch(path: &str, mtime: i64) -> String {
+        format!(
+            "touch -m -t {} {}",
+            super::format_touch_time(mtime),
+            super::sh_quote(path)
+        )
+    }
     /// Name of the link script.
     pub const LINK_SCRIPT: &str = "linkgamessync.sh";
     /// A file is uploaded under its name plus this suffix and renamed when complete, so an
@@ -630,20 +638,6 @@ impl SyncPlan {
         script
     }
 
-    /// The script setting the uploaded files' modification times (hakchi2 CE's `modtime.sh`),
-    /// so the next diff recognises them.
-    pub fn modtime_script(&self) -> String {
-        let mut script = format!("#!/bin/sh\ncd \"{}\"\n", self.paths.upload_path());
-        for file in &self.uploads {
-            script.push_str(&format!(
-                "touch -m -t {} {}\n",
-                format_touch_time(file.mtime),
-                sh_quote(&file.path)
-            ));
-        }
-        script
-    }
-
     /// The `cfg_` assignments for `hakchi eval`.
     pub fn config_script(&self) -> String {
         self.config
@@ -757,7 +751,9 @@ pub trait Transport: Send + Sync {
     ) -> impl Future<Output = Result<ExecOutput>> + Send + 'a;
 
     /// Creates `directories` (parents first; existing ones are fine) and stores `files` under
-    /// `upload_path`, reporting progress. Returns the bytes sent.
+    /// `upload_path`, reporting progress. Each file is complete, under its final name and
+    /// with its modification time set before the next one starts, so that an interrupted
+    /// run can be resumed. Returns the bytes sent.
     fn upload<'a>(
         &'a self,
         upload_path: &'a str,
@@ -803,6 +799,8 @@ impl Transport for Session {
                     Source::Bytes(bytes) => ftp.upload(&part, bytes, |p| report(p.done)).await?,
                 };
                 ftp.rename(&part, &remote).await?;
+                let touch = commands::touch(&remote, file.mtime);
+                Shell::exec(self, &touch, None).await?.checked(&touch)?;
                 overall_done += sent;
             }
             if let Err(error) = ftp.quit().await {
@@ -954,12 +952,6 @@ async fn sync_steps<T: Transport>(
             .upload(&upload_path, &directories, &plan.uploads, progress)
             .await?;
         report.uploaded_files = plan.uploads.len();
-        run_script(
-            target,
-            commands::MODTIME_SCRIPT,
-            plan.modtime_script().as_bytes(),
-        )
-        .await?;
     }
 
     step(
@@ -1531,9 +1523,20 @@ mod tests {
         assert!(script.contains("rm './.storage/CLV-U-ZJSQU/metadata.json'\n"));
         assert!(script.contains("rm './000/CLV-P-SAA00/autoplay'\n"));
         assert!(script.contains("rmdir './000/CLV-P-SADJE'\n"));
-        let modtime = plan.modtime_script();
-        assert!(modtime.contains("touch -m -t "));
-        assert!(modtime.contains(" './000/CLV-S-00001/CLV-S-00001.desktop'\n"));
+        let desktop = plan
+            .uploads
+            .iter()
+            .find(|f| f.path.ends_with("CLV-S-00001.desktop"))
+            .expect("desktop entry");
+        let touch = commands::touch(
+            &desktop.remote_path(&plan.paths.upload_path()),
+            desktop.mtime,
+        );
+        assert!(touch.starts_with("touch -m -t "));
+        assert!(
+            touch
+                .ends_with(" '/var/lib/hakchi/games/snes-eur/000/CLV-S-00001/CLV-S-00001.desktop'")
+        );
         let dirs = plan.directories();
         assert_eq!(dirs[0], "/var/lib/hakchi/games/snes-eur/.storage");
         assert!(dirs.contains(&"/var/lib/hakchi/games/snes-eur/000/CLV-S-00001".to_string()));
@@ -1814,7 +1817,6 @@ mod tests {
         );
         assert_eq!(expected.uploads.len(), collection.files.len() - 1);
         let cleanup = expected.cleanup_script();
-        let modtime = expected.modtime_script();
         let up = "/var/lib/hakchi/games/snes-eur";
         let shell = Scripted::new(vec![
             ("which tiny7zx", None, ok("/bin/tiny7zx\n")),
@@ -1829,9 +1831,6 @@ mod tests {
             ("cat > /tmp/cleanup.sh", Some(cleanup.as_bytes()), ok("")),
             ("chmod +x /tmp/cleanup.sh && /tmp/cleanup.sh", None, ok("")),
             ("rm /tmp/cleanup.sh", None, ok("")),
-            ("cat > /tmp/modtime.sh", Some(modtime.as_bytes()), ok("")),
-            ("chmod +x /tmp/modtime.sh && /tmp/modtime.sh", None, ok("")),
-            ("rm /tmp/modtime.sh", None, ok("")),
             (
                 "cat > /tmp/linkgamessync.sh",
                 Some(collection.link_script.as_bytes()),

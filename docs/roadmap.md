@@ -12,5 +12,8 @@ Next, in order:
 2. macOS run on hardware (the universal build comes from the release workflow).
 3. Windows run on hardware, with the WinUSB (Zadig) and RNDIS driver steps written up from
    a real machine.
-4. Signing and notarisation, once the builds are known to work.
-5. An update check against the GitHub releases.
+4. An update check against the GitHub releases.
+
+Not planned: code signing and notarisation. The builds stay unsigned by choice (no yearly
+Apple developer account or Windows certificate); the README explains the one-time warning
+on each desktop.

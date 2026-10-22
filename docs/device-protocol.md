@@ -28,9 +28,8 @@ kernel images; `CLV-S-SNPY` verified on a European SNES Classic Mini):
 The Shonen Jump edition reports as a Famicom Mini, which it is in a different shell. In FEL
 mode no model is reported at all: the boot ROM is the same chip in every console.
 
-The Mega Drive Mini is recognised by its system code but not supported: it uses another
-emulator and menu format and is served by Project Lunar. Cartload says so when one is
-connected and starts no flow or sync on it.
+Cartload does not support the Mega Drive Mini. It is recognised by its system code only so
+that the app can say so when one is connected; no flow or sync starts on it.
 
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.
