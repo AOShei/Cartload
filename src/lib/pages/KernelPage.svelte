@@ -793,7 +793,6 @@
     max-width: 240px;
   }
 
-  .model-pick + .spacer,
   .row:has(.model-pick) {
     flex-wrap: wrap;
   }
