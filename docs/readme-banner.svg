@@ -42,7 +42,7 @@
 
   <!-- the line -->
   <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
-    <text x="320" y="232" font-size="26" fill="#d9d5ce">Install hakchi. Manage your games. Sync.</text>
+    <text x="320" y="232" font-size="26" fill="#d9d5ce">Install hakchi. Manage your games.</text>
     <text x="320" y="268" font-size="18" fill="#a8a298">For the NES, SNES and Famicom Classic Mini consoles.</text>
     <g font-size="13" font-weight="600" fill="#b8b0ff">
       <rect x="320" y="296" width="120" height="30" rx="15" fill="#2b284a"/>
