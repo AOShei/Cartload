@@ -622,3 +622,45 @@ export function previewSync(): { plan: SyncPlanView | null; snapshot: SyncSnapsh
 export function previewDialog(): string | null {
   return typeof location !== "undefined" ? new URLSearchParams(location.search).get("dialog") : null;
 }
+
+/* Import fixtures: `?import=running|done` shows the import strip (and its report). */
+import type { ImportEvent, ImportReport } from "../api/types";
+
+function importFile(index: number, total: number, name: string, outcome: ImportEvent["outcome"]): ImportEvent {
+  return { index, total, path: `/home/user/roms/${name}`, outcome };
+}
+
+function importedGame(name: string, code: string, extra: Partial<{ matched: boolean; warnings: string[]; notes: string[] }> = {}) {
+  return { code, name, system: "SNES", matched: true, replaced: false, warnings: [], notes: [], ...extra };
+}
+
+/** The import fixture named by `?import=`, or none. */
+export function previewImport(): { files: ImportEvent[]; report: ImportReport | null; importing: boolean } | null {
+  const name = typeof location !== "undefined" ? new URLSearchParams(location.search).get("import") : null;
+  if (!name) {
+    return null;
+  }
+  const total = 8;
+  const files: ImportEvent[] = [
+    importFile(0, total, "Final Fantasy III.smc", { state: "imported", games: [importedGame("Final Fantasy III", "CLV-U-MXZET")] }),
+    importFile(1, total, "Final Fantasy IV - 10th Anniversary Edition.smc", {
+      state: "imported",
+      games: [importedGame("Final Fantasy IV - 10th Anniversary Edition", "CLV-U-AVMNR", { matched: false, notes: ["removed a 512-byte copier header"] })],
+    }),
+    importFile(2, total, "Illusion of Gaia.sfc", {
+      state: "imported",
+      games: [importedGame("Illusion of Gaia", "CLV-U-WIWSJ", { warnings: ["\"ILLUSION OF GAIA USA\" is on hakchi2 CE's list of games that do not run well on the stock emulator"] })],
+    }),
+    importFile(3, total, "notes.txt", { state: "skipped", reason: "not a ROM file" }),
+    importFile(4, total, "Broken.sfc", { state: "failed", error: "the file is 37 bytes, too small for a SNES ROM" }),
+    importFile(5, total, "Frogger.smc", { state: "imported", games: [importedGame("Frogger", "CLV-U-CTCLM")] }),
+  ];
+  if (name === "running") {
+    files.push(importFile(6, total, "Gradius III.smc", null));
+    return { files, report: null, importing: true };
+  }
+  files.push(importFile(6, total, "Gradius III.smc", { state: "imported", games: [importedGame("Gradius III", "CLV-U-FBUON")] }));
+  files.push(importFile(7, total, "Harvest Moon.smc", { state: "imported", games: [importedGame("Harvest Moon", "CLV-U-CEGWS")] }));
+  const report: ImportReport = { files, imported: 6, unmatched: 1, failed: 1, skipped: 1, codes: [] };
+  return { files, report, importing: false };
+}

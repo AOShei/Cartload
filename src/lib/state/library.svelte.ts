@@ -28,7 +28,7 @@ import type {
   MenuView,
   LibraryView,
 } from "../api/types";
-import { previewLibrary } from "../dev/preview";
+import { previewLibrary, previewImport } from "../dev/preview";
 import { navigation } from "./navigation.svelte";
 import { toasts } from "./toasts.svelte";
 
@@ -267,6 +267,13 @@ class LibraryStore {
         if (entriesAt(fixture.menu.entries, path)) {
           this.folder = path;
         }
+      }
+      const imported = previewImport();
+      if (imported) {
+        this.importFiles = imported.files;
+        this.importReport = imported.report;
+        this.importing = imported.importing;
+        this.importOpen = true;
       }
       // `?select=N` selects the first N games of that folder, to show the detail panel.
       const select = Number.parseInt(new URLSearchParams(location.search).get("select") ?? "", 10);

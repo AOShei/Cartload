@@ -225,8 +225,10 @@ pub struct Prepared {
     pub snes: Option<SnesInfo>,
     /// NES details, when the system is NES.
     pub nes: Option<NesInfo>,
-    /// Things the user should know (unsupported mapper, known problem game, ...).
+    /// Things that may go wrong on the console (unsupported mapper, known problem game, ...).
     pub warnings: Vec<String>,
+    /// Things that were done and are fine (a copier header removed, ...).
+    pub notes: Vec<String>,
 }
 
 impl Prepared {
@@ -267,11 +269,13 @@ fn prepare_snes(file_name: &str, mut data: Vec<u8>) -> Result<Prepared> {
             save_count: 0,
             snes: None,
             nes: None,
-            warnings: vec!["already an .sfrom file; stored unchanged".to_string()],
+            warnings: Vec::new(),
+            notes: vec!["already an .sfrom file; stored unchanged".to_string()],
             data,
         });
     }
     let mut warnings = Vec::new();
+    let mut notes = Vec::new();
     if !data.len().is_multiple_of(1024) {
         if data.len() < 512 {
             return Err(Error::InvalidRom {
@@ -280,7 +284,7 @@ fn prepare_snes(file_name: &str, mut data: Vec<u8>) -> Result<Prepared> {
             });
         }
         data.drain(..512);
-        warnings.push("removed a 512-byte copier header".to_string());
+        notes.push("removed a 512-byte copier header".to_string());
     }
     let crc = crc32(&data);
     let (sfrom, info) = snes::make_sfrom(&data).map_err(|reason| Error::InvalidRom {
@@ -303,6 +307,7 @@ fn prepare_snes(file_name: &str, mut data: Vec<u8>) -> Result<Prepared> {
         snes: Some(info),
         nes: None,
         warnings,
+        notes,
     })
 }
 
@@ -351,6 +356,7 @@ fn prepare_nes(file_name: &str, data: Vec<u8>) -> Result<Prepared> {
             pal: header.pal,
         }),
         warnings,
+        notes: Vec::new(),
     })
 }
 
@@ -1203,15 +1209,12 @@ pub(crate) mod tests {
         assert_eq!(prepared.code(), codes::game_code(crc32(&rom), 'U'));
         assert_eq!(prepared.save_count, 3);
         assert_eq!(prepared.data.len(), rom.len() + 96);
-        assert!(
-            prepared
-                .warnings
-                .iter()
-                .any(|w| w.contains("copier header"))
-        );
+        assert!(prepared.warnings.is_empty());
+        assert!(prepared.notes.iter().any(|n| n.contains("copier header")));
 
         let plain = prepare("game.sfc", rom.clone()).unwrap();
         assert!(plain.warnings.is_empty());
+        assert!(plain.notes.is_empty());
         assert_eq!(plain.data, prepared.data);
     }
 

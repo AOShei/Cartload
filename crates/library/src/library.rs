@@ -84,8 +84,10 @@ pub struct Imported {
     pub matched: bool,
     /// Whether a game with the same code existed and was replaced.
     pub replaced: bool,
-    /// Things the user should know.
+    /// Things that may go wrong on the console.
     pub warnings: Vec<String>,
+    /// Things that were done and are fine.
+    pub notes: Vec<String>,
 }
 
 /// A file of a game as it will be uploaded.
@@ -409,6 +411,7 @@ impl Library {
             matched: record.is_some(),
             replaced,
             warnings: prepared.warnings,
+            notes: prepared.notes,
         })
     }
 

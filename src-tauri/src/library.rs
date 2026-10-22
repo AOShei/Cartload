@@ -115,8 +115,10 @@ pub struct ImportedGame {
     pub matched: bool,
     /// Whether the game replaced one with the same code.
     pub replaced: bool,
-    /// Things worth knowing.
+    /// Things that may go wrong on the console.
     pub warnings: Vec<String>,
+    /// Things that were done and are fine.
+    pub notes: Vec<String>,
 }
 
 /// What became of one file.
@@ -853,6 +855,7 @@ impl LibraryState {
                                 matched: i.matched,
                                 replaced: i.replaced,
                                 warnings: i.warnings,
+                                notes: i.notes,
                             })
                             .collect();
                         report.imported += games.len();

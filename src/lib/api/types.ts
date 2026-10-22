@@ -362,6 +362,7 @@ export interface ImportedGame {
   matched: boolean;
   replaced: boolean;
   warnings: string[];
+  notes: string[];
 }
 
 export type ImportOutcome =
