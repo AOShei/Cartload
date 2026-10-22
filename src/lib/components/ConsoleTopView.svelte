@@ -162,8 +162,8 @@
     <rect class="nes-top" x="30" y="100" width="280" height="46" rx="3" />
     <!-- the front face cuts in at the sides; two small feet under it -->
     <path class="nes-face" d="M30 146h280l-12 48H42z" />
-    <rect x="58" y="194" width="22" height="5" rx="1" fill="#4a4a4e" />
-    <rect x="248" y="194" width="22" height="5" rx="1" fill="#4a4a4e" />
+    <rect x="42" y="194" width="34" height="5" rx="1" fill="#4a4a4e" />
+    <rect x="264" y="194" width="34" height="5" rx="1" fill="#4a4a4e" />
     <!-- the cartridge cover is the top edge itself, from the black band to the left -->
     <rect x="64" y="100" width="162" height="40" rx="2" fill="#e3e3e3" stroke="#c4c4c4" />
     <!-- the black band runs from the top edge to the bottom -->
