@@ -39,25 +39,32 @@
       preferences.setConsoleModel(previewModel);
     }
   });
-  $effect(() => {
+  /** The model the connected console reports, when it does. */
+  const detectedModel = $derived.by((): string | null => {
     if (!status) {
-      return;
+      return null;
     }
-    const detected =
-      status.state === "connected" && isKnownModel(status.info.console)
-        ? status.info.console
-        : status.state === "fel"
-          ? modelFromProduct(status.device.product)
-          : null;
-    if (detected) {
-      preferences.setConsoleModel(detected);
+    if (status.state === "connected" && isKnownModel(status.info.console)) {
+      return status.info.console;
+    }
+    if (status.state === "fel") {
+      return modelFromProduct(status.device.product);
+    }
+    return null;
+  });
+  /* The drawing switches to the detected model whenever the page is opened and whenever the
+     detection changes; the choice stays free in between, as a fallback for a wrong guess. */
+  onMount(() => {
+    if (detectedModel) {
+      preferences.setConsoleModel(detectedModel);
+    }
+  });
+  $effect(() => {
+    if (detectedModel) {
+      preferences.setConsoleModel(detectedModel);
     }
   });
   const consoleModel = $derived(isKnownModel(preferences.consoleModel) ? preferences.consoleModel : DEFAULT_MODEL);
-  const modelDetected = $derived(
-    (status?.state === "connected" && isKnownModel(status.info.console)) ||
-      (status?.state === "fel" && modelFromProduct(status.device.product) !== null),
-  );
   const snapshot = $derived(flowStore.snapshot);
   const running = $derived(flowStore.running);
   const pkg = $derived(packageStore.status?.package ?? null);
@@ -267,19 +274,23 @@
         <div class="row">
           <h2>Put the console in FEL mode</h2>
           <span class="spacer"></span>
-          <label class="model-pick">
-            <span class="muted">{modelDetected ? "Detected" : "Model"}</span>
-            <select
-              value={consoleModel}
-              disabled={modelDetected}
-              aria-label="Console model"
-              onchange={(e) => preferences.setConsoleModel(e.currentTarget.value)}
-            >
-              {#each CONSOLE_MODELS as m (m.id)}
-                <option value={m.id}>{m.label}</option>
-              {/each}
-            </select>
-          </label>
+          <div class="model-pick">
+            <label>
+              <span class="muted">Model</span>
+              <select
+                value={consoleModel}
+                aria-label="Console model"
+                onchange={(e) => preferences.setConsoleModel(e.currentTarget.value)}
+              >
+                {#each CONSOLE_MODELS as m (m.id)}
+                  <option value={m.id}>{m.label}</option>
+                {/each}
+              </select>
+            </label>
+            {#if detectedModel}
+              <span class="muted detected">Detected: {CONSOLE_MODELS.find((m) => m.id === detectedModel)?.label ?? detectedModel}</span>
+            {/if}
+          </div>
         </div>
         <div class="fel">
           <ConsoleTopView model={consoleModel} width={250} />
@@ -782,10 +793,21 @@
 
   .model-pick {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
     margin-left: auto;
     font-size: var(--text-md);
+  }
+
+  .model-pick label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .model-pick .detected {
+    font-size: var(--text-sm);
   }
 
   .model-pick select {
