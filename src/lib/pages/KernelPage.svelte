@@ -494,12 +494,12 @@
         </li>
         <li>
           <div class="tool-text">
-            <strong>Return to the original system</strong>
-            <span class="muted">Removes hakchi.</span>
+            <strong>Factory reset</strong>
+            <span class="muted">Remove hakchi, restore the console.</span>
           </div>
           <button type="button" class="btn" disabled={!canStart} onclick={() => (confirmUninstall = true)}>
             <Icon name="undo" size={16} />
-            Return…
+            Reset…
           </button>
         </li>
       </ul>
@@ -508,14 +508,14 @@
   </div>
 </div>
 
-<Dialog open={confirmUninstall} title="Return the console to its original system" width="520px" onclose={() => (confirmUninstall = false)}>
+<Dialog open={confirmUninstall} title="Factory reset" width="520px" onclose={() => (confirmUninstall = false)}>
   <p>
     This flashes the original kernel back and removes hakchi from the console. Games added
     with hakchi will no longer appear; the console's own games are untouched.
   </p>
   {#snippet actions()}
     <button type="button" class="btn btn-danger" onclick={() => void begin({ kind: "uninstall", stock_kernel: null, force_stock_kernel: false })}>
-      Return the console to its original system
+      Remove hakchi and restore the console
     </button>
     <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (confirmUninstall = false)}>Keep hakchi</button>
   {/snippet}
