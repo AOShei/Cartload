@@ -64,7 +64,7 @@
       case "famicom":
         return { x: 200, y: 214, w: 24, h: 24, from: "right" };
       default:
-        return { x: 194, y: 164, w: 34, h: 48, from: "right" };
+        return { x: 194, y: 178, w: 34, h: 36, from: "right" };
     }
   });
 
@@ -101,14 +101,14 @@
     <line class="sfc-tick" x1="214" y1="110" x2="214" y2="122" />
     <path d="M144 111h12l-6 7z" fill="#8e8f93" />
     <!-- power slide, eject, reset: one centred row -->
-    <rect class="sfc-dark" x="72" y="164" width="34" height="48" rx="5" />
-    <rect x="76" y="169" width="26" height="18" rx="3" fill="#6b6c70" />
-    <text class="lbl on-dark" x="89" y="228" text-anchor="middle">POWER</text>
-    <rect x="120" y="164" width="60" height="48" rx="6" fill="#a9aaad" stroke="#8a8b8f" />
-    <text class="lbl on-dark" x="150" y="228" text-anchor="middle">EJECT</text>
+    <rect class="sfc-dark" x="72" y="178" width="34" height="36" rx="5" />
+    <rect x="76" y="182" width="26" height="14" rx="3" fill="#6b6c70" />
+    <text class="lbl on-dark" x="89" y="230" text-anchor="middle">POWER</text>
+    <rect x="120" y="178" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f" />
+    <text class="lbl on-dark" x="150" y="230" text-anchor="middle">EJECT</text>
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="10" />
     <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="5" />
-    <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="228" text-anchor="middle">RESET</text>
+    <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="230" text-anchor="middle">RESET</text>
     <!-- the LED on the light front -->
     <rect x="214" y="274" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "snes-usa"}

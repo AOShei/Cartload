@@ -6,7 +6,7 @@
       <stop offset="0" stop-color="#6557de"/>
       <stop offset="1" stop-color="#4b3ec6"/>
     </linearGradient>
-    <clipPath id="frame"><rect width="1280" height="400" rx="24"/></clipPath>
+    <clipPath id="frame"><rect width="1280" height="400"/></clipPath>
   </defs>
 
   <!-- warm grey page with a soft card on the right -->
@@ -63,10 +63,10 @@
     <line x1="46" y1="82" x2="46" y2="94" stroke="#8e8f93" stroke-width="1.5"/>
     <line x1="174" y1="82" x2="174" y2="94" stroke="#8e8f93" stroke-width="1.5"/>
     <path d="M104 83h12l-6 7z" fill="#8e8f93"/>
-    <rect x="32" y="136" width="34" height="48" rx="5" fill="#44454a" stroke="#2f3034"/>
-    <rect x="36" y="141" width="26" height="18" rx="3" fill="#6b6c70"/>
-    <rect x="80" y="136" width="60" height="48" rx="6" fill="#a9aaad" stroke="#8a8b8f"/>
-    <rect x="154" y="136" width="34" height="48" rx="5" fill="#44454a" stroke="#2f3034"/>
+    <rect x="32" y="150" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
+    <rect x="36" y="154" width="26" height="14" rx="3" fill="#6b6c70"/>
+    <rect x="80" y="150" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f"/>
+    <rect x="154" y="150" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
     <rect x="174" y="246" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f"/>
   </g>
   <g transform="translate(1124 96)">
