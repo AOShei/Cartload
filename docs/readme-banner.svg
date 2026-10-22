@@ -54,8 +54,8 @@
     </g>
   </g>
 
-  <!-- the console, seen from above, with three game tiles -->
-  <g transform="translate(868 64)">
+  <!-- the console, seen from above -->
+  <g transform="translate(930 66)">
     <rect x="0" y="0" width="220" height="268" rx="20" fill="#d7d5d1" stroke="#8d8a85" stroke-width="1.5"/>
     <line x1="32" y1="9" x2="188" y2="9" stroke="#b9b7b3" stroke-width="3" stroke-dasharray="2 4"/>
     <rect x="12" y="20" width="196" height="208" rx="14" fill="#8e8f93" stroke="#6f7074"/>
@@ -69,13 +69,5 @@
     <rect x="80" y="162" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f"/>
     <rect x="154" y="162" width="34" height="36" rx="5" fill="#44454a" stroke="#2f3034"/>
     <rect x="174" y="246" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f"/>
-  </g>
-  <g transform="translate(1124 96)">
-    <rect x="0" y="0" width="92" height="82" rx="10" fill="#5546d4"/>
-    <rect x="0" y="100" width="92" height="82" rx="10" fill="#7a6ee3"/>
-    <rect x="0" y="200" width="92" height="82" rx="10" fill="#2b284a" stroke="#3d3a36"/>
-    <rect x="14" y="14" width="64" height="12" rx="6" fill="#ffffff" opacity="0.55"/>
-    <rect x="14" y="114" width="64" height="12" rx="6" fill="#ffffff" opacity="0.55"/>
-    <rect x="14" y="214" width="64" height="12" rx="6" fill="#9b90ff" opacity="0.45"/>
   </g>
 </svg>
