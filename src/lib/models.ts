@@ -23,9 +23,12 @@ export function isKnownModel(id: string | null | undefined): id is string {
 }
 
 /** The model behind the USB product string of a console in normal boot on stock firmware
- *  (the stock kernel's gadget driver carries one string per model). */
+ *  (the stock kernel's gadget driver carries one string per model). A string the table does
+ *  not know is taken to be a Mega Drive Mini, the one console not in that table; no string
+ *  at all (FEL mode) tells nothing. */
 export function modelFromProduct(product: string | null | undefined): string | null {
-  switch ((product ?? "").trim()) {
+  const text = (product ?? "").trim();
+  switch (text) {
     case "CLV-S-NESY":
       return "Nes";
     case "CLV-S-HVCY":
@@ -37,6 +40,6 @@ export function modelFromProduct(product: string | null | undefined): string | n
     case "CLV-S-SNSY":
       return "SnesUsa";
     default:
-      return null;
+      return text === "" ? null : "MdEur";
   }
 }

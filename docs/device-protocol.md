@@ -25,8 +25,9 @@ kernel images; `CLV-S-SNPY` verified on a European SNES Classic Mini):
 | `CLV-S-SNPY` | SNES Classic Mini, Europe |
 | `CLV-S-SNSY` | SNES Classic, North America |
 
-The Mega Drive Mini is not in that table. In FEL mode no model is reported at all: the boot
-ROM is the same chip in every console.
+The Mega Drive Mini is not in that table, so Cartload takes any other product string for a
+Mega Drive Mini, and the Shonen Jump edition for a Famicom Mini in a different shell. In FEL
+mode no model is reported at all: the boot ROM is the same chip in every console.
 
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.

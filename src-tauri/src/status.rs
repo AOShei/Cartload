@@ -401,8 +401,13 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
     // The USB manufacturer string is not shown: the app names consoles by model only.
     if let Some(product) = &device.product {
         details.push(Detail::new("Product", product.clone()));
-        if let Some(model) = cartload_console::ConsoleType::from_usb_product(product) {
-            details.push(Detail::new("Model", model.to_string()));
+        match cartload_console::ConsoleType::from_usb_product(product) {
+            Some(model) => details.push(Detail::new("Model", model.to_string())),
+            // The Mega Drive Mini is the one console whose string the table does not hold.
+            None if !product.trim().is_empty() => {
+                details.push(Detail::new("Model", "Mega Drive Mini (assumed)".to_string()));
+            }
+            None => {}
         }
     }
     match check {
