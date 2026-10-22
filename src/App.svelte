@@ -50,10 +50,6 @@
   <Sidebar />
   <div class="column">
     <main>
-      <header class="page-header">
-        <h2 class="caps">{navigation.current.label}</h2>
-        <p class="muted">{navigation.current.hint}</p>
-      </header>
       {#key navigation.page}
         <div class="page" in:fly={{ y: 6, duration: ms(NORMAL), easing: cubicOut }}>
           {#if navigation.page === "console"}
@@ -111,17 +107,6 @@
     overflow: hidden;
   }
 
-  .page-header {
-    flex: none;
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
-  }
-
-  .page-header p {
-    font-size: var(--text-md);
-  }
 
   .page {
     flex: 1;

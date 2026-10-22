@@ -6,7 +6,7 @@ export interface PageDef {
   id: PageId;
   label: string;
   icon: IconName;
-  /** One line shown under the page title. */
+  /** One line about the page, shown as the sidebar item's tooltip. */
   hint: string;
 }
 

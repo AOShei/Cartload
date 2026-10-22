@@ -57,7 +57,7 @@
           class:active={page.id === navigation.page}
           aria-current={page.id === navigation.page ? "page" : undefined}
           aria-label={page.label}
-          title={`${page.label} (Ctrl+${i + 1})`}
+          title={`${page.hint} (Ctrl+${i + 1})`}
           bind:this={buttons[i]}
           onclick={() => select(page.id)}
           onkeydown={onkeydown}
