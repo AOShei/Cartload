@@ -181,7 +181,7 @@
     {/each}
     <rect x="36" y="46" width="22" height="150" rx="4" fill="#b8382f" stroke="#8f2a23" />
     <rect x="242" y="46" width="22" height="150" rx="4" fill="#b8382f" stroke="#8f2a23" />
-    <rect x="66" y="78" width="168" height="40" rx="3" fill="#a3272a" stroke="#7d1c1f" />
+    <rect x="66" y="92" width="168" height="40" rx="3" fill="#a3272a" stroke="#7d1c1f" />
     <!-- eject slider on its raised block -->
     <rect x="118" y="153" width="64" height="76" rx="4" fill="#e6dcc7" stroke="#c8bca5" />
     <rect x="146" y="165" width="8" height="52" rx="3" fill="#d6cdb9" stroke="#b7ab94" />
