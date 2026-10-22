@@ -68,7 +68,7 @@
       case "md":
         return { x: 212, y: 86, w: 30, h: 16, from: "right" as const };
       default:
-        return { x: 192, y: 156, w: 28, h: 38, from: "right" as const };
+        return { x: 194, y: 150, w: 34, h: 46, from: "right" as const };
     }
   });
 
@@ -92,30 +92,29 @@
   aria-label="{caption} seen from above. The Reset control is highlighted: hold it while switching Power on."
 >
   {#if shape === "sfc"}
-    <!-- SNES Classic Mini (Europe) / Super Famicom Mini: light grey body, a dark grey plate
-         with the four-colour mark, the slot with its centre notch, then Power, Eject and
-         Reset in a row; the LED on the light front. No marks or lettering: the drawing is a
-         guide to the controls, not a reproduction. -->
+    <!-- SNES Classic Mini (Europe) / Super Famicom Mini: light grey body, a dark grey
+         rounded plate, the wide slot with its centre notch, then Power, Eject and Reset in
+         one centred row; the LED on the light front. No marks or lettering: the drawing is
+         a guide to the controls, not a reproduction. -->
     <rect class="sfc-body" x="40" y="28" width="220" height="268" rx="20" />
     <line class="vents" x1="72" y1="37" x2="228" y2="37" />
-    <path class="sfc-plate" d="M68 48h164q14 0 14 14v134l-14 30H68l-14-30V62q0-14 14-14z" />
-    <rect class="sfc-dark" x="96" y="116" width="108" height="16" rx="5" />
-    <line class="sfc-tick" x1="106" y1="120" x2="106" y2="128" />
-    <line class="sfc-tick" x1="194" y1="120" x2="194" y2="128" />
-    <path d="M146 120h8l-4 5z" fill="#8e8f93" />
-    <!-- power slide -->
-    <rect class="sfc-dark" x="96" y="156" width="28" height="38" rx="4" />
-    <rect x="100" y="160" width="20" height="16" rx="3" fill="#6b6c70" />
-    <text class="lbl on-dark" x="110" y="206" text-anchor="middle">POWER</text>
-    <!-- eject -->
-    <rect x="134" y="156" width="48" height="38" rx="5" fill="#a9aaad" stroke="#8a8b8f" />
-    <text class="lbl on-dark" x="158" y="206" text-anchor="middle">EJECT</text>
-    <!-- reset -->
-    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="8" />
-    <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="4" />
-    <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="206" text-anchor="middle">RESET</text>
-    <!-- front -->
-    <rect x="214" y="258" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
+    <rect class="sfc-plate" x="52" y="48" width="196" height="176" rx="14" />
+    <!-- cartridge slot, centred, with the end marks and the centre notch -->
+    <rect class="sfc-dark" x="84" y="100" width="132" height="22" rx="7" />
+    <line class="sfc-tick" x1="98" y1="105" x2="98" y2="117" />
+    <line class="sfc-tick" x1="202" y1="105" x2="202" y2="117" />
+    <path d="M144 106h12l-6 7z" fill="#8e8f93" />
+    <!-- power slide, eject, reset: one centred row -->
+    <rect class="sfc-dark" x="72" y="150" width="34" height="46" rx="5" />
+    <rect x="76" y="155" width="26" height="18" rx="3" fill="#6b6c70" />
+    <text class="lbl on-dark" x="89" y="211" text-anchor="middle">POWER</text>
+    <rect x="120" y="150" width="60" height="46" rx="6" fill="#a9aaad" stroke="#8a8b8f" />
+    <text class="lbl on-dark" x="150" y="211" text-anchor="middle">EJECT</text>
+    <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="10" />
+    <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="5" />
+    <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y="211" text-anchor="middle">RESET</text>
+    <!-- the LED on the light front -->
+    <rect x="214" y="262" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "snes-usa"}
     <!-- SNES Classic (North America): a boxy grey body, the raised deck with the slot and the
          purple eject button, Power and Reset as purple slide switches at the front left. -->
