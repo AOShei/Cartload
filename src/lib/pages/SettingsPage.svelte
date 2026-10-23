@@ -205,8 +205,9 @@
         <span>Show details</span>
       </label>
     </div>
+    <p class="muted small">Cartload keeps a log of what it does with the console. Diagnostics bundle that log with your system details for a bug report; they never include your TheGamesDB key.</p>
     <div class="actions">
-      <button type="button" class="btn" onclick={() => void copyDiagnostics()} disabled={diagnosticsBusy || !inTauri} title="For a bug report. Never includes your TheGamesDB key.">
+      <button type="button" class="btn" onclick={() => void copyDiagnostics()} disabled={diagnosticsBusy || !inTauri}>
         {#if diagnosticsBusy}<span class="spinner" aria-hidden="true"></span>{/if}
         Copy diagnostics
       </button>
@@ -230,8 +231,9 @@
     </section>
   {/if}
 
-  <section class="card" aria-labelledby="modules-heading">
+  <section class="card grow" aria-labelledby="modules-heading">
     <h2 id="modules-heading">Emulators</h2>
+    <p class="muted small">RetroArch and its cores install into hakchi's storage on the console. The built-in emulators and the menu stay untouched.</p>
     {#if modulesStore.status}
       <ul class="modules">
         {#each modulesStore.status.modules as module (module.id)}
@@ -267,16 +269,17 @@
     {:else}
       <p class="muted"><span class="spinner" aria-hidden="true"></span> Reading the modules…</p>
     {/if}
+    <p class="muted small foot">Modules come from KMFDManic's Mod Hub. Installing needs a connected console running hakchi and reboots it once.</p>
   </section>
   </div>
 
   <div class="column">
-  <section class="card about" aria-labelledby="about-heading" bind:this={about} tabindex="-1">
+  <section class="card about grow" aria-labelledby="about-heading" bind:this={about} tabindex="-1">
     <div class="identity">
-      <AppMark size={48} />
+      <AppMark size={64} />
       <div class="identity-text">
         <h2 id="about-heading" class="visually-hidden">About Cartload</h2>
-        <span class="wordmark"><Wordmark height={20} label="Cartload" /></span>
+        <span class="wordmark"><Wordmark height={26} label="Cartload" /></span>
         <p class="muted small">
           {#if app.version}
             Version <span class="num">{app.version.app}</span>{app.version.debug ? ", debug build" : ""} · GPL-3.0-or-later · <span class="mono">github.com/AOShei/Cartload</span>
@@ -297,7 +300,7 @@
         </li>
       {/each}
     </ul>
-    <p class="muted small">Made with Tauri, Rust and Svelte. A from-scratch implementation; shares no code with hakchi2 CE.</p>
+    <p class="muted small foot">Made with Tauri, Rust and Svelte. A from-scratch implementation; shares no code with hakchi2 CE.</p>
   </section>
 
   <section class="card" aria-labelledby="library-heading">
@@ -400,18 +403,23 @@
       overflow: hidden;
     }
 
+    /* Both columns fill the page height, so their last cards end on the same line. */
     .column {
-      max-height: 100%;
+      height: 100%;
       overflow: auto;
+    }
+
+    .grow {
+      flex: 1 0 auto;
     }
 
   }
 
   .card {
-    padding: var(--space-3) var(--space-5);
+    padding: var(--space-4) var(--space-5);
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-3);
   }
 
   /* A heading with its control on the same line. */
@@ -542,10 +550,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-  }
-
-  .modules {
-    gap: var(--space-2) !important;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
   }
 
   .module-text {
@@ -570,6 +576,13 @@
 
   .key input {
     flex: 1;
+  }
+
+  /* Sits at the bottom of a card that grows to fill its column. */
+  .foot {
+    margin-top: auto;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
   }
 
   .about:focus-visible {
@@ -598,7 +611,12 @@
     padding-left: 20px;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-3);
+    line-height: 1.5;
+  }
+
+  .credits .mono {
+    display: block;
   }
 
   .credits .mono {
