@@ -282,7 +282,7 @@
         <label>
           <span>Emulator</span>
           <select value={usesRetroarch(form.args) ? "retroarch" : "builtin"} onchange={(e) => { if (form) form.args = withEmulator(form.args, e.currentTarget.value === "retroarch"); }}>
-            <option value="builtin">{game.system_name === "NES" ? "The console's own NES emulator" : "The console's own SNES emulator"}</option>
+            <option value="builtin">Built-in Emulator</option>
             <option value="retroarch">RetroArch ({game.system_name === "NES" ? "FCEUmm core" : "Snes9x core"})</option>
           </select>
         </label>
@@ -441,7 +441,7 @@
             <span>Emulator</span>
             <select onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; if (v) void applyEmulator(v === "retroarch"); }} disabled={libraryStore.saving}>
               <option value="">Choose for {selectedGames.length} games…</option>
-              <option value="builtin">The console's own emulator</option>
+              <option value="builtin">Built-in Emulator</option>
               <option value="retroarch">RetroArch</option>
             </select>
           </label>
