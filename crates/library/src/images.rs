@@ -254,63 +254,8 @@ pub fn render(width: u32, height: u32, pixel: impl Fn(u32, u32) -> Rgb) -> Resul
     Ok(out)
 }
 
-/// A symbol drawn on a folder tile, in the border colour.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Glyph {
-    /// Nothing.
-    None,
-    /// An arrow pointing left: "back".
-    BackArrow,
-    /// A house: "home".
-    House,
-}
-
-/// Whether the pixel at (`x`, `y`) of a `width`×`height` tile is part of the glyph. The
-/// shapes are a few inequalities so they scale from the 40 px thumbnail to the 228 px icon
-/// without a font.
-fn glyph_covers(glyph: Glyph, width: u32, height: u32, x: u32, y: u32) -> bool {
-    let (w, h) = (f64::from(width), f64::from(height));
-    let (cx, cy) = (w / 2.0, h / 2.0);
-    let (px, py) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
-    match glyph {
-        Glyph::None => false,
-        Glyph::BackArrow => {
-            // Shaft: a bar across the middle; head: a triangle on the left.
-            let half_shaft = h * 0.07;
-            let shaft = px >= w * 0.28 && px <= w * 0.72 && (py - cy).abs() <= half_shaft;
-            let head_tip = w * 0.22;
-            let head_base = w * 0.46;
-            let head_half = h * 0.2;
-            let head = px >= head_tip
-                && px <= head_base
-                && (py - cy).abs() <= head_half * (px - head_tip) / (head_base - head_tip);
-            shaft || head
-        }
-        Glyph::House => {
-            // Roof: a triangle; walls: a block below it with a door cut out.
-            let roof_top = h * 0.24;
-            let roof_base = h * 0.5;
-            let roof_half = w * 0.26;
-            let roof = py >= roof_top
-                && py <= roof_base
-                && (px - cx).abs() <= roof_half * (py - roof_top) / (roof_base - roof_top);
-            let wall_half = w * 0.18;
-            let walls = py > roof_base && py <= h * 0.74 && (px - cx).abs() <= wall_half;
-            let door = py > h * 0.56 && (px - cx).abs() <= w * 0.05;
-            roof || (walls && !door)
-        }
-    }
-}
-
-/// A flat tile with a border, for folders a tab along the top edge, and an optional glyph.
-fn tile(
-    width: u32,
-    height: u32,
-    fill: Rgb,
-    border: Rgb,
-    tab: bool,
-    glyph: Glyph,
-) -> Result<Vec<u8>> {
+/// A flat tile with a border and, for folders, a tab along the top edge (placeholders).
+fn tile(width: u32, height: u32, fill: Rgb, border: Rgb, tab: bool) -> Result<Vec<u8>> {
     let border_px = (width / 38).max(1);
     let tab_height = height / 8;
     let tab_width = width * 2 / 5;
@@ -323,56 +268,340 @@ fn tile(
         if tab && y < tab_height + border_px && x < tab_width {
             return border;
         }
-        if glyph_covers(glyph, width, height, x, y) {
-            return border;
-        }
         fill
     })
 }
 
-fn folder_glyph(image: &FolderImage) -> Glyph {
-    match image {
-        FolderImage::Back => Glyph::BackArrow,
-        FolderImage::Home => Glyph::House,
-        _ => Glyph::None,
+/* Folder tiles are pixel art: a 19×17 design drawn at 12× for the 228×204 icon and at 2×,
+centred, for the 40×40 thumbnail. Whole-number scaling keeps every edge a clean step, like
+the console's own menu art, instead of the ragged diagonals a resampled shape gets. */
+
+/// Width of a folder design, in design pixels (228 / 12).
+const DESIGN_WIDTH: usize = 19;
+/// Height of a folder design, in design pixels (204 / 12).
+const DESIGN_HEIGHT: usize = 17;
+/// Design pixels to image pixels for the icon.
+const ICON_SCALE: u32 = 12;
+/// Design pixels to image pixels for the thumbnail.
+const THUMB_SCALE: u32 = 2;
+
+/// The four colours of a folder tile.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Palette {
+    /// The tile behind the drawing.
+    background: Rgb,
+    /// Dark outline and shadow.
+    outline: Rgb,
+    /// The drawing's main colour.
+    fill: Rgb,
+    /// Highlights.
+    light: Rgb,
+}
+
+fn folder_palette(image: &FolderImage) -> Palette {
+    let (background, outline, fill, light) = match image {
+        FolderImage::Folder | FolderImage::Custom(_) => (
+            Rgb(0x2c, 0x3e, 0x66),
+            Rgb(0x12, 0x1a, 0x30),
+            Rgb(0xe8, 0xb9, 0x4a),
+            Rgb(0xf8, 0xe0, 0x9a),
+        ),
+        FolderImage::Back => (
+            Rgb(0x3a, 0x3a, 0x42),
+            Rgb(0x16, 0x16, 0x1c),
+            Rgb(0xd8, 0xd8, 0xe0),
+            Rgb(0xff, 0xff, 0xff),
+        ),
+        FolderImage::Home => (
+            Rgb(0x25, 0x5a, 0x44),
+            Rgb(0x0e, 0x26, 0x1c),
+            Rgb(0xe6, 0xe2, 0xcc),
+            Rgb(0xff, 0xfb, 0xe8),
+        ),
+        FolderImage::Number => (
+            Rgb(0x56, 0x34, 0x6e),
+            Rgb(0x22, 0x12, 0x2e),
+            Rgb(0xf0, 0xe0, 0xf8),
+            Rgb(0xff, 0xff, 0xff),
+        ),
+        FolderImage::Letter(_) => (
+            Rgb(0x7a, 0x3e, 0x2a),
+            Rgb(0x30, 0x14, 0x0c),
+            Rgb(0xf6, 0xe4, 0xc8),
+            Rgb(0xff, 0xff, 0xff),
+        ),
+    };
+    Palette {
+        background,
+        outline,
+        fill,
+        light,
     }
 }
 
-fn folder_colours(image: &FolderImage) -> (Rgb, Rgb) {
-    match image {
-        FolderImage::Folder => (Rgb(0x3b, 0x5b, 0x8c), Rgb(0xd7, 0xe0, 0xf0)),
-        FolderImage::Back => (Rgb(0x5a, 0x5a, 0x5a), Rgb(0xe6, 0xe6, 0xe6)),
-        FolderImage::Home => (Rgb(0x2f, 0x6b, 0x4f), Rgb(0xd5, 0xee, 0xdf)),
-        FolderImage::Number => (Rgb(0x7a, 0x4e, 0x8a), Rgb(0xec, 0xdc, 0xf2)),
-        FolderImage::Letter(_) => (Rgb(0x8a, 0x5a, 0x2b), Rgb(0xf2, 0xe4, 0xd2)),
-        FolderImage::Custom(_) => (Rgb(0x4e, 0x5a, 0x7a), Rgb(0xdc, 0xe2, 0xf2)),
+/// A classic folder: tab top left, body with a lighter band under the tab.
+const FOLDER_DESIGN: [&str; DESIGN_HEIGHT] = [
+    "...................",
+    "...................",
+    "..#######..........",
+    ".#ooooooo#.........",
+    ".#ooooooo#########.",
+    ".#+++++++++++++++#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#ooooooooooooooo#.",
+    ".#################.",
+    "...................",
+    "...................",
+];
+
+/// A chunky arrow pointing left: "back".
+const BACK_DESIGN: [&str; DESIGN_HEIGHT] = [
+    "...................",
+    "...................",
+    "...................",
+    ".......##..........",
+    "......#+#..........",
+    ".....#+o#..........",
+    "....#+oo##########.",
+    "...#+ooooooooooooo#",
+    "..#+oooooooooooooo#",
+    "...#oooooooooooooo#",
+    "....#ooo##########.",
+    ".....#oo#..........",
+    "......#o#..........",
+    ".......##..........",
+    "...................",
+    "...................",
+    "...................",
+];
+
+/// A house with a door: "home".
+const HOME_DESIGN: [&str; DESIGN_HEIGHT] = [
+    "...................",
+    "...................",
+    "........##.........",
+    ".......#++#........",
+    "......#+oo+#.......",
+    ".....#+oooo+#......",
+    "....#+oooooo+#.....",
+    "...#+oooooooo+#....",
+    "..####oooooo####...",
+    ".....#oooooo#......",
+    ".....#oo##oo#......",
+    ".....#oo#.#oo#.....",
+    ".....#oo#.#oo#.....",
+    ".....#oo#.#oo#.....",
+    ".....########......",
+    "...................",
+    "...................",
+];
+
+/// A 5×7 pixel font for the letter and number folders: A to Z, `#` and `?` for anything else.
+fn font_glyph(c: char) -> [&'static str; 7] {
+    match c.to_ascii_uppercase() {
+        'A' => [
+            ".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#",
+        ],
+        'B' => [
+            "####.", "#...#", "#...#", "####.", "#...#", "#...#", "####.",
+        ],
+        'C' => [
+            ".####", "#....", "#....", "#....", "#....", "#....", ".####",
+        ],
+        'D' => [
+            "####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####.",
+        ],
+        'E' => [
+            "#####", "#....", "#....", "####.", "#....", "#....", "#####",
+        ],
+        'F' => [
+            "#####", "#....", "#....", "####.", "#....", "#....", "#....",
+        ],
+        'G' => [
+            ".####", "#....", "#....", "#.###", "#...#", "#...#", ".####",
+        ],
+        'H' => [
+            "#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#",
+        ],
+        'I' => [
+            "#####", "..#..", "..#..", "..#..", "..#..", "..#..", "#####",
+        ],
+        'J' => [
+            "..###", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##..",
+        ],
+        'K' => [
+            "#...#", "#..#.", "#.#..", "##...", "#.#..", "#..#.", "#...#",
+        ],
+        'L' => [
+            "#....", "#....", "#....", "#....", "#....", "#....", "#####",
+        ],
+        'M' => [
+            "#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#",
+        ],
+        'N' => [
+            "#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#", "#...#",
+        ],
+        'O' => [
+            ".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###.",
+        ],
+        'P' => [
+            "####.", "#...#", "#...#", "####.", "#....", "#....", "#....",
+        ],
+        'Q' => [
+            ".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#",
+        ],
+        'R' => [
+            "####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#",
+        ],
+        'S' => [
+            ".####", "#....", "#....", ".###.", "....#", "....#", "####.",
+        ],
+        'T' => [
+            "#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#..",
+        ],
+        'U' => [
+            "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###.",
+        ],
+        'V' => [
+            "#...#", "#...#", "#...#", "#...#", "#...#", ".#.#.", "..#..",
+        ],
+        'W' => [
+            "#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#",
+        ],
+        'X' => [
+            "#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#",
+        ],
+        'Y' => [
+            "#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#..",
+        ],
+        'Z' => [
+            "#####", "....#", "...#.", "..#..", ".#...", "#....", "#####",
+        ],
+        '#' => [
+            ".#.#.", ".#.#.", "#####", ".#.#.", "#####", ".#.#.", ".#.#.",
+        ],
+        _ => [
+            ".###.", "#...#", "....#", "..##.", "..#..", ".....", "..#..",
+        ],
     }
+}
+
+/// A design pixel: which palette entry, or the background.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Ink {
+    Background,
+    Outline,
+    Fill,
+    Light,
+}
+
+fn ink(c: u8) -> Ink {
+    match c {
+        b'#' => Ink::Outline,
+        b'o' => Ink::Fill,
+        b'+' => Ink::Light,
+        _ => Ink::Background,
+    }
+}
+
+/// The 19×17 design of a folder image, as inks.
+fn folder_design(image: &FolderImage) -> Vec<[Ink; DESIGN_WIDTH]> {
+    let from_rows = |rows: [&str; DESIGN_HEIGHT]| {
+        rows.iter()
+            .map(|row| {
+                let mut out = [Ink::Background; DESIGN_WIDTH];
+                for (i, c) in row.bytes().enumerate().take(DESIGN_WIDTH) {
+                    out[i] = ink(c);
+                }
+                out
+            })
+            .collect::<Vec<_>>()
+    };
+    match image {
+        FolderImage::Folder | FolderImage::Custom(_) => from_rows(FOLDER_DESIGN),
+        FolderImage::Back => from_rows(BACK_DESIGN),
+        FolderImage::Home => from_rows(HOME_DESIGN),
+        FolderImage::Number => letter_design('#'),
+        FolderImage::Letter(c) => letter_design(*c),
+    }
+}
+
+/// A font glyph at 2× (10×14), centred, in the fill colour with a one-pixel outline shadow
+/// to the lower right.
+fn letter_design(c: char) -> Vec<[Ink; DESIGN_WIDTH]> {
+    let glyph = font_glyph(c);
+    let (x0, y0) = (4usize, 1usize);
+    let mut lit = vec![[false; DESIGN_WIDTH]; DESIGN_HEIGHT];
+    for (gy, row) in glyph.iter().enumerate() {
+        for (gx, cell) in row.bytes().enumerate() {
+            if cell == b'#' {
+                for dy in 0..2 {
+                    for dx in 0..2 {
+                        lit[y0 + gy * 2 + dy][x0 + gx * 2 + dx] = true;
+                    }
+                }
+            }
+        }
+    }
+    let mut design = vec![[Ink::Background; DESIGN_WIDTH]; DESIGN_HEIGHT];
+    for y in 0..DESIGN_HEIGHT {
+        for x in 0..DESIGN_WIDTH {
+            if lit[y][x] {
+                design[y][x] = Ink::Fill;
+            } else if x > 0 && y > 0 && lit[y - 1][x - 1] {
+                design[y][x] = Ink::Outline;
+            }
+        }
+    }
+    design
+}
+
+/// Draws a design scaled by `scale`, offset by (`dx`, `dy`), on a `width`×`height` tile.
+fn pixel_tile(
+    image: &FolderImage,
+    width: u32,
+    height: u32,
+    scale: u32,
+    dx: u32,
+    dy: u32,
+) -> Result<Vec<u8>> {
+    let palette = folder_palette(image);
+    let design = folder_design(image);
+    render(width, height, |x, y| {
+        let (Some(cx), Some(cy)) = (x.checked_sub(dx), y.checked_sub(dy)) else {
+            return palette.background;
+        };
+        let (col, row) = ((cx / scale) as usize, (cy / scale) as usize);
+        let ink = design
+            .get(row)
+            .and_then(|r| r.get(col))
+            .copied()
+            .unwrap_or(Ink::Background);
+        match ink {
+            Ink::Background => palette.background,
+            Ink::Outline => palette.outline,
+            Ink::Fill => palette.fill,
+            Ink::Light => palette.light,
+        }
+    })
 }
 
 /// The 228×204 icon of a folder.
 pub fn folder_icon(image: &FolderImage) -> Result<Vec<u8>> {
-    let (fill, border) = folder_colours(image);
-    tile(
-        COVER_WIDTH,
-        COVER_HEIGHT,
-        fill,
-        border,
-        true,
-        folder_glyph(image),
-    )
+    pixel_tile(image, COVER_WIDTH, COVER_HEIGHT, ICON_SCALE, 0, 0)
 }
 
-/// The 40×40 thumbnail of a folder.
+/// The 40×40 thumbnail of a folder: the design at 2× (38×34), centred.
 pub fn folder_thumbnail(image: &FolderImage) -> Result<Vec<u8>> {
-    let (fill, border) = folder_colours(image);
-    tile(
-        THUMB_SIZE,
-        THUMB_SIZE,
-        fill,
-        border,
-        true,
-        folder_glyph(image),
-    )
+    let dx = (THUMB_SIZE - DESIGN_WIDTH as u32 * THUMB_SCALE) / 2;
+    let dy = (THUMB_SIZE - DESIGN_HEIGHT as u32 * THUMB_SCALE) / 2;
+    pixel_tile(image, THUMB_SIZE, THUMB_SIZE, THUMB_SCALE, dx, dy)
 }
 
 fn system_colours(system: System) -> (Rgb, Rgb) {
@@ -386,13 +615,13 @@ fn system_colours(system: System) -> (Rgb, Rgb) {
 /// The 228×204 placeholder cover of a game without art.
 pub fn cover_placeholder(system: System) -> Result<Vec<u8>> {
     let (fill, border) = system_colours(system);
-    tile(COVER_WIDTH, COVER_HEIGHT, fill, border, false, Glyph::None)
+    tile(COVER_WIDTH, COVER_HEIGHT, fill, border, false)
 }
 
 /// The 40×40 placeholder thumbnail of a game without art.
 pub fn thumbnail_placeholder(system: System) -> Result<Vec<u8>> {
     let (fill, border) = system_colours(system);
-    tile(THUMB_SIZE, THUMB_SIZE, fill, border, false, Glyph::None)
+    tile(THUMB_SIZE, THUMB_SIZE, fill, border, false)
 }
 
 /// Reads the dimensions of a PNG file's header.
@@ -548,24 +777,37 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn back_and_home_tiles_carry_a_glyph() {
-        // The arrow's shaft crosses the middle of the back tile, in the border colour; a plain
-        // folder is fill colour there.
-        let (fill, border) = folder_colours(&FolderImage::Back);
-        assert!(glyph_covers(Glyph::BackArrow, 228, 204, 114, 102));
-        assert!(glyph_covers(Glyph::BackArrow, 40, 40, 20, 20));
-        assert!(!glyph_covers(Glyph::BackArrow, 228, 204, 114, 20));
-        assert!(glyph_covers(Glyph::House, 228, 204, 114, 90));
-        assert!(
-            !glyph_covers(Glyph::House, 228, 204, 114, 140),
-            "the door is cut out"
+    fn folder_designs_are_well_formed_and_distinct() {
+        for rows in [FOLDER_DESIGN, BACK_DESIGN, HOME_DESIGN] {
+            for row in rows {
+                assert_eq!(row.len(), DESIGN_WIDTH, "{row}");
+                assert!(row.bytes().all(|b| b".#o+".contains(&b)), "{row}");
+            }
+        }
+        for c in ('A'..='Z').chain(['#', '?']) {
+            for row in font_glyph(c) {
+                assert_eq!(row.len(), 5, "{c}: {row}");
+                assert!(row.bytes().all(|b| b".#".contains(&b)), "{c}: {row}");
+            }
+        }
+        let a = folder_icon(&FolderImage::Letter('A')).unwrap();
+        let b = folder_icon(&FolderImage::Letter('B')).unwrap();
+        let back = folder_icon(&FolderImage::Back).unwrap();
+        assert_ne!(a, b);
+        assert_ne!(back, folder_icon(&FolderImage::Home).unwrap());
+        assert_eq!(png_dimensions(&back), Some((COVER_WIDTH, COVER_HEIGHT)));
+        assert_eq!(
+            png_dimensions(&folder_thumbnail(&FolderImage::Back).unwrap()),
+            Some((THUMB_SIZE, THUMB_SIZE))
         );
-        assert!(!glyph_covers(Glyph::None, 228, 204, 114, 102));
-        assert_ne!(fill, border);
-        assert_ne!(
-            folder_thumbnail(&FolderImage::Back).unwrap(),
-            folder_thumbnail(&FolderImage::Home).unwrap()
-        );
+        // The arrow's tip is the outline colour at design cell (2, 8); the corner is background.
+        let design = folder_design(&FolderImage::Back);
+        assert_eq!(design[8][2], Ink::Outline);
+        assert_eq!(design[0][0], Ink::Background);
+        // A letter's shadow sits one cell right and below its strokes.
+        let letter = folder_design(&FolderImage::Letter('L'));
+        assert_eq!(letter[1][4], Ink::Fill);
+        assert!(letter.iter().flatten().any(|i| *i == Ink::Outline));
     }
 
     /// `cargo test -p cartload-library folder_tiles_to_disk -- --ignored` writes the folder
@@ -581,6 +823,10 @@ pub(crate) mod tests {
             ("back", FolderImage::Back),
             ("home", FolderImage::Home),
             ("letter", FolderImage::Letter('A')),
+            ("letter-m", FolderImage::Letter('M')),
+            ("letter-s", FolderImage::Letter('S')),
+            ("letter-q", FolderImage::Letter('Q')),
+            ("number", FolderImage::Number),
         ] {
             std::fs::write(
                 dir.join(format!("{name}.png")),
