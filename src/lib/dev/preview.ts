@@ -535,6 +535,8 @@ function previewPlan(changes: number): SyncPlanView {
     changes: changes === 0 ? 0 : uploads.length + 4,
     storage: { total: 369_737_728, used: 32_718_848, free: 325_582_848 },
     planned_at: Date.now(),
+    nes_via_retroarch: 0,
+    warnings: [],
   };
 }
 
@@ -560,6 +562,18 @@ export function previewSync(): { plan: SyncPlanView | null; snapshot: SyncSnapsh
       return { plan: previewPlan(3), snapshot: null, reviewing: false };
     case "review":
       return { plan: previewPlan(3), snapshot: null, reviewing: true };
+    case "warning":
+      return {
+        plan: {
+          ...previewPlan(3),
+          nes_via_retroarch: 2,
+          warnings: [
+            "2 NES games will not start: this console has no NES emulator of its own, and RetroArch with the fceumm core (hakchi2 CE's retroarch and fceumm modules) is not installed on it.",
+          ],
+        },
+        snapshot: null,
+        reviewing: false,
+      };
     case "uptodate":
       return { plan: previewPlan(0), snapshot: null, reviewing: false };
     case "running":

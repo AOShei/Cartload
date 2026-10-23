@@ -207,13 +207,16 @@
       <span class="caps">This library</span>
       <span class="num muted">{formatBytes(libSize)} · {libraryStore.gameCount} game{libraryStore.gameCount === 1 ? "" : "s"}</span>
     </div>
-    <div class="block pending" class:warn={plan !== null && !plan.fits}>
+    <div class="block pending" class:warn={plan !== null && (!plan.fits || plan.warnings.length > 0)}>
       <span class="caps">Changes</span>
       <span class="pending-text">
         {#if syncStore.planning && !plan}<span class="spinner spinner-sm" aria-hidden="true"></span>{/if}
         {#if plan && !plan.noop && plan.fits}
           <strong class="num">{plan.changes} change{plan.changes === 1 ? "" : "s"}</strong>
           <span class="muted">{pending}</span>
+          {#if plan.warnings.length > 0}
+            <span class="warning-text" title={plan.warnings.join("\n")}><Icon name="warning" size={14} /> {plan.warnings.length === 1 ? "1 warning" : `${plan.warnings.length} warnings`}</span>
+          {/if}
           {#if !running}
             <button type="button" class="btn btn-sm" onclick={() => (changesOpen = true)}>
               <Icon name="list" size={14} />
@@ -235,6 +238,16 @@
 {#if plan}
   <Dialog open={changesOpen} title="What the sync will change" width="760px" onclose={() => (changesOpen = false)}>
     <p class="muted num">{plan.games} games, {plan.originals} built in, {plan.folders} folders · {formatBytes(plan.total_size)} on the console · {plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} unchanged</p>
+    {#if plan.warnings.length > 0}
+      <ul class="warnings" aria-label="Warnings">
+        {#each plan.warnings as warning (warning)}
+          <li><Icon name="warning" size={16} /><span>{warning}</span></li>
+        {/each}
+      </ul>
+    {/if}
+    {#if plan.nes_via_retroarch > 0 && plan.warnings.length === 0}
+      <p class="muted">{plan.nes_via_retroarch} NES game{plan.nes_via_retroarch === 1 ? "" : "s"} will run through RetroArch: this console has no NES emulator of its own.</p>
+    {/if}
     {@render changeLists(plan, true)}
     {#snippet actions()}
       <button type="button" class="btn btn-primary" onclick={() => { changesOpen = false; syncStore.review(); }} disabled={!canSync || syncStore.reviewing}>
@@ -422,5 +435,36 @@
   .spinner.on-accent {
     border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
     border-top-color: var(--on-accent);
+  }
+  .warning-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--warn);
+    font-size: var(--text-sm);
+  }
+
+  .warnings {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    border: 1px solid var(--warn);
+    border-radius: var(--radius-s);
+    color: var(--text);
+  }
+
+  .warnings li {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+
+  .warnings :global(svg) {
+    flex: none;
+    color: var(--warn);
+    margin-top: 2px;
   }
 </style>

@@ -571,6 +571,7 @@ archive with the 4.2 MB `.sfrom` and the game must still start.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | OK (Chrono Trigger, code and .sfrom size as in the CE trace) | OK, read-only, 21 firmware entries cached | not run (user absent) | not run | the entries the plan generates have the sizes of CE's uploads |
 | 2026-10-21 | same console | OK, compressed: 2 850 539-byte .7z in 0.9 s; compress --off/on round-trips | OK, read-only: 31 uploads, 2 973 696 bytes total, CE's .7z at the same path replaced | not run (user absent) | not run | `which tiny7zx` on the console answers /bin/tiny7zx (read-only check) |
+| 2026-10-23 | same console | OK (a batch of SNES ROMs from the desktop app) | OK | OK: first sync from the app, games play on the console | not run | reported by the user; the back-link tile showed as a plain grey square, fixed the same day with an arrow glyph |
 
 ## Console page (desktop app)
 

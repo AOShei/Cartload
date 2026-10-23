@@ -254,8 +254,63 @@ pub fn render(width: u32, height: u32, pixel: impl Fn(u32, u32) -> Rgb) -> Resul
     Ok(out)
 }
 
-/// A flat tile with a border and, for folders, a tab along the top edge.
-fn tile(width: u32, height: u32, fill: Rgb, border: Rgb, tab: bool) -> Result<Vec<u8>> {
+/// A symbol drawn on a folder tile, in the border colour.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Glyph {
+    /// Nothing.
+    None,
+    /// An arrow pointing left: "back".
+    BackArrow,
+    /// A house: "home".
+    House,
+}
+
+/// Whether the pixel at (`x`, `y`) of a `width`×`height` tile is part of the glyph. The
+/// shapes are a few inequalities so they scale from the 40 px thumbnail to the 228 px icon
+/// without a font.
+fn glyph_covers(glyph: Glyph, width: u32, height: u32, x: u32, y: u32) -> bool {
+    let (w, h) = (f64::from(width), f64::from(height));
+    let (cx, cy) = (w / 2.0, h / 2.0);
+    let (px, py) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
+    match glyph {
+        Glyph::None => false,
+        Glyph::BackArrow => {
+            // Shaft: a bar across the middle; head: a triangle on the left.
+            let half_shaft = h * 0.07;
+            let shaft = px >= w * 0.28 && px <= w * 0.72 && (py - cy).abs() <= half_shaft;
+            let head_tip = w * 0.22;
+            let head_base = w * 0.46;
+            let head_half = h * 0.2;
+            let head = px >= head_tip
+                && px <= head_base
+                && (py - cy).abs() <= head_half * (px - head_tip) / (head_base - head_tip);
+            shaft || head
+        }
+        Glyph::House => {
+            // Roof: a triangle; walls: a block below it with a door cut out.
+            let roof_top = h * 0.24;
+            let roof_base = h * 0.5;
+            let roof_half = w * 0.26;
+            let roof = py >= roof_top
+                && py <= roof_base
+                && (px - cx).abs() <= roof_half * (py - roof_top) / (roof_base - roof_top);
+            let wall_half = w * 0.18;
+            let walls = py > roof_base && py <= h * 0.74 && (px - cx).abs() <= wall_half;
+            let door = py > h * 0.56 && (px - cx).abs() <= w * 0.05;
+            roof || (walls && !door)
+        }
+    }
+}
+
+/// A flat tile with a border, for folders a tab along the top edge, and an optional glyph.
+fn tile(
+    width: u32,
+    height: u32,
+    fill: Rgb,
+    border: Rgb,
+    tab: bool,
+    glyph: Glyph,
+) -> Result<Vec<u8>> {
     let border_px = (width / 38).max(1);
     let tab_height = height / 8;
     let tab_width = width * 2 / 5;
@@ -268,8 +323,19 @@ fn tile(width: u32, height: u32, fill: Rgb, border: Rgb, tab: bool) -> Result<Ve
         if tab && y < tab_height + border_px && x < tab_width {
             return border;
         }
+        if glyph_covers(glyph, width, height, x, y) {
+            return border;
+        }
         fill
     })
+}
+
+fn folder_glyph(image: &FolderImage) -> Glyph {
+    match image {
+        FolderImage::Back => Glyph::BackArrow,
+        FolderImage::Home => Glyph::House,
+        _ => Glyph::None,
+    }
 }
 
 fn folder_colours(image: &FolderImage) -> (Rgb, Rgb) {
@@ -286,13 +352,27 @@ fn folder_colours(image: &FolderImage) -> (Rgb, Rgb) {
 /// The 228×204 icon of a folder.
 pub fn folder_icon(image: &FolderImage) -> Result<Vec<u8>> {
     let (fill, border) = folder_colours(image);
-    tile(COVER_WIDTH, COVER_HEIGHT, fill, border, true)
+    tile(
+        COVER_WIDTH,
+        COVER_HEIGHT,
+        fill,
+        border,
+        true,
+        folder_glyph(image),
+    )
 }
 
 /// The 40×40 thumbnail of a folder.
 pub fn folder_thumbnail(image: &FolderImage) -> Result<Vec<u8>> {
     let (fill, border) = folder_colours(image);
-    tile(THUMB_SIZE, THUMB_SIZE, fill, border, true)
+    tile(
+        THUMB_SIZE,
+        THUMB_SIZE,
+        fill,
+        border,
+        true,
+        folder_glyph(image),
+    )
 }
 
 fn system_colours(system: System) -> (Rgb, Rgb) {
@@ -306,13 +386,13 @@ fn system_colours(system: System) -> (Rgb, Rgb) {
 /// The 228×204 placeholder cover of a game without art.
 pub fn cover_placeholder(system: System) -> Result<Vec<u8>> {
     let (fill, border) = system_colours(system);
-    tile(COVER_WIDTH, COVER_HEIGHT, fill, border, false)
+    tile(COVER_WIDTH, COVER_HEIGHT, fill, border, false, Glyph::None)
 }
 
 /// The 40×40 placeholder thumbnail of a game without art.
 pub fn thumbnail_placeholder(system: System) -> Result<Vec<u8>> {
     let (fill, border) = system_colours(system);
-    tile(THUMB_SIZE, THUMB_SIZE, fill, border, false)
+    tile(THUMB_SIZE, THUMB_SIZE, fill, border, false, Glyph::None)
 }
 
 /// Reads the dimensions of a PNG file's header.
@@ -465,5 +545,53 @@ pub(crate) mod tests {
             make_cover(b"nope", &CoverOptions::default()),
             Err(Error::Image(_))
         ));
+    }
+
+    #[test]
+    fn back_and_home_tiles_carry_a_glyph() {
+        // The arrow's shaft crosses the middle of the back tile, in the border colour; a plain
+        // folder is fill colour there.
+        let (fill, border) = folder_colours(&FolderImage::Back);
+        assert!(glyph_covers(Glyph::BackArrow, 228, 204, 114, 102));
+        assert!(glyph_covers(Glyph::BackArrow, 40, 40, 20, 20));
+        assert!(!glyph_covers(Glyph::BackArrow, 228, 204, 114, 20));
+        assert!(glyph_covers(Glyph::House, 228, 204, 114, 90));
+        assert!(
+            !glyph_covers(Glyph::House, 228, 204, 114, 140),
+            "the door is cut out"
+        );
+        assert!(!glyph_covers(Glyph::None, 228, 204, 114, 102));
+        assert_ne!(fill, border);
+        assert_ne!(
+            folder_thumbnail(&FolderImage::Back).unwrap(),
+            folder_thumbnail(&FolderImage::Home).unwrap()
+        );
+    }
+
+    /// `cargo test -p cartload-library folder_tiles_to_disk -- --ignored` writes the folder
+    /// tiles to `target/folder-tiles/` for a look.
+    #[test]
+    #[ignore]
+    fn folder_tiles_to_disk() {
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/folder-tiles");
+        std::fs::create_dir_all(&dir).unwrap();
+        for (name, image) in [
+            ("folder", FolderImage::Folder),
+            ("back", FolderImage::Back),
+            ("home", FolderImage::Home),
+            ("letter", FolderImage::Letter('A')),
+        ] {
+            std::fs::write(
+                dir.join(format!("{name}.png")),
+                folder_icon(&image).unwrap(),
+            )
+            .unwrap();
+            std::fs::write(
+                dir.join(format!("{name}_small.png")),
+                folder_thumbnail(&image).unwrap(),
+            )
+            .unwrap();
+        }
     }
 }

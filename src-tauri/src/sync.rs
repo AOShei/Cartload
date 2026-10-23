@@ -91,6 +91,11 @@ pub struct SyncPlanView {
     pub storage: Option<StorageView>,
     /// When the plan was made, milliseconds since the Unix epoch.
     pub planned_at: u64,
+    /// NES games whose launch entry points at RetroArch because this console has no NES
+    /// emulator of its own.
+    pub nes_via_retroarch: usize,
+    /// Things the sync will do but that may not work on the console (missing RetroArch, ...).
+    pub warnings: Vec<String>,
 }
 
 impl SyncPlanView {
@@ -129,6 +134,8 @@ impl SyncPlanView {
                 free: s.usage.free,
             }),
             planned_at: now,
+            nes_via_retroarch: plan.collection.nes_via_retroarch,
+            warnings: Vec::new(),
         }
     }
 }
@@ -418,7 +425,19 @@ impl SyncRunner {
         let collection = cartload_library::collect(library, &menus, &paths)?;
         let plan =
             cartload_library::sync_plan(collection, &remote, &remote_links, paths, available);
-        let view = SyncPlanView::new(&plan, info, now_ms());
+        let mut view = SyncPlanView::new(&plan, info, now_ms());
+        if plan.needs_retroarch() {
+            let has = session.exec(commands::HAS_RETROARCH_NES).await?.success();
+            if !has {
+                let n = plan.collection.nes_via_retroarch;
+                view.warnings.push(format!(
+                    "{n} NES game{} will not start: this console has no NES emulator of its own, and \
+                     RetroArch with the fceumm core (hakchi2 CE's retroarch and fceumm modules) is \
+                     not installed on it.",
+                    if n == 1 { "" } else { "s" }
+                ));
+            }
+        }
         info!(
             uploads = view.uploads.len(),
             deletions = view.deletions.len(),

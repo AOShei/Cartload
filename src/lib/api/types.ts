@@ -489,6 +489,8 @@ export interface SyncPlanView {
   changes: number;
   storage: StorageView | null;
   planned_at: number;
+  nes_via_retroarch: number;
+  warnings: string[];
 }
 
 export type SyncState = "idle" | "running" | "done" | "failed";

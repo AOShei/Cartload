@@ -31,6 +31,14 @@ mode no model is reported at all: the boot ROM is the same chip in every console
 Cartload does not support the Mega Drive Mini. It is recognised by its system code only so
 that the app can say so when one is connected; no flow or sync starts on it.
 
+The SNES Classic Mini's firmware has hakchi's NES launcher script (`/bin/clover-kachikachi-wr`
+and `/usr/bin/clover-kachikachi`) but not the `kachikachi` emulator the script runs for
+ordinary mappers (checked on the SNES Classic Mini EUR, 2026-10-22: `/usr/bin/kachikachi`
+absent, `canoe-shvc` present). The script's `--retroarch` flag sends the game to RetroArch
+(`/bin/nes`, hakchi2 CE's `retroarch` module, `fceumm` core, `nestopia` for FDS). Cartload
+adds that flag to NES games synced to a SNES-family console and warns in the plan when
+`retroarch-clover` or `/etc/libretro/core/fceumm_libretro.so` is missing.
+
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.
 Windows needs WinUSB bound to `1f3a:efe8` (Zadig or libwdi). macOS needs nothing.
