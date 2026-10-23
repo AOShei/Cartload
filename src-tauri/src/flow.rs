@@ -15,6 +15,7 @@ use cartload_flow::{
     Backend, ConsoleState, Context, Event, EventReceiver, Flow, FlowOptions, HmodPackage, Level,
     Outcome, Reporter, StepInfo, UsbBackend, channel, flows,
 };
+use cartload_hmod::modhub::ModArchive;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 use tracing::{info, warn};
@@ -49,6 +50,11 @@ pub enum FlowKind {
         /// The output file.
         path: PathBuf,
     },
+    /// Install emulator modules (RetroArch and cores) on the running hakchi kernel.
+    InstallModules {
+        /// Catalog ids (`retroarch`, `fceumm`, `snes9x`).
+        ids: Vec<String>,
+    },
 }
 
 impl FlowKind {
@@ -59,6 +65,7 @@ impl FlowKind {
             Self::Memboot => flows::MEMBOOT,
             Self::Uninstall { .. } => flows::UNINSTALL,
             Self::DumpKernel { .. } => flows::DUMP_KERNEL,
+            Self::InstallModules { .. } => flows::MODS,
         }
     }
 
@@ -69,6 +76,7 @@ impl FlowKind {
             Self::Memboot => "Booting hakchi from memory",
             Self::Uninstall { .. } => "Returning the console to its original system",
             Self::DumpKernel { .. } => "Saving the stock kernel",
+            Self::InstallModules { .. } => "Installing emulator modules",
         }
     }
 
@@ -89,6 +97,7 @@ impl FlowKind {
             Self::Memboot => flows::memboot(),
             Self::Uninstall { .. } => flows::uninstall_kernel(),
             Self::DumpKernel { path } => flows::dump_stock_kernel(path.clone()),
+            Self::InstallModules { .. } => flows::install_mods(),
         }
     }
 
@@ -129,6 +138,8 @@ pub fn step_label(name: &str) -> &str {
         "reboot" => "Reboot the console",
         "wait-offline" => "Wait for the console to leave",
         "dump-stock-kernel" => "Save the stock kernel",
+        "mods" => "Install the emulator modules",
+        "verify-emulators" => "Verify the emulator modules",
         other => other,
     }
 }
@@ -556,6 +567,7 @@ impl FlowRunner {
         self: &Arc<Self>,
         kind: FlowKind,
         package: Option<HmodPackage>,
+        mods: Vec<ModArchive>,
     ) -> Result<FlowSnapshot, CommandError> {
         let mut slot = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
         if let Slot::Running(running) = &*slot {
@@ -575,6 +587,9 @@ impl FlowRunner {
                 if package.is_some() {
                     ctx.hmod = package;
                 }
+                if !mods.is_empty() {
+                    ctx.mods = mods;
+                }
                 ctx
             }
             _ => {
@@ -582,9 +597,14 @@ impl FlowRunner {
                 if let Some(package) = package {
                     ctx = ctx.with_hmod(package);
                 }
-                ctx
+                ctx.with_mods(mods)
             }
         };
+        if matches!(kind, FlowKind::InstallModules { .. }) && ctx.mods.is_empty() {
+            return Err(CommandError::new(
+                "No emulator module is loaded. Download the modules first.",
+            ));
+        }
         kind.apply_options(&mut ctx.options);
         if kind.needs_package() && ctx.hmod.is_none() {
             return Err(CommandError::new(
@@ -1099,7 +1119,9 @@ mod tests {
     #[tokio::test]
     async fn install_without_a_package_is_refused() {
         let (runner, recorder, _) = runner(Duration::from_millis(50));
-        let error = runner.start(FlowKind::Install, None).unwrap_err();
+        let error = runner
+            .start(FlowKind::Install, None, Vec::new())
+            .unwrap_err();
         assert!(error.message.contains("hakchi.hmod"), "{}", error.message);
         assert_eq!(runner.snapshot().state, FlowState::Idle);
         assert!(recorder.snapshots.lock().unwrap().is_empty());
@@ -1108,7 +1130,9 @@ mod tests {
     #[tokio::test]
     async fn a_failed_flow_reports_the_cause_and_releases_the_watcher() {
         let (runner, recorder, state) = runner(Duration::from_millis(50));
-        let first = runner.start(FlowKind::Memboot, Some(package())).unwrap();
+        let first = runner
+            .start(FlowKind::Memboot, Some(package()), Vec::new())
+            .unwrap();
         assert_eq!(first.state, FlowState::Running);
         assert_eq!(first.steps.len(), 3);
         assert!(runner.is_running());
@@ -1148,23 +1172,27 @@ mod tests {
         }
 
         // A retry of the same kind keeps the package and runs again from the start.
-        let again = runner.start(FlowKind::Memboot, None).unwrap();
+        let again = runner.start(FlowKind::Memboot, None, Vec::new()).unwrap();
         assert_eq!(again.state, FlowState::Running);
         assert!(again.failure.is_none());
         let snapshot = wait_until(&runner, |s| s.state != FlowState::Running).await;
         assert_eq!(snapshot.state, FlowState::Failed);
 
         // A different kind that needs a package gets a fresh context, so it is refused.
-        let error = runner.start(FlowKind::Install, None).unwrap_err();
+        let error = runner
+            .start(FlowKind::Install, None, Vec::new())
+            .unwrap_err();
         assert!(error.message.contains("hakchi.hmod"));
     }
 
     #[tokio::test]
     async fn only_one_flow_at_a_time_and_cancel_stops_a_waiting_step() {
         let (runner, _, state) = runner(Duration::from_secs(60));
-        runner.start(FlowKind::Memboot, Some(package())).unwrap();
+        runner
+            .start(FlowKind::Memboot, Some(package()), Vec::new())
+            .unwrap();
         let error = runner
-            .start(FlowKind::Memboot, Some(package()))
+            .start(FlowKind::Memboot, Some(package()), Vec::new())
             .unwrap_err();
         assert!(error.message.contains("in progress"), "{}", error.message);
 

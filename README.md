@@ -83,6 +83,16 @@ Not yet tested on hardware. Two drivers are involved:
 4. **Settings page.** Theme, the log, the Linux setup, the library location and the
    TheGamesDB key.
 
+### Emulator modules
+
+The SNES Classic Mini has no NES emulator of its own, and both consoles have games their
+built-in emulator does not run well. For those, **Settings → Emulators** installs RetroArch
+and a core (FCEUmm for NES, Snes9x for SNES) from KMFD's Mod Hub, the same modules hakchi2
+CE offers. Cartload downloads the module, checks it against the hub's checksum, installs it
+with the console's own tools and reboots the console once. NES games synced to a SNES Mini
+use RetroArch automatically; any game can be switched to RetroArch in its Advanced dialog.
+When a sync needs a module the console lacks, the plan says so and offers the install.
+
 ### Cover art
 
 Covers and metadata come from [TheGamesDB](https://thegamesdb.net). Create a free account,

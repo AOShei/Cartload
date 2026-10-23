@@ -39,6 +39,20 @@ absent, `canoe-shvc` present). The script's `--retroarch` flag sends the game to
 adds that flag to NES games synced to a SNES-family console and warns in the plan when
 `retroarch-clover` or `/etc/libretro/core/fceumm_libretro.so` is missing.
 
+Emulator modules: Cartload installs RetroArch and cores from KMFD's Mod Hub, the repository
+hakchi2 CE ships as its default (`https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/`).
+The hub is a directory tree: `<item>.hmod/link` holds the download URL, `<item>.hmod/md5` the
+checksum (CE reads the same files, or the whole `pack.tgz`). The catalog Cartload uses is
+`_km_retroarch_1910_ozone` (RetroArch 1.9.10 with the `retroarch-clover`, `nes`, `fceumm`,
+`nestopia`, `quicknes` launchers), `_km_fceumm_xtreme` (NES core) and `_km_snes9x_xtreme`
+(SNES core, with the `snes` and `snes9x` launchers). Install is hakchi2 CE's `ModTasks`:
+`mkdir -p /tmp/cartload/hmods/<item>.hmod`, `tar -xzvC` that directory with the `.hmod` (a
+gzip tar) on stdin, `hakchi packs_install /tmp/cartload/hmods`, then `reboot -f`; the console
+registers each as `<installpath>/hmod/uninstall-<item>`. Verified on hakchi2 CE's own
+modules present on the SNES Classic Mini EUR (`retroarch`, `snes9x2010`, ...), which provide
+the same launchers under other module names; the KMFD modules themselves are untested on
+hardware (see `docs/hardware-tests.md`).
+
 Linux udev: grant user access to `1f3a:efe8` (`MODE="0666", TAG+="uaccess"`) and rename the
 `04e8:6863` net device to a fixed name (`hakchi0`) so a NetworkManager keyfile can match it.
 Windows needs WinUSB bound to `1f3a:efe8` (Zadig or libwdi). macOS needs nothing.

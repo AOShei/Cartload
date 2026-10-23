@@ -100,6 +100,37 @@ pub enum Error {
         actual: String,
     },
 
+    /// A Mod Hub module is not in the cache.
+    #[error("module {name}: {} is not cached; download it first", path.display())]
+    ModuleNotCached {
+        /// The module id.
+        name: String,
+        /// The missing file.
+        path: PathBuf,
+    },
+
+    /// A Mod Hub module's file does not have the MD5 the hub lists for it.
+    #[error("module {name}: {} has MD5 {actual}, the Mod Hub lists {expected}", path.display())]
+    ModuleChecksum {
+        /// The module id.
+        name: String,
+        /// The file.
+        path: PathBuf,
+        /// MD5 from the hub.
+        expected: String,
+        /// MD5 of the file.
+        actual: String,
+    },
+
+    /// The Mod Hub's `link` file for a module is empty or not an HTTPS URL.
+    #[error("the Mod Hub gives no usable download link for {name}: {link:?}")]
+    ModuleLink {
+        /// The module id.
+        name: String,
+        /// What the hub returned.
+        link: String,
+    },
+
     /// The HTTP client could not be built.
     #[cfg(feature = "fetch")]
     #[error("cannot build the HTTP client: {0}")]

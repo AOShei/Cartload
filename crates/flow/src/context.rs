@@ -4,7 +4,7 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use cartload_console::{ExecOutput, Hakchi, OutputLine};
 use cartload_fel::MembootOptions;
-use cartload_hmod::{BootFiles, Package, basemods::LoadedMod};
+use cartload_hmod::{BootFiles, Package, basemods::LoadedMod, modhub::ModArchive};
 use tracing::debug;
 
 use crate::{
@@ -152,6 +152,9 @@ pub struct Context {
     pub hmod: Option<HmodPackage>,
     /// hakchi2 CE base mods to install (loaded from the cache), when the flow installs any.
     pub base_mods: Vec<LoadedMod>,
+    /// Emulator modules from the Mod Hub (RetroArch and cores) to install, when the flow
+    /// installs any.
+    pub mods: Vec<ModArchive>,
     /// The open SSH session, if any.
     pub console: Option<Box<dyn Console>>,
     /// What the last state detection found.
@@ -177,6 +180,14 @@ impl std::fmt::Debug for Context {
                     .map(LoadedMod::name)
                     .collect::<Vec<_>>(),
             )
+            .field(
+                "mods",
+                &self
+                    .mods
+                    .iter()
+                    .map(|m| m.name.as_str())
+                    .collect::<Vec<_>>(),
+            )
             .field("connected", &self.console.is_some())
             .field("state", &self.state)
             .field("grew", &self.grew)
@@ -194,6 +205,7 @@ impl Context {
             options,
             hmod: None,
             base_mods: Vec::new(),
+            mods: Vec::new(),
             console: None,
             state: ConsoleState::Offline,
             grew: false,
@@ -211,6 +223,12 @@ impl Context {
     /// Attaches base mods to install.
     pub fn with_base_mods(mut self, mods: Vec<LoadedMod>) -> Self {
         self.base_mods = mods;
+        self
+    }
+
+    /// Attaches emulator modules to install.
+    pub fn with_mods(mut self, mods: Vec<ModArchive>) -> Self {
+        self.mods = mods;
         self
     }
 

@@ -678,3 +678,48 @@ export function previewImport(): { files: ImportEvent[]; report: ImportReport | 
   const report: ImportReport = { files, imported: 6, unmatched: 1, failed: 1, skipped: 1, codes: [] };
   return { files, report, importing: false };
 }
+
+/* Emulator modules: `?modules=none|cached|installed` (default: nothing installed). */
+import type { ModulesStatus } from "../api/types";
+
+export function previewModules(): ModulesStatus {
+  const name = typeof location !== "undefined" ? new URLSearchParams(location.search).get("modules") : null;
+  const connected =
+    typeof location !== "undefined" && new URLSearchParams(location.search).get("preview") === "connected";
+  const state = (cachedBytes: number, installed: boolean) => ({
+    cached: name === "cached" || name === "installed",
+    cached_bytes: name === "cached" || name === "installed" ? cachedBytes : null,
+    installed: connected ? name === "installed" && installed : null,
+  });
+  return {
+    cache_dir: "/home/user/.cache/cartload/mods",
+    hub: "https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/",
+    console_checked: connected,
+    modules: [
+      {
+        id: "retroarch",
+        item: "_km_retroarch_1910_ozone",
+        title: "RetroArch 1.9.10",
+        purpose: "The emulator frontend the cores run in. Needed once for every core.",
+        approx_bytes: 10_600_000,
+        ...state(10_557_798, true),
+      },
+      {
+        id: "fceumm",
+        item: "_km_fceumm_xtreme",
+        title: "NES core (FCEUmm)",
+        purpose: "Runs NES games on a console without an NES emulator of its own, and NES games the built-in emulator cannot handle.",
+        approx_bytes: 760_000,
+        ...state(761_432, true),
+      },
+      {
+        id: "snes9x",
+        item: "_km_snes9x_xtreme",
+        title: "SNES core (Snes9x)",
+        purpose: "Runs SNES games that the console's own emulator does not run well, through RetroArch.",
+        approx_bytes: 3_100_000,
+        ...state(3_111_882, false),
+      },
+    ],
+  };
+}

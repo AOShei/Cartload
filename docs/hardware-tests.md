@@ -920,3 +920,43 @@ hardware.
    rotated to `cartload.log.1`).
 4. `RUST_LOG=debug` is not needed: the file is written at debug level for the cartload
    crates.
+
+## Emulator modules (desktop app)
+
+Added 2026-10-23. Not yet run on hardware: the console on hand already carries hakchi2 CE's
+RetroArch modules under other names, so the install path with KMFD's modules is unverified.
+
+### Prerequisites
+
+- A console running its hakchi kernel without RetroArch (Settings → Emulators shows "Not on
+  the console" for all three), or one where the KMFD modules are not installed.
+- Internet access to hakchi.net.
+
+### 1. Install from Settings
+
+1. Settings → Emulators → **Install** on "NES core (FCEUmm)". Expected: "Downloading …" on
+   RetroArch then the core (about 11 MB), then the app switches to the Kernel page and the
+   flow "Installing emulator modules" runs its six steps; the console reboots once; the last
+   step reports both modules registered and `retroarch-clover`, `nes`, `fceumm` on the PATH.
+2. Back in Settings, both rows say "Installed on the console". `ls /var/lib/hakchi/hmod` on
+   the console lists `uninstall-_km_retroarch_1910_ozone` and `uninstall-_km_fceumm_xtreme`.
+3. Rerun **Install**: the flow's install step is skipped as already done.
+
+### 2. NES game through RetroArch
+
+1. Library: import an NES ROM, sync to a SNES Classic Mini. The plan's Show changes says the
+   game runs through RetroArch and shows no warning.
+2. On the console, the game starts (RetroArch's screen, then the game). Save states work
+   from the console's menu.
+
+### 3. Install from the sync warning
+
+1. On a console without RetroArch, with an NES game in the library of a SNES Mini: Show
+   changes shows the warning and **Install RetroArch and the NES core**. Press it. Same flow
+   as 1; when it ends, press Sync again and the warning is gone.
+
+### 4. SNES game on Snes9x
+
+1. Install "SNES core (Snes9x)". On a SNES game's Advanced dialog pick "RetroArch (Snes9x
+   core)", save, sync. The game starts through RetroArch (`--retroarch` on the launch line);
+   switching back to "The console's own SNES emulator" and syncing restores canoe.

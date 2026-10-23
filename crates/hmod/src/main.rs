@@ -82,6 +82,21 @@ enum Command {
         #[arg(value_name = "NAME")]
         names: Vec<String>,
     },
+    /// List the emulator modules Cartload can install from KMFD's Mod Hub (RetroArch and
+    /// cores) and their cache state; with --fetch, download the missing ones.
+    HubMods {
+        /// Download the modules that are missing from the cache.
+        #[arg(long)]
+        fetch: bool,
+
+        /// Cache directory (default: the user cache directory, cartload/mods).
+        #[arg(long, value_name = "DIR")]
+        cache: Option<PathBuf>,
+
+        /// Modules to fetch by id (default: all of them).
+        #[arg(value_name = "ID")]
+        ids: Vec<String>,
+    },
 }
 
 #[tokio::main]
@@ -110,7 +125,71 @@ async fn main() -> Result<()> {
             cache,
             names,
         } => base_mods(fetch, cache, &names).await,
+        Command::HubMods { fetch, cache, ids } => hub_mods(fetch, cache, &ids).await,
     }
+}
+
+async fn hub_mods(fetch: bool, cache: Option<PathBuf>, ids: &[String]) -> Result<()> {
+    use cartload_hmod::modhub;
+    let cache = match cache {
+        Some(cache) => cache,
+        None => modhub::default_cache_dir().context("no cache directory on this system")?,
+    };
+    let modules: Vec<&'static modhub::Module> = if ids.is_empty() {
+        modhub::CATALOG.to_vec()
+    } else {
+        ids.iter()
+            .map(|id| {
+                modhub::find(id).with_context(|| {
+                    format!(
+                        "{id} is not a known module; known: {}",
+                        modhub::CATALOG
+                            .iter()
+                            .map(|m| m.id)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })
+            })
+            .collect::<Result<_>>()?
+    };
+    println!("hub:     {}", modhub::HUB_URL);
+    println!("cache:   {}", cache.display());
+    if fetch {
+        let mut last = None;
+        modhub::fetch(&modules, &cache, |p| {
+            let key = (
+                p.index,
+                p.done / (1 << 20),
+                p.total.is_some_and(|t| p.done >= t),
+            );
+            if last != Some(key) {
+                last = Some(key);
+                info!(
+                    "{}: {} / {} bytes",
+                    modules[p.index].id,
+                    p.done,
+                    p.total.map_or("?".to_string(), |t| t.to_string())
+                );
+            }
+        })
+        .await?;
+    }
+    for module in modhub::CATALOG {
+        let wanted = modules.iter().any(|m| m.id == module.id);
+        let state = match module.cached_size(&cache) {
+            Some(size) => format!("cached, {size} bytes"),
+            None => "not cached".to_string(),
+        };
+        println!(
+            "{:<10} {:<18} {}{}",
+            module.id,
+            module.title,
+            state,
+            if wanted { "" } else { " (not requested)" }
+        );
+    }
+    Ok(())
 }
 
 fn open(path: &std::path::Path) -> Result<Package> {

@@ -13,6 +13,8 @@ Next, in order:
 3. Windows run on hardware, with the WinUSB (Zadig) and RNDIS driver steps written up from
    a real machine.
 4. An update check against the GitHub releases.
+5. More systems through RetroArch (Mega Drive, Game Boy, ...): a core and a launcher each,
+   on the module installer that now covers NES and SNES.
 
 Not planned: code signing and notarisation. The builds stay unsigned by choice (no yearly
 Apple developer account or Windows certificate); the README explains the one-time warning

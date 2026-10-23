@@ -164,7 +164,8 @@ export type FlowKind =
   | { kind: "install" }
   | { kind: "memboot" }
   | { kind: "uninstall"; stock_kernel?: string | null; force_stock_kernel?: boolean }
-  | { kind: "dump_kernel"; path: string };
+  | { kind: "dump_kernel"; path: string }
+  | { kind: "install_modules"; ids: string[] };
 
 export type StepState = "pending" | "running" | "done" | "failed" | "skipped";
 
@@ -532,4 +533,30 @@ export interface SyncSnapshot {
   error: { message: string; detail: string | null } | null;
   started_at: number | null;
   finished_at: number | null;
+}
+
+/* Emulator modules (RetroArch and cores) from the Mod Hub */
+
+export interface ModuleView {
+  id: string;
+  item: string;
+  title: string;
+  purpose: string;
+  approx_bytes: number;
+  cached: boolean;
+  cached_bytes: number | null;
+  installed: boolean | null;
+}
+
+export interface ModulesStatus {
+  cache_dir: string | null;
+  hub: string;
+  modules: ModuleView[];
+  console_checked: boolean;
+}
+
+export interface ModuleDownload {
+  id: string;
+  done: number;
+  total: number | null;
 }

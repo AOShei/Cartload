@@ -126,6 +126,22 @@
     }
   });
 
+  /** The flag hakchi's launcher scripts take to run a game through RetroArch. */
+  const RETROARCH_FLAG = "--retroarch";
+
+  function usesRetroarch(args: string): boolean {
+    return args.split(/\s+/).includes(RETROARCH_FLAG);
+  }
+
+  /** Adds or removes the RetroArch flag in the draft's arguments. */
+  function setEmulator(retroarch: boolean): void {
+    const words = advDraft.args.split(/\s+/).filter((w) => w !== "" && w !== RETROARCH_FLAG);
+    if (retroarch) {
+      words.push(RETROARCH_FLAG);
+    }
+    advDraft.args = words.join(" ");
+  }
+
   async function saveAdvanced(): Promise<void> {
     if (!form) {
       return;
@@ -293,8 +309,22 @@
 
       <Dialog open={advOpen} title="Advanced: {game.game.name}" width="600px" onclose={() => (advOpen = false)}>
         <label>
+          <span>Emulator</span>
+          <select value={usesRetroarch(advDraft.args) ? "retroarch" : "builtin"} onchange={(e) => setEmulator(e.currentTarget.value === "retroarch")} data-autofocus>
+            <option value="builtin">{game.system_name === "NES" ? "The console's own NES emulator" : "The console's own SNES emulator"}</option>
+            <option value="retroarch">RetroArch ({game.system_name === "NES" ? "FCEUmm core" : "Snes9x core"})</option>
+          </select>
+        </label>
+        <p class="muted small">
+          {#if game.system_name === "NES"}
+            A SNES Classic Mini has no NES emulator of its own, so NES games synced to one use RetroArch whatever this says.
+          {:else}
+            Use RetroArch for games the console's own emulator does not run well. It needs the RetroArch and Snes9x modules (Settings).
+          {/if}
+        </p>
+        <label>
           <span>Launch command</span>
-          <input type="text" class="mono" bind:value={advDraft.application} data-autofocus />
+          <input type="text" class="mono" bind:value={advDraft.application} />
         </label>
         <label>
           <span>Arguments</span>

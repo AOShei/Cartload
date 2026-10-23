@@ -460,10 +460,10 @@ pub mod commands {
     /// Exit code 0 when the console can extract compressed games: the emulator wrappers call
     /// `tiny7zx` through `PATH`, so this is the check that matters.
     pub const WHICH_EXTRACTOR: &str = "which tiny7zx";
-    /// Exit code 0 when the console can run NES games through RetroArch: hakchi2 CE's
-    /// `retroarch` module (`retroarch-clover`) and the `fceumm` core its `nes` launcher uses.
-    pub const HAS_RETROARCH_NES: &str =
-        "which retroarch-clover >/dev/null && [ -f /etc/libretro/core/fceumm_libretro.so ]";
+    /// Exit code 0 when the console can run NES games through RetroArch: a RetroArch module
+    /// (`retroarch-clover` and the `nes` launcher hakchi's script calls) and an FCEUmm core
+    /// (`fceumm_libretro.so` from hakchi2 CE's module, `km_fceumm_libretro.so` from KMFD's).
+    pub const HAS_RETROARCH_NES: &str = "which retroarch-clover >/dev/null && which nes >/dev/null && ls /etc/libretro/core/ 2>/dev/null | grep -q fceumm";
     /// Stops the stock UI (the console's own `uistop` script).
     pub const UI_STOP: &str = "uistop";
     /// Unmounts the games overlay; exits 1 when nothing was mounted.
@@ -1741,7 +1741,7 @@ mod tests {
         game.args.clear();
         game.application = "/bin/nes".to_string();
         assert!(!nes_on_builtin(&game));
-        assert!(commands::HAS_RETROARCH_NES.contains("fceumm_libretro.so"));
+        assert!(commands::HAS_RETROARCH_NES.contains("fceumm"));
     }
 
     #[test]

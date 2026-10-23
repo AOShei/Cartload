@@ -6,7 +6,7 @@
   import { inTauri } from "../../api/tauri";
   import { previewDialog } from "../../dev/preview";
   import { NORMAL, ms } from "../../motion";
-  import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore } from "../../state";
+  import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore, modulesStore, NES_MODULES } from "../../state";
 
   const report = $derived(consoleStore.report);
   const status = $derived(report?.status ?? null);
@@ -243,6 +243,14 @@
         {#each plan.warnings as warning (warning)}
           <li><Icon name="warning" size={16} /><span>{warning}</span></li>
         {/each}
+        {#if plan.nes_via_retroarch > 0}
+          <li class="warning-action">
+            <button type="button" class="btn btn-sm" onclick={() => { changesOpen = false; void modulesStore.install(NES_MODULES); }} disabled={modulesStore.downloading.length > 0}>
+              Install RetroArch and the NES core
+            </button>
+            <span class="muted">About 11 MB from KMFD's Mod Hub; the console reboots once.</span>
+          </li>
+        {/if}
       </ul>
     {/if}
     {#if plan.nes_via_retroarch > 0 && plan.warnings.length === 0}
@@ -460,6 +468,12 @@
     display: flex;
     gap: var(--space-2);
     align-items: flex-start;
+  }
+
+  .warning-action {
+    align-items: center;
+    padding-left: 24px;
+    font-size: var(--text-sm);
   }
 
   .warnings :global(svg) {

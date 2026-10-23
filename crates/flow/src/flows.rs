@@ -7,9 +7,9 @@ use crate::{
     Context, Flow,
     steps::{
         CheckMegaDrive, DetectState, DumpStockKernel, FlashStockKernel, GrowPartition,
-        InstallBaseMods, Memboot, PrepareInstall, ReadStockKernel, Reboot, RebootAfterGrow,
-        RemoveInstall, RunInstaller, UploadHmod, VerifyBaseMods, VerifyInstall, WaitForConsole,
-        WaitOffline,
+        InstallBaseMods, InstallMods, Memboot, PrepareInstall, ReadStockKernel, Reboot,
+        RebootAfterGrow, RemoveInstall, RunInstaller, UploadHmod, VerifyBaseMods, VerifyInstall,
+        VerifyMods, WaitForConsole, WaitOffline,
     },
 };
 
@@ -23,6 +23,8 @@ pub const UNINSTALL: &str = "uninstall";
 pub const DUMP_KERNEL: &str = "dump-kernel";
 /// Name of the base mods flow.
 pub const BASE_MODS: &str = "base-mods";
+/// Name of [`install_mods`].
+pub const MODS: &str = "mods";
 
 /// Install (or repair) the hakchi kernel. Needs the package in the context.
 ///
@@ -67,6 +69,19 @@ pub fn install_base_mods() -> Flow<Context> {
         .step(WaitForConsole)
         .step(DetectState::any())
         .step(VerifyBaseMods)
+}
+
+/// Install emulator modules from the Mod Hub (RetroArch and cores) on a console running its
+/// hakchi kernel: identify it, upload and `hakchi packs_install` the modules in the context
+/// ([`Context::with_mods`]), reboot, verify. Nothing touches the kernel partitions.
+pub fn install_mods() -> Flow<Context> {
+    Flow::new(MODS)
+        .step(WaitForConsole)
+        .step(DetectState::expect_installed())
+        .step(InstallMods)
+        .step(WaitForConsole)
+        .step(DetectState::any())
+        .step(VerifyMods)
 }
 
 /// Memboot only, for recovery: the console ends up in the memboot shell with SSH open.
@@ -148,6 +163,17 @@ mod tests {
             ]
         );
         assert_eq!(
+            names(install_mods()),
+            [
+                "wait-console",
+                "detect",
+                "mods",
+                "wait-console",
+                "detect",
+                "verify-emulators",
+            ]
+        );
+        assert_eq!(
             names(uninstall_kernel()),
             [
                 "memboot",
@@ -176,6 +202,7 @@ mod tests {
             memboot(),
             uninstall_kernel(),
             install_base_mods(),
+            install_mods(),
         ] {
             for step in flow.steps() {
                 assert!(

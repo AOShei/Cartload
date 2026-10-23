@@ -16,7 +16,7 @@
   import AppMark from "../components/AppMark.svelte";
   import Icon from "../components/Icon.svelte";
   import Wordmark from "../components/Wordmark.svelte";
-  import { app, libraryStore, navigation, preferences, toasts, type Theme } from "../state";
+  import { app, consoleStore, flowStore, formatBytes, libraryStore, modulesStore, navigation, preferences, toasts, type Theme } from "../state";
 
   let keyStatus = $state<KeyStatus | null>(null);
   let keyLoading = $state(false);
@@ -27,10 +27,16 @@
   let setup = $state<SetupStatus | null>(null);
   let setupBusy = $state(false);
   let log = $state<LogFileInfo | null>(null);
+  /** A console running a hakchi kernel the app can talk to: modules install there. */
+  const consoleReady = $derived.by((): boolean => {
+    const status = consoleStore.report?.status;
+    return status?.state === "connected" && status.info.can_interact && (consoleStore.report?.supported ?? true);
+  });
   let diagnosticsBusy = $state(false);
 
   onMount(() => {
     void libraryStore.start();
+    void modulesStore.start();
     if (inTauri) {
       void setupStatus()
         .then((status) => (setup = status))
@@ -344,6 +350,56 @@
       </div>
     {/if}
   </section>
+  <section class="card" aria-labelledby="modules-heading">
+    <h2 id="modules-heading">Emulators</h2>
+    <p class="muted">
+      RetroArch and its cores, from KMFD's Mod Hub, the same modules hakchi2 CE installs. A SNES
+      Classic Mini needs them to play NES games; both consoles need them for games their own
+      emulator does not run well. Installing downloads the module and reboots the console once.
+    </p>
+    {#if modulesStore.status}
+      <ul class="modules">
+        {#each modulesStore.status.modules as module (module.id)}
+          {@const progress = modulesStore.progress[module.id]}
+          {@const busy = modulesStore.downloading.includes(module.id) || flowStore.running}
+          <li>
+            <div class="module-text">
+              <strong>{module.title}</strong>
+              <span class="muted">{module.purpose}</span>
+              <span class="muted small">
+                {#if module.installed === true}
+                  Installed on the console.
+                {:else if module.installed === false}
+                  Not on the console.
+                {:else}
+                  Connect the console to see whether it is installed.
+                {/if}
+                {#if progress && modulesStore.downloading.includes(module.id)}
+                  Downloading {formatBytes(progress.done)}{progress.total ? ` of ${formatBytes(progress.total)}` : ""}…
+                {:else if module.cached}
+                  Downloaded ({formatBytes(module.cached_bytes ?? 0)}).
+                {:else}
+                  About {formatBytes(module.approx_bytes)} to download.
+                {/if}
+              </span>
+            </div>
+            <button
+              type="button"
+              class="btn"
+              onclick={() => void modulesStore.install(module.id === "retroarch" ? ["retroarch"] : ["retroarch", module.id])}
+              disabled={busy || module.installed === true || !consoleReady}
+              title={consoleReady ? "" : "Connect a console running hakchi"}
+            >
+              {#if modulesStore.downloading.includes(module.id)}<span class="spinner" aria-hidden="true"></span>{/if}
+              {module.installed === true ? "Installed" : "Install"}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="muted"><span class="spinner" aria-hidden="true"></span> Reading the modules…</p>
+    {/if}
+  </section>
   </div>
 
   <div class="column">
@@ -501,6 +557,38 @@
 
   h3 {
     margin-top: var(--space-2);
+  }
+
+  .small {
+    font-size: var(--text-sm);
+  }
+
+  .modules {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .modules li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .module-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .modules .btn {
+    flex: none;
+    min-width: 96px;
   }
 
   .key,

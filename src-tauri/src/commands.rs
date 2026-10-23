@@ -189,12 +189,51 @@ pub async fn flow_start(
         ));
     }
     let package = package::load_for_flow().await;
+    let mods = match &kind {
+        FlowKind::InstallModules { ids } => crate::modules::load(ids)?,
+        _ => Vec::new(),
+    };
     tracing::info!(
         kind = kind.name(),
         package = package.is_some(),
+        modules = mods.len(),
         "flow_start"
     );
-    runner.start(kind, package)
+    runner.start(kind, package, mods)
+}
+
+/// The emulator modules Cartload can install: cached here, installed on the console.
+#[tauri::command]
+pub async fn modules_status(
+    state: State<'_, Arc<AppState>>,
+) -> Result<crate::modules::ModulesStatus, CommandError> {
+    let guard = state.session.lock().await;
+    Ok(crate::modules::status(guard.as_ref()).await)
+}
+
+/// Downloads modules into the cache, with `module-download` progress events, and returns the
+/// new status.
+#[tauri::command]
+pub async fn modules_fetch(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    ids: Vec<String>,
+) -> Result<crate::modules::ModulesStatus, CommandError> {
+    tracing::info!(?ids, "modules_fetch");
+    let mut last: Option<(String, u64)> = None;
+    crate::modules::fetch(&ids, move |progress| {
+        let finished = progress.total.is_some_and(|t| progress.done >= t);
+        let coarse = (progress.id.clone(), progress.done / (256 * 1024));
+        if finished || last.as_ref() != Some(&coarse) {
+            last = Some(coarse);
+            if let Err(error) = app.emit(crate::modules::MODULE_EVENT, &progress) {
+                tracing::warn!(%error, "could not emit {}", crate::modules::MODULE_EVENT);
+            }
+        }
+    })
+    .await?;
+    let guard = state.session.lock().await;
+    Ok(crate::modules::status(guard.as_ref()).await)
 }
 
 /// Asks the running flow to stop. Steps that write to the console's flash finish first.

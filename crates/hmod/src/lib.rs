@@ -23,6 +23,7 @@ pub mod basemods;
 mod error;
 #[cfg(feature = "fetch")]
 mod fetch;
+pub mod modhub;
 mod package;
 mod version;
 

@@ -9,7 +9,10 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
-use cartload_hmod::basemods::{LoadedMod, md5_hex};
+use cartload_hmod::{
+    basemods::{LoadedMod, md5_hex},
+    modhub::ModArchive,
+};
 
 use crate::{
     Context, Error, Outcome, Result, Step, device_failure,
@@ -232,6 +235,179 @@ impl Step<Context> for VerifyBaseMods {
                     output.stdout_trimmed()
                 ));
             }
+        }
+        Ok(Outcome::Done)
+    }
+}
+
+/// Whether a Mod Hub module is registered on the console and every binary it promises is on
+/// the `PATH`. `Ok(Some(reason))` when it is.
+async fn module_installed(ctx: &Context, m: &ModArchive) -> Result<Option<String>> {
+    let (_, installpath) = hakchi_paths(ctx);
+    if !ctx
+        .succeeds(&commands::mod_registered(&installpath, &m.name))
+        .await?
+    {
+        return Ok(None);
+    }
+    for binary in &m.binaries {
+        if !ctx.succeeds(&commands::which(binary)).await? {
+            return Ok(None);
+        }
+    }
+    Ok(Some(format!(
+        "{} is registered in {installpath}/hmod and provides {}",
+        m.name,
+        m.binaries.join(", ")
+    )))
+}
+
+/// Uploads emulator modules from the Mod Hub (gzip tars, as downloaded), runs
+/// `hakchi packs_install`, and reboots the console.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct InstallMods;
+
+#[async_trait]
+impl Step<Context> for InstallMods {
+    fn name(&self) -> &str {
+        "mods"
+    }
+
+    fn description(&self) -> &str {
+        "Upload and install the emulator modules, then reboot"
+    }
+
+    async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
+        if ctx.mods.is_empty() {
+            return Ok(None);
+        }
+        let mut reasons = Vec::new();
+        for m in &ctx.mods {
+            match module_installed(ctx, m).await? {
+                Some(reason) => reasons.push(reason),
+                None => return Ok(None),
+            }
+        }
+        Ok(Some(reasons.join("; ")))
+    }
+
+    async fn run(&self, ctx: &mut Context) -> Result<Outcome> {
+        if ctx.mods.is_empty() {
+            return Err(Error::Precondition(
+                "no emulator modules were loaded; download them first".to_string(),
+            ));
+        }
+        if !ctx.state.is_installed() || ctx.state.is_memboot_shell() {
+            return Err(Error::WrongState(format!(
+                "modules are installed on a console booted into its hakchi kernel, not {}",
+                ctx.state.describe()
+            )));
+        }
+        let mods = ctx.mods.clone();
+        ctx.exec_checked(commands::RM_MODS, ctx.options.command_timeout)
+            .await?;
+        ctx.exec_checked(commands::MKDIR_MODS, ctx.options.command_timeout)
+            .await?;
+        for m in &mods {
+            ctx.exec_checked(&commands::mkdir_mod(&m.name), ctx.options.command_timeout)
+                .await?;
+            let extract = commands::extract_mod_gz(&m.name);
+            ctx.reporter.progress(&m.name, 0, m.bytes.len() as u64);
+            let output = ctx
+                .exec_with(&extract, Some(&m.bytes), ctx.options.flash_timeout)
+                .await?;
+            if !output.success() {
+                return Err(device_failure(&extract, &output));
+            }
+            ctx.reporter
+                .progress(&m.name, m.bytes.len() as u64, m.bytes.len() as u64);
+            ctx.reporter.info(format!(
+                "uploaded {}.hmod ({} bytes, {})",
+                m.name,
+                m.bytes.len(),
+                m.title
+            ));
+        }
+        let output = ctx
+            .exec_with(commands::PACKS_INSTALL, None, ctx.options.flash_timeout)
+            .await?;
+        for line in output
+            .stdout_lossy()
+            .lines()
+            .chain(output.stderr_lossy().lines())
+        {
+            let line = line.trim_end();
+            if !line.is_empty() {
+                ctx.reporter.info(format!("console: {line}"));
+            }
+        }
+        if !output.success() {
+            return Err(device_failure(commands::PACKS_INSTALL, &output));
+        }
+        let (_, installpath) = hakchi_paths(ctx);
+        for m in &mods {
+            if !ctx
+                .succeeds(&commands::mod_registered(&installpath, &m.name))
+                .await?
+            {
+                return Err(Error::Device(format!(
+                    "{}.hmod was sent but the console did not register it; see the installer \
+                     output above",
+                    m.name
+                )));
+            }
+        }
+        let _ = ctx.exec(commands::RM_MODS).await;
+        ctx.reporter.info(format!(
+            "installed {}; rebooting the console so the new files are seen",
+            mods.iter()
+                .map(|m| m.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+        if let Err(error) = ctx
+            .exec_with(commands::REBOOT, None, std::time::Duration::from_secs(10))
+            .await
+        {
+            ctx.reporter
+                .debug(format!("reboot command returned {error} (expected)"));
+        }
+        ctx.expect_cycle = true;
+        ctx.disconnect().await;
+        Ok(Outcome::Done)
+    }
+}
+
+/// After the reboot: every module is registered and its binaries are on the console's `PATH`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct VerifyMods;
+
+#[async_trait]
+impl Step<Context> for VerifyMods {
+    fn name(&self) -> &str {
+        "verify-emulators"
+    }
+
+    fn description(&self) -> &str {
+        "Check the emulator modules are installed"
+    }
+
+    async fn run(&self, ctx: &mut Context) -> Result<Outcome> {
+        if ctx.mods.is_empty() {
+            return Ok(Outcome::NotNeeded("no modules were loaded".to_string()));
+        }
+        if ctx.console.is_none() {
+            ctx.refresh_state().await?;
+        }
+        let mods = ctx.mods.clone();
+        for m in &mods {
+            let Some(reason) = module_installed(ctx, m).await? else {
+                return Err(Error::Device(format!(
+                    "{}.hmod is not installed on the console; run the install again",
+                    m.name
+                )));
+            };
+            ctx.reporter.info(reason);
         }
         Ok(Outcome::Done)
     }

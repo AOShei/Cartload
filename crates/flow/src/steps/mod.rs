@@ -25,7 +25,7 @@ pub use install::{PrepareInstall, RunInstaller, UploadHmod};
 pub use kernel::{DumpStockKernel, FlashStockKernel, ReadStockKernel, RemoveInstall};
 pub use md::CheckMegaDrive;
 pub use memboot::Memboot;
-pub use mods::{InstallBaseMods, VerifyBaseMods};
+pub use mods::{InstallBaseMods, InstallMods, VerifyBaseMods, VerifyMods};
 pub use reboot::Reboot;
 pub use verify::VerifyInstall;
 pub use wait::{WaitForConsole, WaitOffline};
@@ -159,6 +159,13 @@ pub mod commands {
     pub fn extract_mod(name: &str) -> String {
         format!("tar -xvC {}", sh_quote(&format!("{MODS_DIR}/{name}.hmod")))
     }
+    /// Unpacks a gzip-compressed hmod (the Mod Hub's `.hmod` files, on stdin) into its
+    /// directory, as hakchi2 CE's `ModTasks.TransferHmod` does for a file.
+    pub fn extract_mod_gz(name: &str) -> String {
+        format!("tar -xzvC {}", sh_quote(&format!("{MODS_DIR}/{name}.hmod")))
+    }
+    /// Removes the mods directory, so a rerun starts clean.
+    pub const RM_MODS: &str = "rm -rf '/tmp/cartload/hmods'";
     /// Installs every `*.hmod` in the mods directory (hakchi2 CE `ModTasks.InstallHmods`).
     pub const PACKS_INSTALL: &str = "hakchi packs_install '/tmp/cartload/hmods'";
     /// Exit code 0 when the device registered the mod (`pack_install` wrote its uninstall

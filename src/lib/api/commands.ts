@@ -7,6 +7,7 @@ import type {
   FlowSnapshot,
   LogFileInfo,
   LogLine,
+  ModulesStatus,
   PackageStatus,
   SetupStatus,
   StatusReport,
@@ -101,6 +102,16 @@ export function packageInfo(): Promise<PackageStatus> {
 /** Downloads the latest kernel package; progress follows as `package-download` events. */
 export function packageUpdate(): Promise<PackageStatus> {
   return call<PackageStatus>("package_update");
+}
+
+/** The emulator modules Cartload can install, with cache and console state. */
+export function modulesStatus(): Promise<ModulesStatus> {
+  return call<ModulesStatus>("modules_status");
+}
+
+/** Downloads modules into the cache; progress follows as `module-download` events. */
+export function modulesFetch(ids: string[]): Promise<ModulesStatus> {
+  return call<ModulesStatus>("modules_fetch", { ids });
 }
 
 /* Library page */

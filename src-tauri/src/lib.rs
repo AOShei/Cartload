@@ -14,6 +14,7 @@ pub mod failure;
 pub mod flow;
 pub mod library;
 pub mod logging;
+pub mod modules;
 pub mod package;
 pub mod setup;
 pub mod state;
@@ -102,6 +103,8 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             commands::flow_steps,
             commands::package_info,
             commands::package_update,
+            commands::modules_status,
+            commands::modules_fetch,
             commands::library_list,
             commands::library_import,
             commands::library_update,
@@ -140,6 +143,8 @@ fn handler() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
             commands::flow_steps,
             commands::package_info,
             commands::package_update,
+            commands::modules_status,
+            commands::modules_fetch,
             commands::library_list,
             commands::library_import,
             commands::library_update,
