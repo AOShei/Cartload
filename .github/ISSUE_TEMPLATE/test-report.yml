@@ -1,0 +1,69 @@
+name: Test report
+description: You tried Cartload on a console, computer or feature that is not tested yet.
+title: "Test report: "
+labels: ["test report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing. `docs/help-testing.md` lists what is untested and what to try.
+        Reports of things that worked are as useful as reports of things that broke.
+  - type: dropdown
+    id: console
+    attributes:
+      label: Console
+      options:
+        - SNES Classic Mini (EUR)
+        - SNES Classic Mini (USA)
+        - Super Famicom Mini
+        - NES Classic Mini (EUR)
+        - NES Classic Mini (USA)
+        - Famicom Mini
+        - Famicom Mini, Shonen Jump edition
+        - None (the test does not need one)
+    validations:
+      required: true
+  - type: dropdown
+    id: state
+    attributes:
+      label: Console state before the test
+      options:
+        - Never modified (stock firmware)
+        - hakchi installed by hakchi2 CE
+        - hakchi installed by Cartload
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Computer
+      options:
+        - Linux
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows 10
+        - Windows 11
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Cartload version
+      description: Settings → About.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What you tried and what happened
+      description: Which item of docs/help-testing.md, the steps, and what you saw. Say so if it worked.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Settings → Activity log → Copy diagnostics, pasted here. It never contains your TheGamesDB key.
+      render: text

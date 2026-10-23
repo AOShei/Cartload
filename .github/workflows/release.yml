@@ -101,8 +101,13 @@ jobs:
           releaseBody: |
             See the README for install notes per platform (Linux udev rule, macOS quarantine,
             Windows WinUSB driver for FEL mode).
+
+            Tested end to end on a SNES Classic Mini (EUR) under Linux only. If you have an
+            NES or Famicom Mini, a Mac or a Windows PC, see docs/help-testing.md and send a
+            test report: https://github.com/AOShei/Cartload/issues/new?template=test-report.yml
           releaseDraft: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # 0.x releases and tags with a suffix (v1.0.0-rc.1) are pre-releases.
+          prerelease: ${{ contains(github.ref_name, '-') || startsWith(github.ref_name, 'v0.') }}
           args: ${{ matrix.args }}
 
       - name: Keep the bundles as workflow artifacts

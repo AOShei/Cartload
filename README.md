@@ -13,10 +13,10 @@ Cartload is a from-scratch implementation. It uses the GPL-3 hakchi kernel packa
 from madmonkey's hakchi sources and the device-side protocol documented in `docs/`, but
 none of the hakchi2 CE application code. Cartload does not support the Mega Drive Mini.
 
-**Status:** pre-release. The kernel install, kexec reboot, library and art fetching have
-been verified on a SNES Classic Mini (EUR) running Linux. The first sync from the app, the
-macOS build and the Windows build are still to be tested on hardware; see
-[What has been tested](#what-has-been-tested).
+**Status:** pre-release. The kernel install, the library, art fetching and syncing from the
+app have been verified on a SNES Classic Mini (EUR) running Linux. Other consoles, macOS and
+Windows have not been run on hardware yet. If you have one of them,
+[help test](docs/help-testing.md).
 
 ## Install
 
@@ -76,22 +76,38 @@ Not yet tested on hardware. Two drivers are involved:
    anything stops, run it again and finished steps are skipped. The same page boots the
    console from memory without writing anything, saves the stock kernel to a file, and
    removes hakchi again (factory reset).
-3. **Library page.** Add ROMs (`.sfc`, `.smc`, `.fig`, `.swc`, `.nes`, `.zip`), arrange
-   them in the folders the console will show, give them covers, and press **Sync**. Sync is
+3. **Library page.** Add ROMs (SNES `.sfc`, `.smc`, `.fig`, `.swc`; NES `.nes`; and, with
+   their RetroArch core installed, Mega Drive / Genesis `.md`, `.gen`, `.smd`, Game Boy
+   `.gb`, `.gbc`, Game Boy Advance `.gba`, N64 `.z64`, `.n64`, `.v64`; or a `.zip` of any of
+   them), arrange them in the folders the console will show, give them covers, and press
+   **Sync**. Sync is
    a diff: only changed files travel, and files already on the console are kept. If the
    cable is pulled mid-way, run the sync again once the console is back.
-4. **Settings page.** Theme, the log, the Linux setup, the library location and the
-   TheGamesDB key.
+4. **Settings page.** Theme, the log, the Linux setup, the emulator modules, the library
+   location and the TheGamesDB key.
 
 ### Emulator modules
 
-The SNES Classic Mini has no NES emulator of its own, and both consoles have games their
-built-in emulator does not run well. For those, **Settings → Emulators** installs RetroArch
-and a core (FCEUmm for NES, Snes9x for SNES) from KMFD's Mod Hub, the same modules hakchi2
-CE offers. Cartload downloads the module, checks it against the hub's checksum, installs it
-with the console's own tools and reboots the console once. NES games synced to a SNES Mini
-use RetroArch automatically; any game can be switched to RetroArch with the Emulator choice in its
-details, or several at once from the multi-selection panel. Modules live in hakchi's overlay on
+Each console has only its own system's emulator: the SNES Mini cannot play NES games, the
+NES and Famicom Minis cannot play SNES games, and neither plays anything else. **Settings →
+Emulators** installs RetroArch and one core per system from KMFD's Mod Hub, the same modules
+hakchi2 CE offers:
+
+| System | Core | Notes |
+|---|---|---|
+| NES | FCEUmm | Used automatically on SNES-family consoles |
+| SNES | Snes9x | Used automatically on NES-family consoles (untested on hardware) |
+| Mega Drive / Genesis | Genesis Plus GX | Full speed |
+| Game Boy, Game Boy Color | Gambatte | Full speed |
+| Game Boy Advance | mGBA | Full speed |
+| N64 | Mupen64Plus | **Runs poorly.** The console's chip is too slow for most N64 games; a few lighter ones are playable. The app asks before installing it. Use at your own risk. |
+
+Cartload downloads the module, checks it against the hub's checksum, installs it with the
+console's own tools and reboots the console once. NES and SNES games can also be switched
+to RetroArch on a console that has its own emulator, with the Emulator choice in a game's
+details or for several games at once from the multi-selection panel; the other systems
+always run through RetroArch. SNES games need a SNES controller on an NES Mini for the
+X, Y, L and R buttons. Modules live in hakchi's overlay on
 the data partition: the console's own files and its menu are untouched, and a factory reset
 removes them with everything else.
 When a sync needs a module the console lacks, the plan says so and offers the install.
@@ -126,9 +142,12 @@ data folder elsewhere) and kept across runs.
 
 `docs/hardware-tests.md` is the record. On a SNES Classic Mini (EUR) under Linux: FEL
 memboot, the full kernel install (from stock and from a running hakchi kernel through
-kexec), console detection and identification, art fetching, and a read-only sync plan.
-Not yet on hardware: the first sync from the app, the base mods flow, installing on a unit
-that was never modified, macOS, Windows.
+kexec), console detection and identification, art fetching, and syncing from the app,
+including NES games through RetroArch. Not yet on hardware: the NES and Famicom Minis, SNES
+games on them, installing on a unit that was never modified, the emulator module installer,
+the Mega Drive, Game Boy and N64 cores, macOS and Windows.
+[docs/help-testing.md](docs/help-testing.md) lists them with what each test needs; reports
+go in a [test report](https://github.com/AOShei/Cartload/issues/new?template=test-report.yml).
 
 ## Building from source
 
@@ -152,5 +171,6 @@ without the UI.
 ## License
 
 GPL-3.0-or-later. `data/README.md` lists the binaries embedded from hakchi and hakchi2 CE
-and their origin. Cartload is not affiliated with the console manufacturer; NES, SNES and
-Famicom are the names of the consoles it works with.
+and their origin. Cartload is not affiliated with any console manufacturer; NES, SNES,
+Famicom, Mega Drive, Genesis, Game Boy and N64 are the names of the systems it works
+with.

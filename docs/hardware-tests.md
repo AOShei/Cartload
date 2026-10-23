@@ -960,3 +960,32 @@ RetroArch modules under other names, so the install path with KMFD's modules is 
 1. Install "SNES core (Snes9x)". In a SNES game's details set Emulator to "RetroArch (Snes9x
    core)", save, sync. The game starts through RetroArch (`--retroarch` on the launch line);
    switching back to "Built-in Emulator" and syncing restores canoe.
+
+### 5. SNES game on an NES or Famicom Mini
+
+Added 2026-10-23, needs an NES Classic Mini, Famicom Mini or Shonen Jump edition. The
+firmware has no `canoe`, so the sync writes `/bin/snes <rom>` as the launch line instead of
+hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
+
+1. Library: import a SNES ROM, sync to the NES-family console without the Snes9x core.
+   Show changes warns that the SNES game needs RetroArch with the SNES core and offers the
+   install. Install it.
+2. Sync again. On the console, `cat /var/lib/hakchi/games/<system>/.storage/<code>/<code>.desktop`
+   (or the folder the game is in) shows `Exec=/bin/snes /var/games/<code>/<file>.sfrom.7z …`.
+3. The game starts through RetroArch. A SNES controller is needed for X, Y, L and R.
+
+### 6. Mega Drive / Genesis, Game Boy, Game Boy Advance
+
+1. Import one ROM of each (`.md`, `.gb`, `.gbc`, `.gba`). Each imports unchanged (no `.7z`),
+   with a placeholder cover in the system's colours, and the details show "RetroArch
+   (<core> core)" without a choice.
+2. Sync without the cores: one warning per system, and one install button for all of them.
+   Install, sync again, start each game on the console.
+
+### 7. N64
+
+1. Settings → Emulators → **Install** on N64. Expected: the "Install at your own risk?"
+   dialog with the performance warning first; Cancel installs nothing, **Install anyway**
+   runs the flow.
+2. Import a `.z64` ROM, sync, start it. Record which game and how it runs; slow or broken
+   games are expected.
