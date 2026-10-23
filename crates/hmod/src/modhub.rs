@@ -38,7 +38,7 @@ pub const RETROARCH: Module = Module {
     id: "retroarch",
     item: "_km_retroarch_1910_ozone",
     title: "RetroArch 1.9.10",
-    purpose: "The emulator frontend the cores run in. Needed once for every core.",
+    purpose: "The frontend every core runs in.",
     binaries: &["retroarch-clover", "nes"],
     approx_bytes: 10_600_000,
 };
@@ -48,7 +48,7 @@ pub const FCEUMM: Module = Module {
     id: "fceumm",
     item: "_km_fceumm_xtreme",
     title: "NES core (FCEUmm)",
-    purpose: "Runs NES games on a console without an NES emulator of its own, and NES games the built-in emulator cannot handle.",
+    purpose: "Plays NES games through RetroArch.",
     binaries: &["fceumm"],
     approx_bytes: 760_000,
 };
@@ -58,7 +58,7 @@ pub const SNES9X: Module = Module {
     id: "snes9x",
     item: "_km_snes9x_xtreme",
     title: "SNES core (Snes9x)",
-    purpose: "Runs SNES games that the console's own emulator does not run well, through RetroArch.",
+    purpose: "Plays SNES games through RetroArch.",
     binaries: &["snes9x", "snes"],
     approx_bytes: 3_100_000,
 };

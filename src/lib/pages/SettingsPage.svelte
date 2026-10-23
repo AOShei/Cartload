@@ -14,6 +14,7 @@
   import { AppError, inTauri } from "../api/tauri";
   import type { KeyStatus, LogFileInfo, SetupStatus } from "../api/types";
   import AppMark from "../components/AppMark.svelte";
+  import Dialog from "../components/Dialog.svelte";
   import Icon from "../components/Icon.svelte";
   import Wordmark from "../components/Wordmark.svelte";
   import { app, consoleStore, flowStore, formatBytes, libraryStore, modulesStore, navigation, preferences, toasts, type Theme } from "../state";
@@ -26,6 +27,8 @@
   let about: HTMLElement | undefined = $state();
   let setup = $state<SetupStatus | null>(null);
   let setupBusy = $state(false);
+  let setupOpen = $state(false);
+  let setupChecking = $state(false);
   let log = $state<LogFileInfo | null>(null);
   /** A console running a hakchi kernel the app can talk to: modules install there. */
   const consoleReady = $derived.by((): boolean => {
@@ -62,6 +65,20 @@
       });
     }
   });
+
+  /** Runs the checks again and shows the result in the dialog. */
+  async function checkSetup(): Promise<void> {
+    setupOpen = true;
+    setupChecking = true;
+    try {
+      setup = await setupStatus();
+    } catch (error: unknown) {
+      const e = AppError.from(error);
+      toasts.error(`Could not read the system setup: ${e.message}`, e.detail);
+    } finally {
+      setupChecking = false;
+    }
+  }
 
   async function installSetup(): Promise<void> {
     setupBusy = true;
@@ -146,19 +163,8 @@
     }
   }
 
-  /** `1.2 MB`, `640 KB`. */
-  function humanBytes(bytes: number): string {
-    if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-    if (bytes >= 1024) {
-      return `${Math.round(bytes / 1024)} KB`;
-    }
-    return `${bytes} B`;
-  }
-
   const themes: { id: Theme; label: string; hint: string }[] = [
-    { id: "system", label: "Follow the system", hint: "Light or dark, as the desktop is set." },
+    { id: "system", label: "System", hint: "" },
     { id: "light", label: "Light", hint: "" },
     { id: "dark", label: "Dark", hint: "" },
   ];
@@ -166,231 +172,93 @@
   const credits: { name: string; by: string; url: string; what: string }[] = [
     { name: "hakchi", by: "madmonkey", url: "github.com/madmonkey1907/hakchi", what: "the kernel and the device-side tools Cartload installs and talks to (GPL-3)." },
     { name: "hakchi2 CE", by: "TeamShinkansen", url: "github.com/TeamShinkansen/Hakchi2-CE", what: "the reference for the console protocol, the FEL sequence and the sync (GPL-3)." },
+    { name: "RetroArch", by: "the Libretro team", url: "retroarch.com", what: "the emulator frontend and cores the Emulators section installs (GPL-3), packaged for the console by KMFDManic." },
     { name: "TheGamesDB", by: "the TheGamesDB community", url: "thegamesdb.net", what: "cover art and game metadata, fetched with your own API key." },
   ];
 </script>
 
 <div class="page">
   <div class="column">
-  <section class="card" aria-labelledby="theme-heading">
+  <section class="card row-card" aria-labelledby="theme-heading">
     <h2 id="theme-heading">Appearance</h2>
-    <fieldset>
-      <legend class="visually-hidden">Theme</legend>
+    <div class="segmented" role="radiogroup" aria-labelledby="theme-heading">
       {#each themes as theme (theme.id)}
-        <label class="option">
-          <input
-            type="radio"
-            name="theme"
-            value={theme.id}
-            checked={preferences.theme === theme.id}
-            onchange={() => preferences.setTheme(theme.id)}
-          />
-          <span class="option-icon">
-            <Icon name={theme.id === "dark" ? "moon" : "sun"} size={16} />
-          </span>
-          <span>
-            {theme.label}
-            {#if theme.hint}<span class="muted"> · {theme.hint}</span>{/if}
-          </span>
-        </label>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={preferences.theme === theme.id}
+          class:active={preferences.theme === theme.id}
+          onclick={() => preferences.setTheme(theme.id)}
+        >
+          <Icon name={theme.id === "dark" ? "moon" : "sun"} size={14} />
+          {theme.label}
+        </button>
       {/each}
-    </fieldset>
+    </div>
   </section>
 
   <section class="card" aria-labelledby="log-heading">
-    <h2 id="log-heading">Activity log</h2>
-    <label class="option">
-      <input
-        type="checkbox"
-        checked={preferences.showDebugLog}
-        onchange={(e) => preferences.setShowDebugLog(e.currentTarget.checked)}
-      />
-      <span>
-        Show details
-        <span class="muted"> · every command sent to the console and USB events.</span>
-      </span>
-    </label>
-    <h3>Bug reports</h3>
-    <p class="muted">
-      {#if log?.path}
-        The log is also written to <span class="mono path">{log.path}</span>
-        {#if log.exists}({humanBytes(log.size)}){/if}, with the previous three files kept beside it.
-      {:else}
-        The log is kept in this window only.
-      {/if}
-      A diagnostics report holds the build, the system, the console as last seen (including its
-      serial number and hardware id), the last install and sync, and the recent log. It never
-      contains your TheGamesDB key.
-    </p>
+    <div class="head">
+      <h2 id="log-heading">Activity log</h2>
+      <label class="option">
+        <input type="checkbox" checked={preferences.showDebugLog} onchange={(e) => preferences.setShowDebugLog(e.currentTarget.checked)} />
+        <span>Show details</span>
+      </label>
+    </div>
     <div class="actions">
-      <button type="button" class="btn" onclick={() => void copyDiagnostics()} disabled={diagnosticsBusy || !inTauri}>
+      <button type="button" class="btn" onclick={() => void copyDiagnostics()} disabled={diagnosticsBusy || !inTauri} title="For a bug report. Never includes your TheGamesDB key.">
         {#if diagnosticsBusy}<span class="spinner" aria-hidden="true"></span>{/if}
         Copy diagnostics
       </button>
-      <button type="button" class="btn btn-quiet" onclick={() => void saveDiagnostics()} disabled={diagnosticsBusy || !inTauri}>
-        Save diagnostics…
-      </button>
+      <button type="button" class="btn btn-quiet" onclick={() => void saveDiagnostics()} disabled={diagnosticsBusy || !inTauri}>Save diagnostics…</button>
       {#if log?.path}
-        <button type="button" class="btn btn-quiet" onclick={() => void revealLog()}>Open log folder</button>
+        <button type="button" class="btn btn-quiet" onclick={() => void revealLog()} title={log.path}>Open log folder</button>
       {/if}
     </div>
   </section>
 
   {#if setup?.applies}
-    <section class="card" aria-labelledby="setup-heading">
+    <section class="card row-card" aria-labelledby="setup-heading">
       <h2 id="setup-heading">Linux setup</h2>
-      <p class="muted">
-        Two system files let the app reach the console without root: a udev rule for USB
-        access and the hakchi0 interface name, and a NetworkManager profile that gives that
-        interface a link-local address and trusts it in the firewall. Installing asks for
-        your password.
-      </p>
-      <ul class="checks">
-        <li class:ok={setup.usb_rule}>
-          <Icon name={setup.usb_rule ? "check" : "dash"} size={16} />
-          <span>USB access rule {setup.usb_rule ? "installed" : "missing"}</span>
-        </li>
-        <li class:ok={setup.name_rule}>
-          <Icon name={setup.name_rule ? "check" : "dash"} size={16} />
-          <span>hakchi0 interface name {setup.name_rule ? "installed" : "missing"}</span>
-        </li>
-        {#if setup.network_manager}
-          <li class:ok={setup.network_profile}>
-            <Icon name={setup.network_profile ? "check" : "dash"} size={16} />
-            <span>Link-local network profile {setup.network_profile ? "installed" : "missing"}</span>
-          </li>
-        {:else}
-          <li>
-            <Icon name="dash" size={16} />
-            <span class="muted">NetworkManager not found: give hakchi0 a link-local address yourself when the console is connected.</span>
-          </li>
-        {/if}
-        {#if setup.firewalld}
-          {#if setup.firewall_zone === "trusted"}
-            <li class="ok">
-              <Icon name="check" size={16} />
-              <span>Firewall: hakchi0 is in the trusted zone</span>
-            </li>
-          {:else if setup.firewall_zone}
-            <li>
-              <Icon name="warning" size={16} />
-              <span>Firewall: hakchi0 is in the {setup.firewall_zone} zone, where the console's replies may be dropped. Install moves it to the trusted zone.</span>
-            </li>
-          {:else}
-            <li>
-              <Icon name="dash" size={16} />
-              <span class="muted">Firewall: firewalld is running; hakchi0's zone is checked once the console is connected{setup.network_profile ? " (the profile puts it in the trusted zone)" : ""}.</span>
-            </li>
-          {/if}
-        {/if}
-      </ul>
       {#if setup.complete}
-        <p class="muted">Everything is in place.</p>
+        <span class="status ok"><Icon name="check" size={16} /> Ready</span>
+        <button type="button" class="btn btn-quiet btn-sm" onclick={() => void checkSetup()}>Check again</button>
       {:else}
-        <div>
-          <button type="button" class="btn btn-primary" onclick={() => void installSetup()} disabled={setupBusy || !setup.can_install}>
-            {#if setupBusy}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
-            {setupBusy ? "Installing…" : "Install"}
-          </button>
-          {#if !setup.can_install}
-            <p class="muted">pkexec was not found, so the app cannot ask for administrator rights. See docs/hardware-tests.md for the files to install by hand.</p>
-          {/if}
-        </div>
+        <span class="status warn"><Icon name="warning" size={16} /> Needs attention</span>
+        <button type="button" class="btn btn-sm" onclick={() => void checkSetup()}>Check setup…</button>
       {/if}
     </section>
   {/if}
 
-  <section class="card" aria-labelledby="library-heading">
-    <h2 id="library-heading">Library</h2>
-    <p class="muted">
-      Games are kept in <span class="mono path">{libraryStore.view?.root ?? "the user data directory"}</span>.
-    </p>
-    <h3>TheGamesDB key</h3>
-    <p class="muted">
-      Cover art and metadata come from TheGamesDB, which needs a free API key from thegamesdb.net.
-      {#if keyLoading}
-        Checking the stored key…
-      {:else if keyStatus?.environment}
-        The CARTLOAD_TGDB_KEY variable is set and is used.
-      {:else if keyStatus?.stored}
-        A key is stored.
-      {:else}
-        No key yet.
-      {/if}
-      {#if keyStatus?.remaining !== null && keyStatus?.remaining !== undefined}
-        <span class="num">{keyStatus.remaining}</span> requests left this month.
-      {/if}
-    </p>
-    <form class="key" onsubmit={(e) => { e.preventDefault(); void saveKey(false); }}>
-      <input
-        type="password"
-        bind:value={keyValue}
-        placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"}
-        aria-label="TheGamesDB API key"
-        autocomplete="off"
-        disabled={keyBusy}
-      />
-      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>
-        {#if keyBusy}<span class="spinner" aria-hidden="true"></span>{/if}
-        Store
-      </button>
-      {#if keyStatus?.stored && !confirmKeyRemoval}
-        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => (confirmKeyRemoval = true)}>
-          Remove…
-        </button>
-      {/if}
-    </form>
-    {#if confirmKeyRemoval}
-      <div class="confirm" role="group" aria-label="Confirm removing the key">
-        <p>Remove the stored key? Fetching art stops working until a key is stored again.</p>
-        <div class="confirm-actions">
-          <button type="button" class="btn btn-danger" disabled={keyBusy} onclick={() => saveKey(true)}>Remove key</button>
-          <button type="button" class="btn btn-quiet" onclick={() => (confirmKeyRemoval = false)}>Keep it</button>
-        </div>
-      </div>
-    {/if}
-  </section>
   <section class="card" aria-labelledby="modules-heading">
     <h2 id="modules-heading">Emulators</h2>
-    <p class="muted">
-      RetroArch and its cores, from KMFD's Mod Hub, the same modules hakchi2 CE installs. A SNES
-      Classic Mini needs them to play NES games; both consoles need them for games their own
-      emulator does not run well. Installing downloads the module and reboots the console once.
-    </p>
     {#if modulesStore.status}
       <ul class="modules">
         {#each modulesStore.status.modules as module (module.id)}
           {@const progress = modulesStore.progress[module.id]}
-          {@const busy = modulesStore.downloading.includes(module.id) || flowStore.running}
+          {@const downloading = modulesStore.downloading.includes(module.id)}
           <li>
             <div class="module-text">
               <strong>{module.title}</strong>
-              <span class="muted">{module.purpose}</span>
               <span class="muted small">
-                {#if module.installed === true}
-                  Installed on the console.
-                {:else if module.installed === false}
-                  Not on the console.
-                {:else}
-                  Connect the console to see whether it is installed.
-                {/if}
-                {#if progress && modulesStore.downloading.includes(module.id)}
-                  Downloading {formatBytes(progress.done)}{progress.total ? ` of ${formatBytes(progress.total)}` : ""}…
-                {:else if module.cached}
-                  Downloaded ({formatBytes(module.cached_bytes ?? 0)}).
-                {:else}
-                  About {formatBytes(module.approx_bytes)} to download.
+                {module.purpose}
+                {#if downloading && progress}
+                  · Downloading {formatBytes(progress.done)}{progress.total ? ` of ${formatBytes(progress.total)}` : ""}
+                {:else if module.installed === true}
+                  · <span class="ok-text">Installed</span>
+                {:else if !module.cached}
+                  · {formatBytes(module.approx_bytes)}
                 {/if}
               </span>
             </div>
             <button
               type="button"
-              class="btn"
+              class="btn btn-sm"
               onclick={() => void modulesStore.install(module.id === "retroarch" ? ["retroarch"] : ["retroarch", module.id])}
-              disabled={busy || module.installed === true || !consoleReady}
-              title={consoleReady ? "" : "Connect a console running hakchi"}
+              disabled={downloading || flowStore.running || module.installed === true || !consoleReady}
+              title={consoleReady ? "Downloads the module and reboots the console once" : "Connect a console running hakchi"}
             >
-              {#if modulesStore.downloading.includes(module.id)}<span class="spinner" aria-hidden="true"></span>{/if}
+              {#if downloading}<span class="spinner" aria-hidden="true"></span>{/if}
               {module.installed === true ? "Installed" : "Install"}
             </button>
           </li>
@@ -405,13 +273,13 @@
   <div class="column">
   <section class="card about" aria-labelledby="about-heading" bind:this={about} tabindex="-1">
     <div class="identity">
-      <AppMark size={64} />
+      <AppMark size={48} />
       <div class="identity-text">
         <h2 id="about-heading" class="visually-hidden">About Cartload</h2>
-        <span class="wordmark"><Wordmark height={22} label="Cartload" /></span>
-        <p class="muted">
+        <span class="wordmark"><Wordmark height={20} label="Cartload" /></span>
+        <p class="muted small">
           {#if app.version}
-            Version <span class="num">{app.version.app}</span>{app.version.debug ? ", debug build" : ""}
+            Version <span class="num">{app.version.app}</span>{app.version.debug ? ", debug build" : ""} · GPL-3.0-or-later · <span class="mono">github.com/AOShei/Cartload</span>
           {:else if app.versionError}
             Version unknown ({app.versionError})
           {:else}
@@ -420,14 +288,6 @@
         </p>
       </div>
     </div>
-    <p>
-      Installs the hakchi kernel on NES, SNES and Famicom Classic Mini consoles and keeps a
-      games library in sync with them.
-    </p>
-    <p class="muted">
-      Free software under the GNU General Public License, version 3 or later. Source at
-      <span class="mono">github.com/AOShei/Cartload</span>.
-    </p>
     <h3>Built on</h3>
     <ul class="credits">
       {#each credits as credit (credit.name)}
@@ -437,22 +297,78 @@
         </li>
       {/each}
     </ul>
-    <p class="muted">
-      Made with Tauri, Rust and Svelte. Cartload is a from-scratch implementation and shares no code with hakchi2 CE.
+    <p class="muted small">Made with Tauri, Rust and Svelte. A from-scratch implementation; shares no code with hakchi2 CE.</p>
+  </section>
+
+  <section class="card" aria-labelledby="library-heading">
+    <div class="head">
+      <h2 id="library-heading">Library</h2>
+      <span class="mono path muted small" title={libraryStore.view?.root ?? ""}>{libraryStore.view?.root ?? "the user data directory"}</span>
+    </div>
+    <p class="muted small">
+      TheGamesDB key for cover art (free at thegamesdb.net):
+      {#if keyLoading}checking…{:else if keyStatus?.environment}set by CARTLOAD_TGDB_KEY{:else if keyStatus?.stored}stored{:else}none yet{/if}{#if keyStatus?.remaining !== null && keyStatus?.remaining !== undefined}, <span class="num">{keyStatus.remaining}</span> requests left this month{/if}.
     </p>
-    {#if app.version}
-      <details class="crates">
-        <summary>Linked crates</summary>
-        <ul class="muted">
-          {#each app.version.crates as crate (crate)}
-            <li class="num">{crate}</li>
-          {/each}
-        </ul>
-      </details>
-    {/if}
+    <form class="key" onsubmit={(e) => { e.preventDefault(); void saveKey(false); }}>
+      <input type="password" bind:value={keyValue} placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"} aria-label="TheGamesDB API key" autocomplete="off" disabled={keyBusy} />
+      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>
+        {#if keyBusy}<span class="spinner" aria-hidden="true"></span>{/if}
+        Store
+      </button>
+      {#if keyStatus?.stored}
+        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => (confirmKeyRemoval = true)}>Remove…</button>
+      {/if}
+    </form>
   </section>
   </div>
 </div>
+
+<Dialog open={confirmKeyRemoval} title="Remove the TheGamesDB key?" width="440px" onclose={() => (confirmKeyRemoval = false)}>
+  <p>Fetching art stops working until a key is stored again.</p>
+  {#snippet actions()}
+    <button type="button" class="btn btn-danger" disabled={keyBusy} onclick={() => saveKey(true)}>Remove key</button>
+    <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (confirmKeyRemoval = false)}>Keep it</button>
+  {/snippet}
+</Dialog>
+
+{#if setup}
+  <Dialog open={setupOpen} title="Linux setup" width="560px" onclose={() => (setupOpen = false)}>
+    {#if setupChecking}
+      <p class="muted"><span class="spinner" aria-hidden="true"></span> Checking…</p>
+    {:else}
+      <ul class="checks">
+        <li class:ok={setup.usb_rule}><Icon name={setup.usb_rule ? "check" : "warning"} size={16} /><span>USB access rule</span></li>
+        <li class:ok={setup.name_rule}><Icon name={setup.name_rule ? "check" : "warning"} size={16} /><span>hakchi0 interface name</span></li>
+        {#if setup.network_manager}
+          <li class:ok={setup.network_profile}><Icon name={setup.network_profile ? "check" : "warning"} size={16} /><span>Link-local network profile</span></li>
+        {:else}
+          <li><Icon name="warning" size={16} /><span>NetworkManager not found: give hakchi0 a link-local address yourself.</span></li>
+        {/if}
+        {#if setup.firewalld}
+          {#if setup.firewall_zone === "trusted"}
+            <li class="ok"><Icon name="check" size={16} /><span>Firewall: hakchi0 trusted</span></li>
+          {:else if setup.firewall_zone}
+            <li><Icon name="warning" size={16} /><span>Firewall: hakchi0 is in the {setup.firewall_zone} zone</span></li>
+          {:else}
+            <li class="ok"><Icon name="dash" size={16} /><span>Firewall: checked once the console is connected</span></li>
+          {/if}
+        {/if}
+      </ul>
+      {#if !setup.complete}
+        <p class="muted small">Install writes the missing files and asks for your password.{#if !setup.can_install} pkexec was not found, so install them by hand (docs/hardware-tests.md).{/if}</p>
+      {/if}
+    {/if}
+    {#snippet actions()}
+      {#if !setup?.complete}
+        <button type="button" class="btn btn-primary" onclick={() => void installSetup()} disabled={setupBusy || setupChecking || !setup?.can_install}>
+          {#if setupBusy}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
+          {setupBusy ? "Installing…" : "Install"}
+        </button>
+      {/if}
+      <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (setupOpen = false)}>Close</button>
+    {/snippet}
+  </Dialog>
+{/if}
 
 <style>
   /* Narrow: one scrolling column. Wide (1100 px and up): the settings on the left and the
@@ -489,20 +405,84 @@
       overflow: auto;
     }
 
-    .column > :last-child {
-      flex: 1 0 auto;
-    }
-
-    .about > :last-child {
-      margin-top: auto;
-    }
   }
 
   .card {
-    padding: var(--space-4) var(--space-5);
+    padding: var(--space-3) var(--space-5);
     display: flex;
     flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  /* A heading with its control on the same line. */
+  .head {
+    display: flex;
+  }
+
+  .row-card,
+  .head {
+    flex-direction: row;
+    align-items: center;
     gap: var(--space-3);
+  }
+
+  .row-card h2,
+  .head h2 {
+    flex: 1;
+  }
+
+  .head .path {
+    flex: 2;
+    min-width: 0;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .segmented {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-s);
+    overflow: hidden;
+  }
+
+  .segmented button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .segmented button + button {
+    border-left: 1px solid var(--border-strong);
+  }
+
+  .segmented button.active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .status.ok,
+  .ok-text {
+    color: var(--ok);
+  }
+
+  .status.warn {
+    color: var(--warn);
   }
 
   .checks {
@@ -529,25 +509,11 @@
     color: var(--ok);
   }
 
-  fieldset {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-
   .option {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     cursor: pointer;
-  }
-
-  .option-icon {
-    display: inline-flex;
-    color: var(--text-muted);
   }
 
   .path {
@@ -556,7 +522,7 @@
   }
 
   h3 {
-    margin-top: var(--space-2);
+    margin-top: var(--space-1);
   }
 
   .small {
@@ -578,6 +544,10 @@
     gap: var(--space-3);
   }
 
+  .modules {
+    gap: var(--space-2) !important;
+  }
+
   .module-text {
     flex: 1;
     min-width: 0;
@@ -588,7 +558,7 @@
 
   .modules .btn {
     flex: none;
-    min-width: 96px;
+    min-width: 88px;
   }
 
   .key,
@@ -635,12 +605,4 @@
     user-select: text;
   }
 
-  .crates {
-    font-size: var(--text-md);
-  }
-
-  .crates ul {
-    margin: var(--space-1) 0 0;
-    padding-left: 20px;
-  }
 </style>
