@@ -2,7 +2,8 @@
 //!
 //! hakchi2 CE names every game directory `CLV-<prefix>-<five letters>` where the letters come
 //! from the ROM's CRC-32 (`NesApplication.GenerateCode`) and the prefix identifies the system
-//! (`AppTypeCollection`: `U` for SNES, `H` for NES, `G` for Mega Drive). The stock games are
+//! (`AppTypeCollection`: `U` for SNES, `H` for NES, `G` for Mega Drive, `B`, `C` and `A`
+//! for the Game Boy family, `6` for N64). The stock games are
 //! `CLV-P-...`; menu folders are `CLV-S-<index>` with the index of the menu they open.
 
 /// Prefix of SNES game codes.
@@ -11,6 +12,14 @@ pub const PREFIX_SNES: char = 'U';
 pub const PREFIX_NES: char = 'H';
 /// Prefix of Mega Drive game codes.
 pub const PREFIX_MEGA_DRIVE: char = 'G';
+/// Prefix of Game Boy game codes.
+pub const PREFIX_GAME_BOY: char = 'B';
+/// Prefix of Game Boy Color game codes.
+pub const PREFIX_GAME_BOY_COLOR: char = 'C';
+/// Prefix of Game Boy Advance game codes.
+pub const PREFIX_GAME_BOY_ADVANCE: char = 'A';
+/// Prefix of N64 game codes.
+pub const PREFIX_N64: char = '6';
 /// Prefix of the stock games built into the firmware.
 pub const PREFIX_ORIGINAL: char = 'P';
 /// Prefix of menu folders.
@@ -37,7 +46,7 @@ pub fn is_code(code: &str) -> bool {
     let bytes = code.as_bytes();
     bytes.len() == 11
         && bytes.starts_with(b"CLV-")
-        && bytes[4].is_ascii_uppercase()
+        && (bytes[4].is_ascii_uppercase() || bytes[4].is_ascii_digit())
         && bytes[5] == b'-'
         && bytes[6..]
             .iter()

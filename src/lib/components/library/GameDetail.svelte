@@ -3,7 +3,7 @@
   import Dialog from "../Dialog.svelte";
   import Icon from "../Icon.svelte";
   import { inTauri } from "../../api/tauri";
-  import type { Game, GameEdit, MenuEntry, MenuPath } from "../../api/types";
+  import type { Game, GameEdit, MenuEntry, MenuPath, System } from "../../api/types";
   import { previewDialog } from "../../dev/preview";
   import { formatBytes, libraryStore, type Tile } from "../../state";
 
@@ -126,7 +126,23 @@
     }
   });
 
-  /** The flag hakchi's launcher scripts take to run a game through RetroArch. */
+  /** The RetroArch core each system's games run on (the core modules in Settings). */
+  const CORES: Record<System, string> = {
+    nes: "FCEUmm",
+    snes: "Snes9x",
+    "mega-drive": "Genesis Plus GX",
+    "game-boy": "Gambatte",
+    "game-boy-color": "Gambatte",
+    "game-boy-advance": "mGBA",
+    n64: "Mupen64Plus",
+  };
+
+  /** Systems the console has no built-in emulator for: only RetroArch plays them. */
+  function retroarchOnly(system: System): boolean {
+    return system !== "nes" && system !== "snes";
+  }
+
+  /** The flag RetroArch's emulator wrappers take to run a game through RetroArch. */
   const RETROARCH_FLAG = "--retroarch";
 
   function usesRetroarch(args: string): boolean {
@@ -144,7 +160,7 @@
 
   /** Sets the emulator of the selected games at once (the multi-selection panel). */
   async function applyEmulator(retroarch: boolean): Promise<void> {
-    for (const view of selectedGames) {
+    for (const view of selectedGames.filter((g) => !retroarchOnly(g.game.system))) {
       const edit = toEdit(view.game);
       const args = withEmulator(edit.args, retroarch);
       if (args !== edit.args) {
@@ -279,13 +295,20 @@
             <span>At the same time</span>
           </label>
         </div>
-        <label>
-          <span>Emulator</span>
-          <select value={usesRetroarch(form.args) ? "retroarch" : "builtin"} onchange={(e) => { if (form) form.args = withEmulator(form.args, e.currentTarget.value === "retroarch"); }}>
-            <option value="builtin">Built-in Emulator</option>
-            <option value="retroarch">RetroArch ({game.system_name === "NES" ? "FCEUmm core" : "Snes9x core"})</option>
-          </select>
-        </label>
+        {#if retroarchOnly(game.game.system)}
+          <div class="field">
+            <span class="field-label">Emulator</span>
+            <span>RetroArch ({CORES[game.game.system]} core)</span>
+          </div>
+        {:else}
+          <label>
+            <span>Emulator</span>
+            <select value={usesRetroarch(form.args) ? "retroarch" : "builtin"} onchange={(e) => { if (form) form.args = withEmulator(form.args, e.currentTarget.value === "retroarch"); }}>
+              <option value="builtin">Built-in Emulator</option>
+              <option value="retroarch">RetroArch ({CORES[game.game.system]} core)</option>
+            </select>
+          </label>
+        {/if}
         <div class="field">
           <span class="field-label" id="description-label">Description</span>
           <button type="button" class="desc-preview" onclick={openDescription} aria-labelledby="description-label" aria-describedby="description-text" title="Edit the description">

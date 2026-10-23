@@ -91,11 +91,27 @@ pub struct SyncPlanView {
     pub storage: Option<StorageView>,
     /// When the plan was made, milliseconds since the Unix epoch.
     pub planned_at: u64,
-    /// NES games whose launch entry points at RetroArch because this console has no NES
-    /// emulator of its own.
-    pub nes_via_retroarch: usize,
+    /// Games that run through RetroArch, one entry per system.
+    pub retroarch: Vec<RetroarchView>,
     /// Things the sync will do but that may not work on the console (missing RetroArch, ...).
     pub warnings: Vec<String>,
+}
+
+/// The games of one system that run through RetroArch.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RetroarchView {
+    /// The system.
+    pub system: cartload_library::System,
+    /// Its short name.
+    pub name: String,
+    /// Games of the system that run through RetroArch.
+    pub games: usize,
+    /// Of those, games pointed at RetroArch because the console has no emulator for them.
+    pub redirected: usize,
+    /// The core module the games need.
+    pub module: String,
+    /// Whether the console has RetroArch and the core (`None` when not checked).
+    pub installed: Option<bool>,
 }
 
 impl SyncPlanView {
@@ -134,7 +150,19 @@ impl SyncPlanView {
                 free: s.usage.free,
             }),
             planned_at: now,
-            nes_via_retroarch: plan.collection.nes_via_retroarch,
+            retroarch: plan
+                .collection
+                .retroarch
+                .iter()
+                .map(|(system, usage)| RetroarchView {
+                    system: *system,
+                    name: crate::library::short_system_name(*system).to_string(),
+                    games: usage.games,
+                    redirected: usage.redirected,
+                    module: system.core_module().to_string(),
+                    installed: None,
+                })
+                .collect(),
             warnings: Vec::new(),
         }
     }
@@ -426,15 +454,22 @@ impl SyncRunner {
         let plan =
             cartload_library::sync_plan(collection, &remote, &remote_links, paths, available);
         let mut view = SyncPlanView::new(&plan, info, now_ms());
-        if plan.needs_retroarch() {
-            let has = session.exec(commands::HAS_RETROARCH_NES).await?.success();
+        for usage in &mut view.retroarch {
+            let has = session
+                .exec(&commands::has_retroarch(usage.system))
+                .await?
+                .success();
+            usage.installed = Some(has);
             if !has {
-                let n = plan.collection.nes_via_retroarch;
+                let n = usage.games;
+                let core = cartload_hmod::modhub::find(&usage.module)
+                    .map_or(usage.module.as_str(), |m| m.title);
                 view.warnings.push(format!(
-                    "{n} NES game{} will not start: this console has no NES emulator of its own, and \
-                     RetroArch with the fceumm core (hakchi2 CE's retroarch and fceumm modules) is \
-                     not installed on it.",
-                    if n == 1 { "" } else { "s" }
+                    "{n} {} game{} need{} RetroArch with the {core}, which is not installed on \
+                     this console.",
+                    usage.name,
+                    if n == 1 { "" } else { "s" },
+                    if n == 1 { "s" } else { "" },
                 ));
             }
         }

@@ -1039,12 +1039,11 @@ fn is_art_file(code: &str, file: &str) -> bool {
     file == format!("{code}.png") || file == format!("{code}_small.png")
 }
 
-/// `SNES`, `NES`, `Mega Drive`.
+/// `SNES`, `NES`, `Mega Drive`, `Game Boy`, ...
 pub fn short_system_name(system: cartload_library::System) -> &'static str {
     match system {
-        cartload_library::System::Snes => "SNES",
-        cartload_library::System::Nes => "NES",
         cartload_library::System::MegaDrive => "Mega Drive",
+        other => other.name(),
     }
 }
 

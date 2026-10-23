@@ -40,6 +40,14 @@ pub const PLATFORM_NES: u32 = 7;
 pub const PLATFORM_GENESIS: u32 = 18;
 /// TheGamesDB platform id of the Sega Mega Drive.
 pub const PLATFORM_MEGA_DRIVE: u32 = 36;
+/// TheGamesDB platform id of the N64.
+pub const PLATFORM_N64: u32 = 3;
+/// TheGamesDB platform id of the Game Boy.
+pub const PLATFORM_GAME_BOY: u32 = 4;
+/// TheGamesDB platform id of the Game Boy Advance.
+pub const PLATFORM_GAME_BOY_ADVANCE: u32 = 5;
+/// TheGamesDB platform id of the Game Boy Color.
+pub const PLATFORM_GAME_BOY_COLOR: u32 = 41;
 
 /// The platforms a system's games are listed under.
 pub fn platform_ids(system: System) -> &'static [u32] {
@@ -47,6 +55,10 @@ pub fn platform_ids(system: System) -> &'static [u32] {
         System::Snes => &[PLATFORM_SNES],
         System::Nes => &[PLATFORM_NES],
         System::MegaDrive => &[PLATFORM_GENESIS, PLATFORM_MEGA_DRIVE],
+        System::GameBoy => &[PLATFORM_GAME_BOY],
+        System::GameBoyColor => &[PLATFORM_GAME_BOY_COLOR, PLATFORM_GAME_BOY],
+        System::GameBoyAdvance => &[PLATFORM_GAME_BOY_ADVANCE],
+        System::N64 => &[PLATFORM_N64],
     }
 }
 

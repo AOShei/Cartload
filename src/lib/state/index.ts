@@ -22,4 +22,4 @@ export {
   type ViewMode,
 } from "./library.svelte";
 export { syncStore, idleSync } from "./sync.svelte";
-export { modulesStore, NES_MODULES, SNES_MODULES } from "./modules.svelte";
+export { modulesStore, withRetroarch } from "./modules.svelte";

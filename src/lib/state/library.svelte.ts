@@ -40,7 +40,13 @@ export type Tile =
   | { kind: "original"; id: string; code: string; name: string; cover: string | null; thumbnail: string | null }
   | { kind: "folder"; id: string; path: MenuPath; folder: MenuFolder; games: number; cover: string | null };
 
-export const IMPORT_EXTENSIONS = ["sfc", "smc", "fig", "swc", "nes", "zip"];
+export const IMPORT_EXTENSIONS = [
+  "sfc", "smc", "fig", "swc", "nes",
+  "md", "mdx", "smd", "gen", "68k",
+  "gb", "sgb", "gbc", "gba",
+  "n64", "z64", "v64",
+  "zip",
+];
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "bmp"];
 /** MIME type of an internal drag (games and folders moved between folders). */
 export const DRAG_TYPE = "application/x-cartload-items";

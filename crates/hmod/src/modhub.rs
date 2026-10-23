@@ -5,8 +5,9 @@
 //! CE's `ModHub.Repository` reads them. Downloads are cached under the user's cache
 //! directory and verified against the hub's MD5 before use.
 //!
-//! The catalog is deliberately short: the three modules that make NES and SNES games run
-//! through RetroArch. Other systems are the same mechanism with another core.
+//! The catalog is deliberately short: RetroArch and one core per system the library knows
+//! (NES, SNES, Mega Drive / Genesis, the Game Boy family, N64). Each core module also puts
+//! the launcher the game's entry calls on the console's `PATH` (`/bin/md`, `/bin/gba`, ...).
 
 use std::path::{Path, PathBuf};
 
@@ -24,12 +25,16 @@ pub struct Module {
     pub item: &'static str,
     /// Human name.
     pub title: &'static str,
+    /// The name in the Settings grid: the system it plays, or RetroArch.
+    pub short: &'static str,
     /// What it is for, one sentence.
     pub purpose: &'static str,
     /// Binaries the module puts on the console's `PATH`; checked after the install.
     pub binaries: &'static [&'static str],
     /// Rough download size, for the UI before the download starts.
     pub approx_bytes: u64,
+    /// A caution the app shows before installing, when the module has one.
+    pub warning: Option<&'static str>,
 }
 
 /// RetroArch itself: the frontend, its launchers (`retroarch-clover`, `/bin/nes`, ...) and
@@ -38,9 +43,11 @@ pub const RETROARCH: Module = Module {
     id: "retroarch",
     item: "_km_retroarch_1910_ozone",
     title: "RetroArch 1.9.10",
+    short: "RetroArch 1.9.10",
     purpose: "The frontend every core runs in.",
     binaries: &["retroarch-clover", "nes"],
     approx_bytes: 10_600_000,
+    warning: None,
 };
 
 /// The NES core hakchi's launcher script and `/bin/nes` use.
@@ -48,9 +55,11 @@ pub const FCEUMM: Module = Module {
     id: "fceumm",
     item: "_km_fceumm_xtreme",
     title: "NES core (FCEUmm)",
-    purpose: "Plays NES games through RetroArch.",
+    short: "NES",
+    purpose: "The FCEUmm core.",
     binaries: &["fceumm"],
     approx_bytes: 760_000,
+    warning: None,
 };
 
 /// A SNES core for games the built-in emulator does not run well.
@@ -58,13 +67,71 @@ pub const SNES9X: Module = Module {
     id: "snes9x",
     item: "_km_snes9x_xtreme",
     title: "SNES core (Snes9x)",
-    purpose: "Plays SNES games through RetroArch.",
+    short: "SNES",
+    purpose: "The Snes9x core.",
     binaries: &["snes9x", "snes"],
     approx_bytes: 3_100_000,
+    warning: None,
+};
+
+/// Genesis Plus GX: Mega Drive / Genesis games through `/bin/md` (the module also carries
+/// the Master System, Game Gear and Mega-CD launchers).
+pub const GENESIS: Module = Module {
+    id: "genesis",
+    item: "_km_genesis_xtreme_gx",
+    title: "Mega Drive core (Genesis Plus GX)",
+    short: "Mega Drive / Genesis",
+    purpose: "The Genesis Plus GX core.",
+    binaries: &["md"],
+    approx_bytes: 1_650_000,
+    warning: None,
+};
+
+/// Gambatte: Game Boy and Game Boy Color games through `/bin/gb` and `/bin/gbc`.
+pub const GAMBATTE: Module = Module {
+    id: "gambatte",
+    item: "_km_gambatte",
+    title: "Game Boy core (Gambatte)",
+    short: "Game Boy and Color",
+    purpose: "The Gambatte core.",
+    binaries: &["gb", "gbc"],
+    approx_bytes: 300_000,
+    warning: None,
+};
+
+/// mGBA: Game Boy Advance games through `/bin/gba`.
+pub const MGBA: Module = Module {
+    id: "mgba",
+    item: "_km_mgba",
+    title: "Game Boy Advance core (mGBA)",
+    short: "Game Boy Advance",
+    purpose: "The mGBA core.",
+    binaries: &["gba"],
+    approx_bytes: 260_000,
+    warning: None,
+};
+
+/// Mupen64Plus (KMFD's Xtreme build): N64 games through `/bin/n64`. The console's chip is
+/// too slow for most of the library.
+pub const MUPEN64: Module = Module {
+    id: "mupen64",
+    item: "_km_mupen64_xtreme",
+    title: "N64 core (Mupen64Plus)",
+    short: "N64",
+    purpose: "The Mupen64Plus core.",
+    binaries: &["n64"],
+    approx_bytes: 1_360_000,
+    warning: Some(
+        "N64 emulation is too heavy for this console's chip. A few lighter games are playable; \
+         most run slowly, stutter or show graphics and sound glitches, and some do not start. \
+         Install it at your own risk.",
+    ),
 };
 
 /// Every module Cartload knows, RetroArch first.
-pub const CATALOG: &[&Module] = &[&RETROARCH, &FCEUMM, &SNES9X];
+pub const CATALOG: &[&Module] = &[
+    &RETROARCH, &FCEUMM, &SNES9X, &GENESIS, &GAMBATTE, &MGBA, &MUPEN64,
+];
 
 /// The module with this id or hub item name.
 pub fn find(id: &str) -> Option<&'static Module> {

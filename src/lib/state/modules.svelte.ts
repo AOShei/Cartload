@@ -6,9 +6,16 @@ import { flowStore } from "./flow.svelte";
 import { navigation } from "./navigation.svelte";
 import { toasts } from "./toasts.svelte";
 
-/** Which modules a need translates to: RetroArch plus the core. */
-export const NES_MODULES = ["retroarch", "fceumm"];
-export const SNES_MODULES = ["retroarch", "snes9x"];
+/** The modules a core needs on the console: RetroArch plus the core. */
+export function withRetroarch(core: string): string[] {
+  return core === "retroarch" ? ["retroarch"] : ["retroarch", core];
+}
+
+/** An install waiting for the user to accept a module's warning. */
+export interface PendingInstall {
+  ids: string[];
+  warnings: { title: string; text: string }[];
+}
 
 /* Emulator modules from the Mod Hub: the catalog with its cache and console state, downloads
    with progress, and the hand-off to the install flow (which runs on the Kernel page like
@@ -20,6 +27,8 @@ class ModulesStore {
   downloading = $state<string[]>([]);
   /** Download progress per module id. */
   progress = $state<Record<string, ModuleDownload>>({});
+  /** An install that asks for confirmation first (a module with a warning). */
+  pending = $state<PendingInstall | null>(null);
   private started = false;
 
   /** The modules with this id that are not yet on the console (unknown counts as missing). */
@@ -59,9 +68,30 @@ class ModulesStore {
     }
   }
 
+  /** Installs `ids`, asking first when one of them carries a warning (`pending`, shown by
+   *  `ModuleWarningDialog`). */
+  async install(ids: string[]): Promise<boolean> {
+    const warnings = ids
+      .map((id) => this.status?.modules.find((m) => m.id === id))
+      .filter((m) => m?.warning)
+      .map((m) => ({ title: m!.title, text: m!.warning! }));
+    if (warnings.length > 0) {
+      this.pending = { ids, warnings };
+      return false;
+    }
+    return this.installNow(ids);
+  }
+
+  /** Accepts the pending install's warnings and installs. */
+  async confirmPending(): Promise<boolean> {
+    const pending = this.pending;
+    this.pending = null;
+    return pending ? this.installNow(pending.ids) : false;
+  }
+
   /** Downloads what is missing from the cache, then starts the install flow for `ids` and
    *  shows the Kernel page, where the flow's steps are followed. */
-  async install(ids: string[]): Promise<boolean> {
+  private async installNow(ids: string[]): Promise<boolean> {
     if (!inTauri) {
       toasts.info("Installing modules works inside the desktop app only.");
       return false;

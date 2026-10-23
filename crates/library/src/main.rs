@@ -441,11 +441,7 @@ fn run_list(library: &Library, json: bool) -> Result<()> {
             "{}  {:<40}  {:<6}  {}  crc32 {:08X}  {}{}",
             game.code,
             game.name,
-            match game.system {
-                cartload_library::System::Snes => "SNES",
-                cartload_library::System::Nes => "NES",
-                cartload_library::System::MegaDrive => "MD",
-            },
+            game.system.name(),
             game.console_rom_file(),
             game.crc32,
             match (game.tgdb_id, game.tgdb_ids.is_empty()) {

@@ -30,7 +30,7 @@ use tracing::{debug, info, warn};
 
 use crate::menu::FolderImage;
 use crate::{
-    Error, Result,
+    Error, Result, System,
     desktop::{DesktopEntry, Format},
     game::{GAMES_PATH, PROFILE_PATH},
     images,
@@ -114,6 +114,15 @@ impl DevicePaths {
     /// `kachikachi` emulator it calls (checked on a SNES Classic Mini EUR, 2026-10-22).
     pub fn nes_needs_retroarch(&self) -> bool {
         self.family == ConsoleFamily::Snes
+    }
+
+    /// Whether SNES games synced to this console must run through RetroArch: the NES Classic
+    /// Mini, Famicom Mini and Shonen Jump edition have no `canoe`, and RetroArch's replacement
+    /// of the SNES wrapper is only mounted where the firmware has one, so hakchi's wrapper
+    /// would hand `-rom` to `/bin/snes` as the file name. The launch entry calls `/bin/snes`
+    /// directly instead, as hakchi2 CE does for SNES games it does not convert.
+    pub fn snes_needs_retroarch(&self) -> bool {
+        self.family == ConsoleFamily::Nes
     }
 
     fn check(&self) -> Result<()> {
@@ -291,9 +300,10 @@ pub struct Collection {
     /// Number of library games whose ROM goes up as a 7z archive (they need `tiny7zx` on the
     /// console).
     pub compressed: usize,
-    /// Number of NES games whose launch entry was pointed at RetroArch because the console
-    /// has no NES emulator of its own (they need RetroArch and its `fceumm` core).
-    pub nes_via_retroarch: usize,
+    /// Library games that run through RetroArch, by system: NES or SNES games the console has
+    /// no emulator for, games set to RetroArch, and the systems only RetroArch plays. Each
+    /// needs RetroArch and the system's core on the console.
+    pub retroarch: BTreeMap<System, RetroarchUse>,
 }
 
 impl Collection {
@@ -343,14 +353,14 @@ pub fn collect(
                             collection.compressed += 1;
                         }
                     }
-                    let game = if paths.nes_needs_retroarch() && nes_on_builtin(&game) {
-                        collection.nes_via_retroarch += 1;
-                        let mut game = game;
-                        game.args = format!("{} {RETROARCH_FLAG}", game.args).trim().to_string();
-                        game
-                    } else {
-                        game
-                    };
+                    let (game, launch) = launch_on(game, paths);
+                    if launch != Launch::Builtin {
+                        let usage = collection.retroarch.entry(game.system).or_default();
+                        usage.games += 1;
+                        if launch == Launch::Redirected {
+                            usage.redirected += 1;
+                        }
+                    }
                     let text = game.desktop_entry(&storage).render(Format::Hakchi);
                     collection.files.push(LocalFile::generated(
                         format!("./{dir}/{code}/{}", game.desktop_file()),
@@ -415,16 +425,74 @@ pub fn collect(
     Ok(collection)
 }
 
-/// The flag hakchi's NES launcher script (`clover-kachikachi-wr`) takes to run the game
-/// through RetroArch instead of the built-in emulator.
+/// The flag RetroArch's replacement of the firmware emulators (`clover-kachikachi`,
+/// `clover-canoe-shvc`, mounted by the RetroArch module) takes to run the game through
+/// RetroArch instead of the built-in emulator.
 pub const RETROARCH_FLAG: &str = "--retroarch";
 
-/// Whether a game is an NES game launched through hakchi's NES launcher script without the
-/// RetroArch flag already set.
-fn nes_on_builtin(game: &crate::Game) -> bool {
-    game.system == crate::System::Nes
-        && game.application.contains("clover-kachikachi")
-        && !game.args.split_whitespace().any(|a| a == RETROARCH_FLAG)
+/// Library games of one system that run through RetroArch.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RetroarchUse {
+    /// Games of the system that run through RetroArch.
+    pub games: usize,
+    /// Of those, the games the sync pointed at RetroArch because the console has no emulator
+    /// of its own for them.
+    pub redirected: usize,
+}
+
+/// How a game launches on the console it is synced to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Launch {
+    /// The firmware's own emulator.
+    Builtin,
+    /// RetroArch, as the game's entry says (or the only way for the system).
+    Retroarch,
+    /// RetroArch because the console has no emulator for the system; the entry was rewritten.
+    Redirected,
+}
+
+/// The game with its launch entry adapted to the console: NES games on SNES-family consoles
+/// get [`RETROARCH_FLAG`], SNES games on NES-family consoles call the `/bin/snes` launcher.
+pub fn launch_on(mut game: crate::Game, paths: &DevicePaths) -> (crate::Game, Launch) {
+    let flagged = game.args.split_whitespace().any(|a| a == RETROARCH_FLAG);
+    match game.system {
+        System::Nes if game.application.contains("clover-kachikachi") => {
+            if flagged {
+                (game, Launch::Retroarch)
+            } else if paths.nes_needs_retroarch() {
+                game.args = format!("{} {RETROARCH_FLAG}", game.args).trim().to_string();
+                (game, Launch::Redirected)
+            } else {
+                (game, Launch::Builtin)
+            }
+        }
+        System::Snes if game.application.contains("clover-canoe") => {
+            if paths.snes_needs_retroarch() {
+                game.application = format!("/bin/{}", System::Snes.retroarch_launcher());
+                game.args = game
+                    .args
+                    .split_whitespace()
+                    .filter(|a| *a != RETROARCH_FLAG)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (game, Launch::Redirected)
+            } else if flagged {
+                (game, Launch::Retroarch)
+            } else {
+                (game, Launch::Builtin)
+            }
+        }
+        System::Nes | System::Snes => {
+            // A launcher typed in Advanced (`/bin/nes`, `/bin/snes`) or another command.
+            let launcher = format!("/bin/{}", game.system.retroarch_launcher());
+            if game.application == launcher {
+                (game, Launch::Retroarch)
+            } else {
+                (game, Launch::Builtin)
+            }
+        }
+        _ => (game, Launch::Retroarch),
+    }
 }
 
 /// The launch entry of a firmware game as uploaded: the hakchi wrapper as emulator, ROM and
@@ -460,10 +528,19 @@ pub mod commands {
     /// Exit code 0 when the console can extract compressed games: the emulator wrappers call
     /// `tiny7zx` through `PATH`, so this is the check that matters.
     pub const WHICH_EXTRACTOR: &str = "which tiny7zx";
-    /// Exit code 0 when the console can run NES games through RetroArch: a RetroArch module
-    /// (`retroarch-clover` and the `nes` launcher hakchi's script calls) and an FCEUmm core
+    /// Exit code 0 when the console can run the system's games through RetroArch: a RetroArch
+    /// module (`retroarch-clover`) and the system's launcher (`nes`, `snes`, `md`, ...). The
+    /// NES launcher comes with RetroArch itself, so for NES the FCEUmm core is checked too
     /// (`fceumm_libretro.so` from hakchi2 CE's module, `km_fceumm_libretro.so` from KMFD's).
-    pub const HAS_RETROARCH_NES: &str = "which retroarch-clover >/dev/null && which nes >/dev/null && ls /etc/libretro/core/ 2>/dev/null | grep -q fceumm";
+    pub fn has_retroarch(system: crate::System) -> String {
+        let launcher = system.retroarch_launcher();
+        let mut command =
+            format!("which retroarch-clover >/dev/null && which {launcher} >/dev/null");
+        if system == crate::System::Nes {
+            command.push_str(" && ls /etc/libretro/core/ 2>/dev/null | grep -q fceumm");
+        }
+        command
+    }
     /// Stops the stock UI (the console's own `uistop` script).
     pub const UI_STOP: &str = "uistop";
     /// Unmounts the games overlay; exits 1 when nothing was mounted.
@@ -645,10 +722,10 @@ impl SyncPlan {
         self.collection.compressed > 0
     }
 
-    /// Whether the plan has NES games that run through RetroArch, which needs RetroArch and
-    /// its `fceumm` core on the console.
+    /// Whether the plan has games that run through RetroArch, which needs RetroArch and the
+    /// systems' cores on the console.
     pub fn needs_retroarch(&self) -> bool {
-        self.collection.nes_via_retroarch > 0
+        !self.collection.retroarch.is_empty()
     }
 
     /// Whether the console already holds everything.
@@ -1714,34 +1791,78 @@ mod tests {
         ));
     }
 
+    fn game(json: &str) -> crate::Game {
+        serde_json::from_str(json).unwrap()
+    }
+
     #[test]
     fn nes_games_go_through_retroarch_on_a_snes_console() {
-        assert!(
-            DevicePaths::for_console(ConsoleType::SnesEur)
-                .unwrap()
-                .nes_needs_retroarch()
+        let snes = DevicePaths::for_console(ConsoleType::SnesEur).unwrap();
+        let sfc = DevicePaths::for_console(ConsoleType::SuperFamicom).unwrap();
+        let nes = DevicePaths::for_console(ConsoleType::Nes).unwrap();
+        assert!(snes.nes_needs_retroarch() && sfc.nes_needs_retroarch());
+        assert!(!nes.nes_needs_retroarch());
+        let mut builtin = game(
+            r#"{"code":"CLV-H-AAAAA","name":"X","system":"nes","rom_file":"X.nes","crc32":1,"application":"/bin/clover-kachikachi-wr","args":"--volume 75"}"#,
         );
-        assert!(
-            DevicePaths::for_console(ConsoleType::SuperFamicom)
-                .unwrap()
-                .nes_needs_retroarch()
+        let (redirected, launch) = launch_on(builtin.clone(), &snes);
+        assert_eq!(launch, Launch::Redirected);
+        assert_eq!(redirected.args, "--volume 75 --retroarch");
+        assert_eq!(launch_on(builtin.clone(), &nes).1, Launch::Builtin);
+        builtin.args = "--volume 75 --retroarch".to_string();
+        let (unchanged, launch) = launch_on(builtin.clone(), &snes);
+        assert_eq!(
+            (launch, unchanged.args.as_str()),
+            (Launch::Retroarch, "--volume 75 --retroarch")
         );
-        assert!(
-            !DevicePaths::for_console(ConsoleType::Nes)
-                .unwrap()
-                .nes_needs_retroarch()
+        assert_eq!(launch_on(builtin.clone(), &nes).1, Launch::Retroarch);
+        builtin.args.clear();
+        builtin.application = "/bin/nes".to_string();
+        assert_eq!(launch_on(builtin, &nes).1, Launch::Retroarch);
+        assert!(commands::has_retroarch(System::Nes).contains("fceumm"));
+    }
+
+    #[test]
+    fn snes_games_call_the_snes_launcher_on_an_nes_console() {
+        let nes = DevicePaths::for_console(ConsoleType::Nes).unwrap();
+        let famicom = DevicePaths::for_console(ConsoleType::Famicom).unwrap();
+        let snes = DevicePaths::for_console(ConsoleType::SnesUsa).unwrap();
+        assert!(nes.snes_needs_retroarch() && famicom.snes_needs_retroarch());
+        assert!(!snes.snes_needs_retroarch());
+        let original = game(
+            r#"{"code":"CLV-U-AAAAA","name":"X","system":"snes","rom_file":"X.sfrom","crc32":1,"application":"/bin/clover-canoe-shvc-wr -rom","args":"--volume 100 --retroarch"}"#,
         );
-        let mut game: crate::Game = serde_json::from_str(
-            r#"{"code":"CLV-H-AAAAA","name":"X","system":"nes","rom_file":"X.nes","crc32":1,"application":"/bin/clover-kachikachi-wr"}"#,
-        )
-        .unwrap();
-        assert!(nes_on_builtin(&game));
-        game.args = "--volume 75 --retroarch".to_string();
-        assert!(!nes_on_builtin(&game));
-        game.args.clear();
-        game.application = "/bin/nes".to_string();
-        assert!(!nes_on_builtin(&game));
-        assert!(commands::HAS_RETROARCH_NES.contains("fceumm"));
+        let (redirected, launch) = launch_on(original.clone(), &nes);
+        assert_eq!(launch, Launch::Redirected);
+        assert_eq!(redirected.application, "/bin/snes");
+        assert_eq!(redirected.args, "--volume 100");
+        let entry = redirected.desktop_entry("/var/games");
+        assert_eq!(
+            entry.exec,
+            "/bin/snes /var/games/CLV-U-AAAAA/X.sfrom.7z --volume 100"
+        );
+        assert_eq!(launch_on(original.clone(), &snes).1, Launch::Retroarch);
+        let mut builtin = original;
+        builtin.args.clear();
+        assert_eq!(launch_on(builtin, &snes).1, Launch::Builtin);
+        assert_eq!(
+            commands::has_retroarch(System::Snes),
+            "which retroarch-clover >/dev/null && which snes >/dev/null"
+        );
+    }
+
+    #[test]
+    fn retroarch_only_systems_always_count() {
+        let snes = DevicePaths::for_console(ConsoleType::SnesEur).unwrap();
+        let md = game(
+            r#"{"code":"CLV-G-AAAAA","name":"X","system":"mega-drive","rom_file":"X.md","crc32":1,"application":"/bin/md","compress":false}"#,
+        );
+        let (same, launch) = launch_on(md.clone(), &snes);
+        assert_eq!((launch, &same), (Launch::Retroarch, &md));
+        assert_eq!(
+            same.desktop_entry("/var/games").exec,
+            "/bin/md /var/games/CLV-G-AAAAA/X.md"
+        );
     }
 
     #[test]

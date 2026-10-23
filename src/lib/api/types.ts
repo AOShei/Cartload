@@ -256,7 +256,7 @@ export interface DownloadProgress {
 
 /* Library page (library.rs, sync.rs) */
 
-export type System = "snes" | "nes" | "mega-drive";
+export type System = "snes" | "nes" | "mega-drive" | "game-boy" | "game-boy-color" | "game-boy-advance" | "n64";
 
 /** `cartload_library::Game` (game.json). */
 export interface Game {
@@ -490,8 +490,21 @@ export interface SyncPlanView {
   changes: number;
   storage: StorageView | null;
   planned_at: number;
-  nes_via_retroarch: number;
+  retroarch: RetroarchView[];
   warnings: string[];
+}
+
+/** The games of one system that run through RetroArch. */
+export interface RetroarchView {
+  system: System;
+  name: string;
+  games: number;
+  /** Games pointed at RetroArch because the console has no emulator for them. */
+  redirected: number;
+  /** The core module the games need. */
+  module: string;
+  /** Whether the console has RetroArch and the core (null when not checked). */
+  installed: boolean | null;
 }
 
 export type SyncState = "idle" | "running" | "done" | "failed";
@@ -541,8 +554,12 @@ export interface ModuleView {
   id: string;
   item: string;
   title: string;
+  /** The name in the Settings grid. */
+  short: string;
   purpose: string;
   approx_bytes: number;
+  /** A caution to show before installing. */
+  warning: string | null;
   cached: boolean;
   cached_bytes: number | null;
   installed: boolean | null;

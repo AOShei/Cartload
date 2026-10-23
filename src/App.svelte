@@ -3,6 +3,7 @@
   import { cubicOut } from "svelte/easing";
   import { fly } from "svelte/transition";
   import LogPanel from "./lib/components/LogPanel.svelte";
+  import ModuleWarningDialog from "./lib/components/ModuleWarningDialog.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import StatusBar from "./lib/components/StatusBar.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
@@ -71,6 +72,7 @@
   <StatusBar />
 </div>
 <Toaster />
+<ModuleWarningDialog />
 
 <style>
   .shell {

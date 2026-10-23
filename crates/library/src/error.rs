@@ -25,14 +25,6 @@ pub enum Error {
     )]
     UnsupportedFile(PathBuf),
 
-    /// A Mega Drive ROM was given; that console is not supported yet.
-    #[error(
-        "{}: Mega Drive / Genesis games are not supported yet (the Mega Drive Mini uses a \
-         different game format and menu layout)",
-        .0.display()
-    )]
-    MegaDriveUnsupported(PathBuf),
-
     /// The ROM could not be understood.
     #[error("{name}: {reason}")]
     InvalidRom {

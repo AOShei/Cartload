@@ -6,7 +6,7 @@
   import { inTauri } from "../../api/tauri";
   import { previewDialog } from "../../dev/preview";
   import { NORMAL, ms } from "../../motion";
-  import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore, modulesStore, NES_MODULES } from "../../state";
+  import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore, modulesStore, withRetroarch } from "../../state";
 
   const report = $derived(consoleStore.report);
   const status = $derived(report?.status ?? null);
@@ -15,6 +15,9 @@
     syncStore.plan?.storage ?? (status?.state === "connected" && status.info.storage ? status.info.storage.usage : null),
   );
   const plan = $derived(syncStore.plan);
+  /** Systems in the plan whose RetroArch core the console lacks, and the modules to fix it. */
+  const missingCores = $derived(plan?.retroarch.filter((r) => r.installed === false) ?? []);
+  const missingModules = $derived(modulesStore.missing([...new Set(missingCores.flatMap((r) => withRetroarch(r.module)))]));
   const snapshot = $derived(syncStore.snapshot);
   const running = $derived(syncStore.running);
   const libSize = $derived(libraryStore.view?.total_size ?? 0);
@@ -243,19 +246,19 @@
         {#each plan.warnings as warning (warning)}
           <li><Icon name="warning" size={16} /><span>{warning}</span></li>
         {/each}
-        {#if plan.nes_via_retroarch > 0}
+        {#if missingCores.length > 0}
           <li class="warning-action">
-            <button type="button" class="btn btn-sm" onclick={() => { changesOpen = false; void modulesStore.install(NES_MODULES); }} disabled={modulesStore.downloading.length > 0}>
-              Install RetroArch and the NES core
+            <button type="button" class="btn btn-sm" onclick={() => { changesOpen = false; void modulesStore.install(missingModules); }} disabled={modulesStore.downloading.length > 0}>
+              Install RetroArch and the {missingCores.length === 1 ? `${missingCores[0]!.name} core` : "cores"}
             </button>
-            <span class="muted">About 11 MB from KMFD's Mod Hub; the console reboots once.</span>
+            <span class="muted">From KMFD's Mod Hub; the console reboots once.</span>
           </li>
         {/if}
       </ul>
     {/if}
-    {#if plan.nes_via_retroarch > 0 && plan.warnings.length === 0}
-      <p class="muted">{plan.nes_via_retroarch} NES game{plan.nes_via_retroarch === 1 ? "" : "s"} will run through RetroArch: this console has no NES emulator of its own.</p>
-    {/if}
+    {#each plan.retroarch.filter((r) => r.redirected > 0 && r.installed !== false) as use (use.system)}
+      <p class="muted">{use.redirected} {use.name} game{use.redirected === 1 ? "" : "s"} will run through RetroArch: this console has no {use.name} emulator of its own.</p>
+    {/each}
     {@render changeLists(plan, true)}
     {#snippet actions()}
       <button type="button" class="btn btn-primary" onclick={() => { changesOpen = false; syncStore.review(); }} disabled={!canSync || syncStore.reviewing}>

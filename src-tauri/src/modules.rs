@@ -22,10 +22,14 @@ pub struct ModuleView {
     pub item: String,
     /// Human name.
     pub title: String,
+    /// The name in the Settings grid.
+    pub short: String,
     /// One sentence.
     pub purpose: String,
     /// Rough download size.
     pub approx_bytes: u64,
+    /// A caution to show before installing.
+    pub warning: Option<String>,
     /// Cached on this machine.
     pub cached: bool,
     /// Size of the cached file.
@@ -98,8 +102,10 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             id: module.id.to_string(),
             item: module.item.to_string(),
             title: module.title.to_string(),
+            short: module.short.to_string(),
             purpose: module.purpose.to_string(),
             approx_bytes: module.approx_bytes,
+            warning: module.warning.map(str::to_string),
             cached: cached_bytes.is_some(),
             cached_bytes,
             installed,
@@ -184,6 +190,23 @@ mod tests {
         assert!(resolve(&["retroarch".to_string(), "fceumm".to_string()]).is_ok());
         let error = resolve(&["mame".to_string()]).expect_err("unknown");
         assert!(error.message.contains("mame"));
+    }
+
+    #[test]
+    fn every_system_has_its_core_in_the_catalog() {
+        for system in cartload_library::System::ALL {
+            let module = modhub::find(system.core_module())
+                .unwrap_or_else(|| panic!("{system} has no core module"));
+            assert!(
+                module.binaries.contains(&system.retroarch_launcher())
+                    || (system == cartload_library::System::Nes
+                        && modhub::RETROARCH.binaries.contains(&"nes")),
+                "{system}: {} does not provide {}",
+                module.id,
+                system.retroarch_launcher()
+            );
+        }
+        assert!(modhub::MUPEN64.warning.is_some());
     }
 
     #[tokio::test]

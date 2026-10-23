@@ -13,20 +13,43 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result, codes};
 
-/// The consoles whose games the library knows how to prepare.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// The systems whose games the library knows how to prepare. SNES and NES games run on the
+/// console's own emulators (`canoe`, `kachikachi`) where the firmware has them; the others
+/// always run through RetroArch and need its core module on the console.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum System {
-    /// Super Nintendo / Super Famicom (`canoe`).
+    /// SNES / Super Famicom (`canoe`).
     Snes,
-    /// Nintendo Entertainment System / Famicom (`kachikachi`).
+    /// NES / Famicom (`kachikachi`).
     Nes,
-    /// Mega Drive / Genesis (`m2engage`). Recognised but not supported yet.
+    /// Mega Drive / Genesis, through RetroArch (`/bin/md`, Genesis Plus GX).
     MegaDrive,
+    /// Game Boy, through RetroArch (`/bin/gb`, Gambatte).
+    GameBoy,
+    /// Game Boy Color, through RetroArch (`/bin/gbc`, Gambatte).
+    GameBoyColor,
+    /// Game Boy Advance, through RetroArch (`/bin/gba`, mGBA).
+    GameBoyAdvance,
+    /// N64, through RetroArch (`/bin/n64`, Mupen64Plus). Slow on this hardware.
+    N64,
 }
 
 impl System {
+    /// Every system, in the order the app lists them.
+    pub const ALL: [Self; 7] = [
+        Self::Snes,
+        Self::Nes,
+        Self::MegaDrive,
+        Self::GameBoy,
+        Self::GameBoyColor,
+        Self::GameBoyAdvance,
+        Self::N64,
+    ];
+
     /// The system a ROM file extension belongs to (case-insensitive, with or without the dot).
+    /// The extensions are hakchi2 CE's (`AppTypeCollection`); `.bin` is left out because
+    /// it says nothing about the system.
     pub fn from_extension(extension: &str) -> Option<Self> {
         match extension
             .trim_start_matches('.')
@@ -35,7 +58,11 @@ impl System {
         {
             "sfc" | "smc" | "fig" | "swc" | "sfrom" => Some(Self::Snes),
             "nes" => Some(Self::Nes),
-            "md" | "mdx" | "smd" | "gen" | "68k" | "bin" => Some(Self::MegaDrive),
+            "md" | "mdx" | "smd" | "gen" | "68k" => Some(Self::MegaDrive),
+            "gb" | "sgb" => Some(Self::GameBoy),
+            "gbc" => Some(Self::GameBoyColor),
+            "gba" => Some(Self::GameBoyAdvance),
+            "n64" | "z64" | "v64" => Some(Self::N64),
             _ => None,
         }
     }
@@ -53,35 +80,79 @@ impl System {
             Self::Snes => codes::PREFIX_SNES,
             Self::Nes => codes::PREFIX_NES,
             Self::MegaDrive => codes::PREFIX_MEGA_DRIVE,
+            Self::GameBoy => codes::PREFIX_GAME_BOY,
+            Self::GameBoyColor => codes::PREFIX_GAME_BOY_COLOR,
+            Self::GameBoyAdvance => codes::PREFIX_GAME_BOY_ADVANCE,
+            Self::N64 => codes::PREFIX_N64,
         }
     }
 
-    /// Hardware family that runs this system's games natively.
-    pub const fn family(self) -> ConsoleFamily {
+    /// The console family whose firmware emulator runs this system's games, when one does.
+    pub const fn native_family(self) -> Option<ConsoleFamily> {
         match self {
-            Self::Snes => ConsoleFamily::Snes,
-            Self::Nes => ConsoleFamily::Nes,
-            Self::MegaDrive => ConsoleFamily::MegaDrive,
+            Self::Snes => Some(ConsoleFamily::Snes),
+            Self::Nes => Some(ConsoleFamily::Nes),
+            _ => None,
         }
     }
 
-    /// Human readable name.
+    /// Short name, as the app shows it.
     pub const fn name(self) -> &'static str {
         match self {
-            Self::Snes => "Super Nintendo Entertainment System",
-            Self::Nes => "Nintendo Entertainment System",
+            Self::Snes => "SNES",
+            Self::Nes => "NES",
             Self::MegaDrive => "Mega Drive / Genesis",
+            Self::GameBoy => "Game Boy",
+            Self::GameBoyColor => "Game Boy Color",
+            Self::GameBoyAdvance => "Game Boy Advance",
+            Self::N64 => "N64",
         }
     }
 
-    /// The emulator wrapper on the console, including the `-rom` switch where the emulator
-    /// takes one (`clover-canoe-shvc-wr -rom <file>`, `clover-kachikachi-wr <file>`).
+    /// The launch command, including the `-rom` switch where the emulator takes one
+    /// (`clover-canoe-shvc-wr -rom <file>`, `clover-kachikachi-wr <file>`, `md <file>`).
     pub const fn application(self) -> &'static str {
         match self {
             Self::Snes => "/bin/clover-canoe-shvc-wr -rom",
             Self::Nes => "/bin/clover-kachikachi-wr",
-            Self::MegaDrive => "/bin/m2engage",
+            Self::MegaDrive => "/bin/md",
+            Self::GameBoy => "/bin/gb",
+            Self::GameBoyColor => "/bin/gbc",
+            Self::GameBoyAdvance => "/bin/gba",
+            Self::N64 => "/bin/n64",
         }
+    }
+
+    /// The RetroArch launcher a core module puts on the console for this system: what a
+    /// launch entry calls when the game runs through RetroArch (`/bin/snes <file>`).
+    pub const fn retroarch_launcher(self) -> &'static str {
+        match self {
+            Self::Snes => "snes",
+            Self::Nes => "nes",
+            Self::MegaDrive => "md",
+            Self::GameBoy => "gb",
+            Self::GameBoyColor => "gbc",
+            Self::GameBoyAdvance => "gba",
+            Self::N64 => "n64",
+        }
+    }
+
+    /// The id of the core module (`cartload_hmod::modhub`) that plays this system's games
+    /// through RetroArch.
+    pub const fn core_module(self) -> &'static str {
+        match self {
+            Self::Snes => "snes9x",
+            Self::Nes => "fceumm",
+            Self::MegaDrive => "genesis",
+            Self::GameBoy | Self::GameBoyColor => "gambatte",
+            Self::GameBoyAdvance => "mgba",
+            Self::N64 => "mupen64",
+        }
+    }
+
+    /// Whether the system's games only ever run through RetroArch.
+    pub const fn retroarch_only(self) -> bool {
+        self.native_family().is_none()
     }
 
     /// The arguments hakchi2 CE puts after the ROM path.
@@ -92,7 +163,7 @@ impl System {
                 "--guest-overscan-dimensions 0,0,9,3 --initial-fadein-durations 3,2 --volume 75 \
                  --enable-armet"
             }
-            Self::MegaDrive => "",
+            _ => "",
         }
     }
 }
@@ -248,7 +319,29 @@ pub fn prepare(file_name: &str, data: Vec<u8>) -> Result<Prepared> {
     match system {
         System::Snes => prepare_snes(file_name, data),
         System::Nes => prepare_nes(file_name, data),
-        System::MegaDrive => Err(Error::MegaDriveUnsupported(file_name.into())),
+        system => Ok(prepare_plain(system, file_name, data)),
+    }
+}
+
+/// A ROM RetroArch loads as it is: stored unchanged, the code from the whole file.
+fn prepare_plain(system: System, file_name: &str, data: Vec<u8>) -> Prepared {
+    let safe = safe_file_name(file_name);
+    let (mut stem, extension) = split_extension(&safe);
+    if stem.is_empty() {
+        stem = "game";
+    }
+    let crc = crc32(&data);
+    Prepared {
+        system,
+        file_name: format!("{stem}{}", extension.to_ascii_lowercase()),
+        crc32: crc,
+        file_crc32: crc,
+        save_count: 0,
+        snes: None,
+        nes: None,
+        warnings: Vec::new(),
+        notes: Vec::new(),
+        data,
     }
 }
 
@@ -1047,6 +1140,11 @@ pub(crate) mod tests {
         assert_eq!(System::from_extension("sfc"), Some(System::Snes));
         assert_eq!(System::from_extension(".nes"), Some(System::Nes));
         assert_eq!(System::from_extension(".md"), Some(System::MegaDrive));
+        assert_eq!(System::from_extension(".bin"), None);
+        assert_eq!(System::from_extension("GBC"), Some(System::GameBoyColor));
+        assert_eq!(System::from_extension(".z64"), Some(System::N64));
+        assert!(System::N64.retroarch_only());
+        assert!(!System::Snes.retroarch_only());
         assert_eq!(System::from_extension(".zip"), None);
         assert!(is_importable("Game (USA).zip"));
         assert!(is_importable("game.NES"));
@@ -1219,15 +1317,17 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn prepare_rejects_garbage_and_mega_drive() {
+    fn prepare_rejects_garbage_and_keeps_retroarch_roms_unchanged() {
         assert!(matches!(
             prepare("x.sfc", vec![0u8; 1024]),
             Err(Error::InvalidRom { .. })
         ));
-        assert!(matches!(
-            prepare("x.md", vec![0u8; 1024]),
-            Err(Error::MegaDriveUnsupported(_))
-        ));
+        let md = prepare("Sonic the Hedgehog (USA, Europe).MD", vec![7u8; 1024]).expect("md");
+        assert_eq!(md.system, System::MegaDrive);
+        assert_eq!(md.file_name, "Sonic_the_Hedgehog.md");
+        assert_eq!(md.data, vec![7u8; 1024]);
+        assert_eq!(md.crc32, crc32(&[7u8; 1024]));
+        assert!(md.code().starts_with("CLV-G-"));
         assert!(matches!(
             prepare("x.txt", vec![]),
             Err(Error::UnsupportedFile(_))

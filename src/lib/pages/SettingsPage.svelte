@@ -17,7 +17,7 @@
   import Dialog from "../components/Dialog.svelte";
   import Icon from "../components/Icon.svelte";
   import Wordmark from "../components/Wordmark.svelte";
-  import { app, consoleStore, flowStore, formatBytes, libraryStore, modulesStore, navigation, preferences, toasts, type Theme } from "../state";
+  import { app, consoleStore, flowStore, formatBytes, libraryStore, modulesStore, navigation, preferences, toasts, withRetroarch, type Theme } from "../state";
 
   let keyStatus = $state<KeyStatus | null>(null);
   let keyLoading = $state(false);
@@ -233,17 +233,20 @@
 
   <section class="card grow" aria-labelledby="modules-heading">
     <h2 id="modules-heading">Emulators</h2>
-    <p class="muted small">RetroArch and its cores install into hakchi's storage on the console. The built-in emulators and the menu stay untouched.</p>
+    <p class="muted small">RetroArch and its cores install into hakchi's storage on the console; each core adds RetroArch when it is missing. The built-in emulators and the menu stay untouched.</p>
     {#if modulesStore.status}
       <ul class="modules">
         {#each modulesStore.status.modules as module (module.id)}
           {@const progress = modulesStore.progress[module.id]}
           {@const downloading = modulesStore.downloading.includes(module.id)}
-          <li>
+          <li class:wide={module.id === "retroarch"}>
             <div class="module-text">
-              <strong>{module.title}</strong>
+              <strong>{module.short}</strong>
               <span class="muted small">
                 {module.purpose}
+                {#if module.warning}
+                  <span class="risk" title={module.warning}><Icon name="warning" size={12} /> At your own risk</span>
+                {/if}
                 {#if downloading && progress}
                   · Downloading {formatBytes(progress.done)}{progress.total ? ` of ${formatBytes(progress.total)}` : ""}
                 {:else if module.installed === true}
@@ -256,7 +259,7 @@
             <button
               type="button"
               class="btn btn-sm"
-              onclick={() => void modulesStore.install(module.id === "retroarch" ? ["retroarch"] : ["retroarch", module.id])}
+              onclick={() => void modulesStore.install(modulesStore.missing(withRetroarch(module.id)))}
               disabled={downloading || flowStore.running || module.installed === true || !consoleReady}
               title={consoleReady ? "Downloads the module and reboots the console once" : "Connect a console running hakchi"}
             >
@@ -537,21 +540,34 @@
     font-size: var(--text-sm);
   }
 
+  /* RetroArch across the top, then the cores two to a row. */
   .modules {
     margin: 0;
     padding: 0;
     list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2) var(--space-5);
+  }
+
+  .modules li.wide {
+    grid-column: 1 / -1;
   }
 
   .modules li {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    padding-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
+  }
+
+  .risk {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: var(--space-1);
+    color: var(--warn);
   }
 
   .module-text {
@@ -564,7 +580,7 @@
 
   .modules .btn {
     flex: none;
-    min-width: 88px;
+    min-width: 76px;
   }
 
   .key,

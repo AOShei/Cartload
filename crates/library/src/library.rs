@@ -346,7 +346,8 @@ impl Library {
         options: &ImportOptions,
     ) -> Result<Imported> {
         let mut prepared = rom::prepare(file_name, data)?;
-        let compress = options.compress && prepared.system != System::MegaDrive;
+        // RetroArch games go up as they are: the core launchers do not run `tiny7zx`.
+        let compress = options.compress && !prepared.system.retroarch_only();
         let compress = if compress && !archive::can_compress(prepared.data.len() as u64) {
             prepared.warnings.push(
                 Error::TooLargeToCompress {
@@ -360,10 +361,16 @@ impl Library {
             compress
         };
         let code = prepared.code();
-        let record = db.and_then(|db| {
-            db.lookup(prepared.crc32)
-                .or_else(|| db.lookup(prepared.file_crc32))
-        });
+        // The database covers every system by CRC alone; a record whose file name says another
+        // system is a collision, not a match.
+        let record = db
+            .and_then(|db| {
+                db.lookup(prepared.crc32)
+                    .or_else(|| db.lookup(prepared.file_crc32))
+            })
+            .filter(|record| {
+                System::from_path(Path::new(&record.name)).is_none_or(|s| s == prepared.system)
+            });
         let name = match record {
             Some(record) => record.title(),
             None => rom::title_from_file_name(file_name),
