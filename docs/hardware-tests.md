@@ -957,6 +957,6 @@ RetroArch modules under other names, so the install path with KMFD's modules is 
 
 ### 4. SNES game on Snes9x
 
-1. Install "SNES core (Snes9x)". On a SNES game's Advanced dialog pick "RetroArch (Snes9x
+1. Install "SNES core (Snes9x)". In a SNES game's details set Emulator to "RetroArch (Snes9x
    core)", save, sync. The game starts through RetroArch (`--retroarch` on the launch line);
    switching back to "The console's own SNES emulator" and syncing restores canoe.

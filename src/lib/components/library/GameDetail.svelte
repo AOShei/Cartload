@@ -133,13 +133,24 @@
     return args.split(/\s+/).includes(RETROARCH_FLAG);
   }
 
-  /** Adds or removes the RetroArch flag in the draft's arguments. */
-  function setEmulator(retroarch: boolean): void {
-    const words = advDraft.args.split(/\s+/).filter((w) => w !== "" && w !== RETROARCH_FLAG);
+  /** The arguments with the RetroArch flag added or removed. */
+  function withEmulator(args: string, retroarch: boolean): string {
+    const words = args.split(/\s+/).filter((w) => w !== "" && w !== RETROARCH_FLAG);
     if (retroarch) {
       words.push(RETROARCH_FLAG);
     }
-    advDraft.args = words.join(" ");
+    return words.join(" ");
+  }
+
+  /** Sets the emulator of the selected games at once (the multi-selection panel). */
+  async function applyEmulator(retroarch: boolean): Promise<void> {
+    for (const view of selectedGames) {
+      const edit = toEdit(view.game);
+      const args = withEmulator(edit.args, retroarch);
+      if (args !== edit.args) {
+        await libraryStore.save({ ...edit, args });
+      }
+    }
   }
 
   async function saveAdvanced(): Promise<void> {
@@ -268,6 +279,13 @@
             <span>At the same time</span>
           </label>
         </div>
+        <label>
+          <span>Emulator</span>
+          <select value={usesRetroarch(form.args) ? "retroarch" : "builtin"} onchange={(e) => { if (form) form.args = withEmulator(form.args, e.currentTarget.value === "retroarch"); }}>
+            <option value="builtin">{game.system_name === "NES" ? "The console's own NES emulator" : "The console's own SNES emulator"}</option>
+            <option value="retroarch">RetroArch ({game.system_name === "NES" ? "FCEUmm core" : "Snes9x core"})</option>
+          </select>
+        </label>
         <div class="field">
           <span class="field-label" id="description-label">Description</span>
           <button type="button" class="desc-preview" onclick={openDescription} aria-labelledby="description-label" aria-describedby="description-text" title="Edit the description">
@@ -309,27 +327,14 @@
 
       <Dialog open={advOpen} title="Advanced: {game.game.name}" width="600px" onclose={() => (advOpen = false)}>
         <label>
-          <span>Emulator</span>
-          <select value={usesRetroarch(advDraft.args) ? "retroarch" : "builtin"} onchange={(e) => setEmulator(e.currentTarget.value === "retroarch")} data-autofocus>
-            <option value="builtin">{game.system_name === "NES" ? "The console's own NES emulator" : "The console's own SNES emulator"}</option>
-            <option value="retroarch">RetroArch ({game.system_name === "NES" ? "FCEUmm core" : "Snes9x core"})</option>
-          </select>
-        </label>
-        <p class="muted small">
-          {#if game.system_name === "NES"}
-            A SNES Classic Mini has no NES emulator of its own, so NES games synced to one use RetroArch whatever this says.
-          {:else}
-            Use RetroArch for games the console's own emulator does not run well. It needs the RetroArch and Snes9x modules (Settings).
-          {/if}
-        </p>
-        <label>
           <span>Launch command</span>
-          <input type="text" class="mono" bind:value={advDraft.application} />
+          <input type="text" class="mono" bind:value={advDraft.application} data-autofocus />
         </label>
         <label>
           <span>Arguments</span>
           <input type="text" class="mono" bind:value={advDraft.args} />
         </label>
+        <p class="muted small">The Emulator choice in the game's details sets or clears <span class="mono">--retroarch</span> here; anything else is passed to the emulator as typed.</p>
         <label class="check">
           <input type="checkbox" bind:checked={advDraft.compress} />
           <span>Compress for the console (7z, needs the tiny7zx mod; roughly halves the space a SNES game takes)</span>
@@ -431,6 +436,16 @@
           <span>{libraryStore.artBusy ? "Fetching…" : `Fetch art for ${selectedGames.length} game${selectedGames.length === 1 ? "" : "s"}`}</span>
         </button>
         {#if artLine}<p class="art-line muted" role="status">{artLine}</p>{/if}
+        {#if selectedGames.length > 0}
+          <label class="move">
+            <span>Emulator</span>
+            <select onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; if (v) void applyEmulator(v === "retroarch"); }} disabled={libraryStore.saving}>
+              <option value="">Choose for {selectedGames.length} games…</option>
+              <option value="builtin">The console's own emulator</option>
+              <option value="retroarch">RetroArch</option>
+            </select>
+          </label>
+        {/if}
         <label class="move">
           <span>Move to</span>
           <select onchange={(e) => { moveTo(e.currentTarget.value); e.currentTarget.value = ""; }} disabled={libraryStore.menuBusy}>

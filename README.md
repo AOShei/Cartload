@@ -90,7 +90,10 @@ built-in emulator does not run well. For those, **Settings → Emulators** insta
 and a core (FCEUmm for NES, Snes9x for SNES) from KMFD's Mod Hub, the same modules hakchi2
 CE offers. Cartload downloads the module, checks it against the hub's checksum, installs it
 with the console's own tools and reboots the console once. NES games synced to a SNES Mini
-use RetroArch automatically; any game can be switched to RetroArch in its Advanced dialog.
+use RetroArch automatically; any game can be switched to RetroArch with the Emulator choice in its
+details, or several at once from the multi-selection panel. Modules live in hakchi's overlay on
+the data partition: the console's own files and its menu are untouched, and a factory reset
+removes them with everything else.
 When a sync needs a module the console lacks, the plan says so and offers the install.
 
 ### Cover art
