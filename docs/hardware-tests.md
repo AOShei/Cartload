@@ -1028,9 +1028,10 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
 
 1. The top bar shows the Cartload mark and three tabs: Console, Library, Settings (Ctrl+1 to
    Ctrl+3; Left/Right move between the tabs). Clicking the mark opens About in Settings.
-2. Console page with a console running hakchi: the status card, then Emulators on the left and
-   hakchi (package, Reinstall, Save the stock kernel, Factory reset), Detected and a collapsed
-   Technical details on the right. With a stock console or FEL mode: the three setup steps on
+2. Console page with a console running hakchi: on the left the status card, hakchi (package,
+   then Reinstall, Save the stock kernel and Factory reset side by side) and Emulators; on the
+   right Detected and a collapsed Technical details, all visible without scrolling at the
+   default 1600 × 800 window. With a stock console or FEL mode: the three setup steps on
    the left and Boot from memory, Save, Factory reset on the right.
 3. Settings has no Emulators section; the Linux setup row is there, and on the Console page
    only while it needs attention.

@@ -12,9 +12,11 @@
   interface Props {
     /** The console runs its installed hakchi. */
     installed: boolean;
+    /** The tools side by side (under the status card) instead of one per line. */
+    row?: boolean;
   }
 
-  let { installed }: Props = $props();
+  let { installed, row = false }: Props = $props();
 
   const watch = $derived(consoleWatch(consoleStore.report));
   const pkg = $derived(packageStore.status?.package ?? null);
@@ -47,7 +49,8 @@
   }
 </script>
 
-<section class="card maintenance" aria-labelledby="maintenance-heading">
+<section class="card maintenance" class:row aria-labelledby="maintenance-heading">
+  <div class="head">
   <h2 id="maintenance-heading">hakchi</h2>
   {#if installed}
     <div class="package">
@@ -66,6 +69,7 @@
       </button>
     </div>
   {/if}
+  </div>
   <ul class="tools" title={canStart ? undefined : reason}>
     {#if installed}
       <li>
@@ -135,11 +139,57 @@
     padding: var(--space-4) var(--space-5);
   }
 
+  .head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
   .package {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     justify-content: space-between;
+  }
+
+  /* Side by side: the heading and the package on one line, then one column per tool with
+     its button at the bottom, so the buttons line up whatever the description's length. */
+  .row .head {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .row .package {
+    flex: 1;
+    justify-content: flex-start;
+  }
+
+  .row .tools {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-2);
+  }
+
+  .row .tools li {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: 0;
+    border-top: 0;
+  }
+
+  .row .tools .btn {
+    align-self: flex-start;
+  }
+
+  @media (max-width: 799px) {
+    .row .tools {
+      grid-template-columns: 1fr;
+    }
   }
 
   .tools {

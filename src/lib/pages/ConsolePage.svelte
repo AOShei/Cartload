@@ -86,73 +86,71 @@
 </script>
 
 <div class="page">
-  <StatusCard {report} refreshing={consoleStore.refreshing} {primary} onrefresh={() => void consoleStore.refresh()} />
-  <LinuxSetup onlyWhenNeeded />
+  <div class="main">
+    <StatusCard {report} refreshing={consoleStore.refreshing} {primary} onrefresh={() => void consoleStore.refresh()} />
+    <LinuxSetup onlyWhenNeeded />
+    {#if mode === "installed"}
+      <MaintenanceCard installed row />
+      <EmulatorsCard />
+    {:else if mode === "setup"}
+      <HakchiSetup />
+    {:else}
+      <section class="card unsupported">
+        <h2>Not supported</h2>
+        <p class="muted">Cartload works with the NES, SNES and Famicom Classic Minis. The Mega Drive Mini is detected only to be left alone.</p>
+      </section>
+    {/if}
+  </div>
 
-  <div class="columns">
-    <div class="main">
-      {#if mode === "installed"}
-        <EmulatorsCard />
-      {:else if mode === "setup"}
-        <HakchiSetup />
-      {:else}
-        <section class="card unsupported">
-          <h2>Not supported</h2>
-          <p class="muted">Cartload works with the NES, SNES and Famicom Classic Minis. The Mega Drive Mini is detected only to be left alone.</p>
-        </section>
-      {/if}
-    </div>
+  <div class="side">
+    {#if mode === "setup"}
+      <MaintenanceCard installed={false} />
+    {/if}
 
-    <div class="side">
-      {#if mode !== "unsupported"}
-        <MaintenanceCard installed={mode === "installed"} />
-      {/if}
+    {#if report && report.details.length > 0}
+      <section class="card details" aria-labelledby="details-heading">
+        <h2 id="details-heading">Detected</h2>
+        <DetailsList details={report.details} />
+      </section>
+    {/if}
 
-      {#if report && report.details.length > 0}
-        <section class="card details" aria-labelledby="details-heading">
-          <h2 id="details-heading">Detected</h2>
-          <DetailsList details={report.details} />
-        </section>
-      {/if}
+    {#if app.devExec && status?.state === "connected"}
+      <section class="card dev" aria-label="Run a command on the console">
+        <h2>Run a command <span class="muted">(development build)</span></h2>
+        <form onsubmit={runCommand}>
+          <input type="text" class="mono" placeholder="hakchi get rootfs" bind:value={command} aria-label="Shell line to run on the console" spellcheck="false" />
+          <button type="submit" class="btn" disabled={running || !command.trim()}>
+            {#if running}
+              <span class="spinner" aria-hidden="true"></span>
+              Running…
+            {:else}
+              <Icon name="play" size={16} />
+              Run
+            {/if}
+          </button>
+        </form>
+        {#if result}
+          <p class="muted num">exit code {result.exit_code ?? "none"}</p>
+          {#if result.stdout}<pre>{result.stdout}</pre>{/if}
+          {#if result.stderr}<pre class="stderr">{result.stderr}</pre>{/if}
+        {/if}
+      </section>
+    {/if}
 
-      {#if app.devExec && status?.state === "connected"}
-        <section class="card dev" aria-label="Run a command on the console">
-          <h2>Run a command <span class="muted">(development build)</span></h2>
-          <form onsubmit={runCommand}>
-            <input type="text" class="mono" placeholder="hakchi get rootfs" bind:value={command} aria-label="Shell line to run on the console" spellcheck="false" />
-            <button type="submit" class="btn" disabled={running || !command.trim()}>
-              {#if running}
-                <span class="spinner" aria-hidden="true"></span>
-                Running…
-              {:else}
-                <Icon name="play" size={16} />
-                Run
-              {/if}
-            </button>
-          </form>
-          {#if result}
-            <p class="muted num">exit code {result.exit_code ?? "none"}</p>
-            {#if result.stdout}<pre>{result.stdout}</pre>{/if}
-            {#if result.stderr}<pre class="stderr">{result.stderr}</pre>{/if}
-          {/if}
-        </section>
-      {/if}
-
-      {#if status}
-        <details class="card raw">
-          <summary>Technical details</summary>
-          <p class="muted raw-lede">Raw data from the console, useful in bug reports.</p>
-          <pre>{JSON.stringify(status, null, 2)}</pre>
-        </details>
-      {/if}
-    </div>
+    {#if status}
+      <details class="card raw">
+        <summary>Technical details</summary>
+        <p class="muted raw-lede">Raw data from the console, useful in bug reports.</p>
+        <pre>{JSON.stringify(status, null, 2)}</pre>
+      </details>
+    {/if}
   </div>
 </div>
 
 <style>
-  /* Narrow: one scrolling column. Wide (1100 px and up): the main card (emulators, or the
-     setup) on the left and the maintenance and details on the right, each column scrolling
-     on its own under the status card. */
+  /* Narrow: one scrolling column. Wide (1100 px and up): the status card, hakchi and the
+     emulators (or the setup) on the left, the details on the right from the top, each
+     column scrolling on its own. */
   .page {
     flex: 1;
     min-height: 0;
@@ -162,7 +160,6 @@
     overflow: auto;
   }
 
-  .columns,
   .main,
   .side {
     display: flex;
@@ -232,11 +229,10 @@
       overflow: hidden;
     }
 
-    .columns {
-      flex: 1;
-      min-height: 0;
+    .page {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(360px, 34%);
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 32%);
+      grid-template-rows: minmax(0, 1fr);
       gap: var(--space-5);
     }
 
