@@ -126,7 +126,8 @@
   {:else if shape === "snes-usa"}
     <!-- SNES Classic (North America): one grey, defined by its contours. The raised
          cartridge block at the back with its slot band, then Power and Reset as purple bars
-         that slide towards and away from you, the grey Eject button standing between them,
+         that slide towards and away from you, labelled on the bars, the grey Eject button
+         between them with its label on it,
          and the controller-port blocks running from the bars past the front edge. -->
     <rect class="usa-body" x="40" y="28" width="220" height="252" rx="8" />
     <!-- the controller-port blocks run from the cartridge block, under the bars, to a little past the front edge -->
@@ -138,20 +139,21 @@
     <line class="usa-line" x1="72" y1="131" x2="228" y2="131" />
     <line class="usa-line" x1="84" y1="111" x2="84" y2="131" />
     <line class="usa-line" x1="216" y1="111" x2="216" y2="131" />
+    <!-- eject: level with the bars' top edges, filling the gap between the port blocks; the
+         bars, drawn after it, overlap its sides a little -->
+    <rect x="130" y="176" width="40" height="60" rx="3" fill="#c4c4c7" stroke="#a0a0a6" />
+    <text class="lbl on-bar" x="150" y="229" text-anchor="middle">EJECT</text>
     <!-- power bar and its lights -->
     <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
     <circle cx="52" cy="191" r="1.8" fill="#8a8a8e" />
     <rect x="62" y="176" width="70" height="22" rx="4" fill="#5a4a9c" stroke="#3f3374" />
     <line x1="68" y1="181" x2="126" y2="181" stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
-    <text class="lbl on-light" x="97" y="214" text-anchor="middle">POWER</text>
-    <!-- eject -->
-    <rect x="138" y="170" width="24" height="56" rx="3" fill="#c4c4c7" stroke="#a0a0a6" />
-    <text class="lbl on-light" x="150" y="240" text-anchor="middle">EJECT</text>
+    <text class="lbl on-bar" x="97" y="193" text-anchor="middle">POWER</text>
     <!-- reset bar -->
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="9" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="4" fill="#5a4a9c" stroke="#3f3374" />
     <line x1={reset.x + 6} y1={reset.y + 5} x2={reset.x + reset.w - 6} y2={reset.y + 5} stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
-    <text class="lbl reset-on-light" x={reset.x + reset.w / 2} y="214" text-anchor="middle">RESET</text>
+    <text class="lbl on-bar" x={reset.x + reset.w / 2} y={reset.y + 17} text-anchor="middle">RESET</text>
   {:else if shape === "nes"}
     <!-- NES Classic Mini, seen from the front, since its buttons are on the front face:
          the light grey top whose cartridge cover forms the top edge, the black band
@@ -298,6 +300,10 @@
 
   .on-light {
     fill: #4a4a4e;
+  }
+
+  .on-bar {
+    fill: #ffffff;
   }
 
 
