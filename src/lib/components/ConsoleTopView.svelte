@@ -113,12 +113,14 @@
     <line class="sfc-tick" x1="214" y1="126" x2="214" y2="138" />
     <path d="M144 127h12l-6 7z" fill="#8e8f93" />
     <!-- power slide, eject, reset: one centred row -->
+    <rect class="sfc-rim" x="69.5" y="197.5" width="39" height="41" rx="7" />
     <rect class="sfc-dark" x="72" y="200" width="34" height="36" rx="5" />
     <rect x="76" y="203" width="26" height="12" rx="3" fill="#6b6c70" />
     <text class="lbl on-dark" x="89" y="229" text-anchor="middle">POWER</text>
     <rect x="120" y="200" width="60" height="36" rx="6" fill="#a9aaad" stroke="#8a8b8f" />
     <text class="lbl on-light" x="150" y="221" text-anchor="middle">EJECT</text>
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="10" />
+    <rect class="sfc-rim" x={reset.x - 2.5} y={reset.y - 2.5} width={reset.w + 5} height={reset.h + 5} rx="7" />
     <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="5" />
     <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y={reset.y + 29} text-anchor="middle">RESET</text>
     <!-- the seams on the light front, inset from the plate's sides, down to the bottom edge -->
@@ -241,6 +243,11 @@
   .sfc-dark {
     fill: #44454a;
     stroke: #2f3034;
+  }
+
+  /* the thin light grey border around Power and Reset */
+  .sfc-rim {
+    fill: #d7d5d1;
   }
 
   .sfc-seam {
