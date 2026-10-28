@@ -487,6 +487,9 @@ impl SyncRunner {
         info!(
             uploads = view.uploads.len(),
             deletions = view.deletions.len(),
+            unlinks = view.link_deletions.len(),
+            links = view.link_additions.len(),
+            empty_dirs = view.empty_dirs.len(),
             upload_bytes = view.upload_size,
             fits = view.fits,
             "sync planned"
