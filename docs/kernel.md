@@ -55,23 +55,31 @@ host in the kernel, the vendor drivers' `__DATE__`, Mali's build date and the ar
 all fixed to the kernel commit, so two builds of the same commits give the same bytes.
 
 Output: the kernel (`zImage`, `System.map`, `.config`), a `boot.img`, the modules
-(`target/kernel/stage/lib/modules/3.4.113.30-cartload`) and a test package
-`hakchi-3.4.113.30-cartload-test.hmod`. The boot image is the pinned package's, with the kernel
-replaced and a second ramdisk archive appended that puts this kernel's NAND and SCSI drivers in
-`/lib/modules-ramfs`, as the package's ramdisk has madmonkey's. The other modules belong in
-`/lib/modules/3.4.113.30-cartload` on the console: hakchi links `/lib/modules/$(uname -r)` to the
-data partition's copy first and to `/lib/modules-ramfs` only when there is none. A ramdisk with
-every module (4.8 MB) does not start from u-boot at all. The script first checks that repacking the package's own kernel and
-ramdisk reproduces its `boot.img`.
+(`target/kernel/stage/lib/modules/3.4.113.30-cartload`) and a package
+`hakchi-3.4.113.30-cartload.hmod`. The script first checks that repacking the pinned package's own
+kernel and ramdisk reproduces its `boot.img`.
+
+- The boot image is the pinned package's, with the kernel replaced and a second ramdisk archive
+  appended that puts this kernel's NAND and SCSI drivers in `/lib/modules-ramfs`, as the
+  package's ramdisk has madmonkey's. A ramdisk with every module (4.8 MB) does not start from
+  u-boot at all, though kexec boots it.
+- The package is the pinned one with that boot image, this kernel's modules in `lib/modules`
+  (hakchi's installer copies them to the data partition, replacing madmonkey's) and one line of
+  its `install` script changed: it refused to run on a kernel whose name lacks `madmonkey`.
+
+## Size
+
+hakchi's installer flashes `boot.img` with `sunxi-flash burn_boot2` from NAND block 0x30 (blocks
+of 128 KiB) and keeps the stock kernel's backup at block 0x68; `sunxi-flash` only stops at the
+end of the boot area, so a larger image would overwrite the backup. Cartload refuses packages
+whose boot image exceeds 0x36 blocks (7,077,888 bytes, two blocks left for bad blocks):
+`cartload_hmod::BOOT_IMAGE_MAX_LEN`, checked by `Package::validate`. This one is 4,712,448 bytes
+(36 blocks, like v1.0.4-126's).
 
 ## Testing
 
-**The test package is for memboot only.** Nothing has checked that its `boot.img` (4.7 MB) or its
-modules work with the install path, and Cartload has no boot-image size check of its own. Never
-install it.
-
 ```sh
-cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload-test.hmod
+cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload.hmod
 ```
 
 boots it from RAM into hakchi's shell (from a running console through kexec, otherwise through
@@ -81,6 +89,25 @@ FEL into the console's own system and menu, with the modules on the console and 
 mode forced. Checklists and results: `docs/hardware-tests.md`, section "Cartload kernel".
 
 On a SNES Classic Mini (EUR) it boots to the menu with Mali, the controller driver and the
-other modules working (2026-10-28). Still to do before the app can offer it: games, sound,
-controllers, USB storage and Wi-Fi; the install and uninstall paths (the modules go to the
-data partition, as in that test); the NES and Famicom Minis.
+other modules working (2026-10-28).
+
+## Installing (not done yet)
+
+A console cannot be bricked by a kernel: FEL is in the chip's boot ROM, and from FEL a working
+kernel boots from RAM and the installer flashes it back. What a faulty kernel can damage is the
+data partition (games, saves, settings). So, in order:
+
+1. Back up the NAND: `scripts/console-backup.sh` copies every partition, u-boot and the kernels
+   to `~/cartload-backups/` with MD5s checked on the console.
+2. Rehearse the way back while nothing is at risk: `cartload-flow install --hmod data/hakchi.hmod`
+   (or **Reinstall** in the app) on the console as it is.
+3. Install: `cargo run -p cartload-flow -- install --hmod target/kernel/out/hakchi-3.4.113.30-cartload.hmod`.
+   The installer runs in the memboot shell on this kernel, flashes u-boot and the kernel and
+   copies the modules.
+4. Back: the same command with `data/hakchi.hmod`. It kexecs madmonkey's kernel from this one,
+   and the installer swaps the modules folder back. If the console does not start: FEL, then the
+   same command (the memboot goes through FEL), then restore the data partition from the backup
+   if needed.
+
+Still to do: games, sound, controllers, USB storage and Wi-Fi; steps 2 to 4 on hardware; the NES
+and Famicom Minis.

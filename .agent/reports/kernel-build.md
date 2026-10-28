@@ -28,12 +28,19 @@
   (`p0000_config_defaults` forces `cfg_usb_host='y'`). All test files removed afterwards and
   the config restored, checked over SSH. This run used `build.sh`'s output.
 
+- Install path (read from v1.0.4-126's scripts): the package's `install` refuses kernels whose
+  name lacks `madmonkey`; build.sh patches that line and names the output
+  `hakchi-3.4.113.30-cartload.hmod`. `cartload-flow --dry-run install --hmod` accepts it.
+- `BOOT_IMAGE_MAX_LEN` (0x36 blocks of 128 KiB) in `Package::validate`, unit-tested: a larger
+  boot.img would overwrite the stock kernel backup at block 0x68.
+- `scripts/console-backup.sh`: raw copies of nanda/b/c, u-boot and the kernels from the memboot
+  shell, MD5-checked against the console. Not run yet (needs the user).
+
 ## Left / uncertain
 
 - rtl8188fu without sunxi platform hooks; clovercon's source differs from the shipped one
   (same parameters).
-- Install and uninstall with this kernel (modules to the data partition), NES and Famicom: not
-  started.
+- Backup, way-back rehearsal, install and return on hardware; NES and Famicom: not run.
 - Cartload has no boot-image size check; the test package must never be installed.
 - Two RTC lines in our FEL boot's log that the installed kernel's NAND boot lacks; probably FEL.
 - Games, sound, controllers, USB storage, Wi-Fi: not tested.

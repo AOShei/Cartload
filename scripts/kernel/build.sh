@@ -24,11 +24,13 @@
 #   boot.img                        the kernel with the package's ramdisk; an appended ramdisk
 #                                   archive puts this kernel's NAND and SCSI drivers in
 #                                   /lib/modules-ramfs, as the package's ramdisk has madmonkey's
-#   hakchi-<release>-test.hmod      the package with that boot.img and this kernel's modules
+#   hakchi-<release>.hmod           the package with that boot.img and this kernel's modules,
+#                                   its installer accepting this kernel
 # and in target/kernel/stage/lib/modules/<release> the modules for the console's data partition.
 #
-# The test package is for memboot only (cartload-flow memboot, cartload-fel memboot --shell
-# boot; docs/kernel.md). The install path has not been tried with it; never install it.
+# The package boots from RAM (cartload-flow memboot, cartload-fel memboot --shell boot) and
+# installs like the pinned one (cartload-flow install --hmod, or the app with CARTLOAD_HMOD).
+# Experimental: see docs/kernel.md before installing it.
 set -euo pipefail
 
 KERNEL_REPO=https://github.com/AOShei/sun-nontendocm-kernel.git
@@ -142,13 +144,19 @@ if [ "${1:-}" = "--inside" ]; then
   cat /work/overlay.xz >>"$ramdisk"
   pack "$out/zImage" "$ramdisk" "$out/boot.img"
 
-  echo "== test package"
+  echo "== package"
   cp "$out/boot.img" /work/pkg/boot/boot.img
+  # The package's installer only runs on a kernel named madmonkey ("if no kexec, abort"); this
+  # one has kexec too.
+  sed -i 's/^(uname -r | grep -qF madmonkey) || return 1$/(uname -r | grep -qE "madmonkey|cartload") || return 1/' \
+    /work/pkg/install
+  grep -qF 'madmonkey|cartload' /work/pkg/install \
+    || { echo "the package's install script no longer has the expected kernel check" >&2; exit 1; }
   rm -rf /work/pkg/lib/modules/*
   cp -a "$mods" /work/pkg/lib/modules/
   sed -i "s/^kernelVersion=.*/kernelVersion='$release'/" /work/pkg/var/version
   (cd /work/pkg && tar --owner=0 --group=0 --numeric-owner --sort=name --mtime="@$KERNEL_EPOCH" -cf - * \
-    | gzip -n -9 >"$out/hakchi-$release-test.hmod")
+    | gzip -n -9 >"$out/hakchi-$release.hmod")
 
   echo "== ramdisk modules:" $(cd "$ramfs" && find . -name '*.ko' | sort)
   echo "== done: $release"

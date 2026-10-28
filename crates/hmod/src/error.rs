@@ -66,6 +66,21 @@ pub enum Error {
         entry: String,
     },
 
+    /// `boot/boot.img` is too large for the console's kernel area: flashing it would reach the
+    /// stock kernel backup.
+    #[error(
+        "boot/boot.img in {} is {len} bytes; the console's kernel area takes at most {max}",
+        path.display()
+    )]
+    BootImageTooLarge {
+        /// The archive.
+        path: PathBuf,
+        /// Size of the boot image.
+        len: u64,
+        /// [`crate::BOOT_IMAGE_MAX_LEN`].
+        max: u64,
+    },
+
     /// `var/version` is not text or lacks `hakchiVersion`.
     #[error("var/version in {} is invalid: {reason}", path.display())]
     InvalidVersion {

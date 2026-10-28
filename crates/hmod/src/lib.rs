@@ -37,7 +37,9 @@ pub use error::{Error, Result};
 pub use fetch::{
     DOWNLOAD_URLS, Fetched, GITHUB_URL, HAKCHI_NET_URL, Progress, fetch_from, fetch_latest,
 };
-pub use package::{BOOT_IMAGE, BootFiles, Entry, EntryKind, Package, UBOOT, VERSION_FILE};
+pub use package::{
+    BOOT_IMAGE, BOOT_IMAGE_MAX_LEN, BootFiles, Entry, EntryKind, Package, UBOOT, VERSION_FILE,
+};
 pub use version::Version;
 
 /// `fes1.bin`, the Allwinner first-stage binary that initialises DRAM on the R16.

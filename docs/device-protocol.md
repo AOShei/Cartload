@@ -152,6 +152,29 @@ output were still that file. The app carries it (`data/hakchi.hmod`) and writes 
 file with another hash is never used, and the download (a fallback) keeps only a file with the
 pinned hash. `CARTLOAD_HMOD` still accepts any valid package, for development.
 
+### How a package installs (verified in v1.0.4-126's scripts, 2026-10-28)
+
+The installer (`boot` with `cf_install`/`cf_update` set and the package in `/hakchi/transfer`)
+runs the package's own `install` script. It returns at once unless `uname -r` contains
+`madmonkey` (its comment: "if no kexec, abort"), copies the package's `bin/` and `lib/` to the
+rootfs and `lib/modules/` with `--delete` (one kernel's modules at a time), flashes
+`boot/uboot.bin` with `flashBoot1`, and `installBoot2 boot/boot.img`: back up the stock kernel to
+block 0x68 if it is still there and no backup exists, put the decryption key file on the image's
+command line (dropping every `hakchi-*` token), and flash it with `flashBoot2`.
+
+NAND boot area, as `sunxi-flash` (`sntool`) addresses it: blocks of 0x20000 bytes, offsets on the
+command line in hex blocks. u-boot at 0x8, the kernel at 0x30, the stock kernel backup at 0x68,
+the boot area ends at 0x80. `burn_boot2` writes from 0x30 until the image ends, skipping bad
+blocks, and only refuses at 0x80: an image longer than 0x38 blocks overwrites the backup. v1.0.4-126's
+`boot.img` takes 36 blocks. `/proc/partitions` on a SNES (EUR): `nand` 16 MiB, `nanda` 3 MiB
+(boot), `nandb` 64 MiB (Nintendo's system, encrypted squashfs), `nandc` 362 MiB (data, ext4 on
+`/var/lib`).
+
+Settings: `rootfs/etc/preinit.d/p0000_config` holds the `cfg_` variables, but
+`p0000_config_defaults` runs after it and forces some of them on every boot (`cfg_usb_host='y'`,
+`cfg_boot_stock='n'`), and `pffff_config` saves the result back. Changing those takes a preinit
+file sorted after the defaults.
+
 ## Device-side `hakchi` script
 
 The console does the heavy lifting. The app runs `hakchi <subcommand>` over SSH. Subcommands used

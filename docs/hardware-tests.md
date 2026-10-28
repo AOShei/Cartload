@@ -1117,7 +1117,7 @@ boot that does not come back needs a power-cycle, which returns to the installed
 
 ### 1. Memboot into the shell
 
-`cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload-test.hmod`
+`cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload.hmod`
 on a console running hakchi. Expected: the three steps pass (kexec, about 16 s), and over SSH
 `cat /proc/version` shows `3.4.113.30-cartload`; `lsmod` lists `nand`, `mali`, `sd_mod`,
 `usb_storage`, `overlayfs`, `evdev`, `gpio_keys`; `ls /dev/nand*` shows `nand nanda nandb nandc`;
@@ -1144,7 +1144,7 @@ both under `/var/lib/hakchi` and undone afterwards:
    saves `'n'` into it).
 
 Then FEL mode (unplug, hold reset, plug in: the light stays off) and
-`cargo run -p cartload-fel -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload-test.hmod --shell boot`.
+`cargo run -p cartload-fel -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload.hmod --shell boot`.
 Expected: the light comes on, SSH answers within about 20 s, `ReedPlayer-Clover` runs, `lsmod`
 lists `mali` (used), `clovercon`, `uinput`, `zram`, `usb_storage`, and `fbgrab` shows the menu.
 Without a network link, a boot script in `rootfs/etc/init.d` that writes `dmesg`, `ps`, `lsmod`

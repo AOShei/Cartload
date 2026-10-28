@@ -17,6 +17,14 @@ use crate::{Error, Result, Version};
 pub const BOOT_IMAGE: &str = "boot/boot.img";
 /// Archive entry holding u-boot.
 pub const UBOOT: &str = "boot/uboot.bin";
+
+/// Largest `boot/boot.img` a package may carry. hakchi's installer flashes it with
+/// `sunxi-flash burn_boot2` from NAND block 0x30 (blocks of 128 KiB) and keeps the stock
+/// kernel's backup at block 0x68, and `sunxi-flash` itself only stops at the end of the boot
+/// area (block 0x80): a larger image would overwrite the backup. That leaves 0x38 blocks; two
+/// are kept free because a bad block is skipped by writing to the next one. hakchi v1.0.4-126's
+/// own image is 4,589,568 bytes (36 blocks).
+pub const BOOT_IMAGE_MAX_LEN: u64 = 0x36 * 0x2_0000;
 /// Archive entry holding the version variables, see [`Version`].
 pub const VERSION_FILE: &str = "var/version";
 
@@ -169,7 +177,8 @@ impl Package {
     }
 
     /// Check that this is a kernel package: `boot/boot.img` and `boot/uboot.bin` are non-empty
-    /// regular files and `var/version` parses. Returns the version.
+    /// regular files, the boot image fits the console's kernel area ([`BOOT_IMAGE_MAX_LEN`]) and
+    /// `var/version` parses. Returns the version.
     pub fn validate(&self) -> Result<Version> {
         for name in [BOOT_IMAGE, UBOOT] {
             let entry = self.file_entry(name)?;
@@ -179,6 +188,14 @@ impl Package {
                     entry: name.to_string(),
                 });
             }
+        }
+        let len = self.file_entry(BOOT_IMAGE)?.size;
+        if len > BOOT_IMAGE_MAX_LEN {
+            return Err(Error::BootImageTooLarge {
+                path: self.path.clone(),
+                len,
+                max: BOOT_IMAGE_MAX_LEN,
+            });
         }
         self.version()
     }
@@ -561,6 +578,24 @@ mod tests {
         let error = Package::open(&path).unwrap().validate().unwrap_err();
         assert!(
             matches!(&error, Error::EmptyEntry { entry, .. } if entry == BOOT_IMAGE),
+            "{error}"
+        );
+
+        // One byte past the kernel area: refused before anything else is read.
+        let huge = vec![0u8; usize::try_from(BOOT_IMAGE_MAX_LEN).unwrap() + 1];
+        let too_large = archive(&[
+            Spec::File("boot/boot.img", &huge),
+            Spec::File("boot/uboot.bin", b"u"),
+            Spec::File("var/version", VERSION_TEXT.as_bytes()),
+        ]);
+        let (_dir, path) = temp_file("large.hmod", &too_large);
+        let error = Package::open(&path).unwrap().validate().unwrap_err();
+        assert!(
+            matches!(
+                &error,
+                Error::BootImageTooLarge { len, max: BOOT_IMAGE_MAX_LEN, .. }
+                    if *len == BOOT_IMAGE_MAX_LEN + 1
+            ),
             "{error}"
         );
 
