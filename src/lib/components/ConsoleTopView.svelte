@@ -105,6 +105,9 @@
          a guide to the controls, not a reproduction. -->
     <rect class="sfc-body" x="40" y="28" width="220" height="268" rx="20" />
     <line class="vents" x1="72" y1="37" x2="228" y2="37" />
+    <!-- the seams on the light back, in line with the front ones, from the top edge to the plate -->
+    <line class="sfc-seam" x1="60" y1="28" x2="60" y2="48" />
+    <line class="sfc-seam" x1="240" y1="28" x2="240" y2="48" />
     <rect class="sfc-plate" x="52" y="48" width="196" height="208" rx="14" />
     <ellipse cx="220" cy="74" rx="17" ry="11" transform="rotate(-18 220 74)" fill="#7e7f84" stroke="#6f7074" />
     <!-- cartridge slot, centred, with the end marks and the centre notch -->
