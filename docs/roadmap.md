@@ -5,17 +5,20 @@ resumable kernel install, the library with folders, art and a diff-based sync, t
 setup installer, a log file with a diagnostics report, the release workflow
 (`.github/workflows/release.yml`), the emulator module installer with cores for NES, SNES,
 Mega Drive / Genesis, the Game Boy family and N64, and SNES games on NES-family consoles.
-The first sync from the app ran on a SNES Classic Mini (EUR) on 2026-10-23.
+The first sync from the app ran on a SNES Classic Mini (EUR) on 2026-10-23. `v0.1.0` was
+released on 2026-10-23. `v0.2.0` adds the merged Console page, emulator updates and removal,
+7z support installed with hakchi and added by the sync when missing, and no dependence on the
+hakchi servers: the kernel package is built in and the emulators are mirrored, both pinned by
+SHA-256.
 
 Next, in order:
 
-1. The `v0.1.0` pre-release, which also runs the release workflow for the first time.
-2. Test reports from people with the hardware this project does not have
+1. Test reports from people with the hardware this project does not have
    (`docs/help-testing.md`): NES and Famicom Minis, never-modified units, macOS, Windows,
    the module installer and the new cores.
-3. Windows: the WinUSB (Zadig) and RNDIS driver steps written up from a real machine.
-4. An update check against the GitHub releases.
-5. More systems through RetroArch where the console runs them well (Master System, Game
+2. Windows: the WinUSB (Zadig) and RNDIS driver steps written up from a real machine.
+3. An update check against the GitHub releases.
+4. More systems through RetroArch where the console runs them well (Master System, Game
    Gear, PC Engine, PlayStation): a core module and a launcher each.
 
 Later, larger projects (not scheduled):
@@ -31,7 +34,7 @@ Later, larger projects (not scheduled):
   `mali_fbdev` context) and the cores (`platform=classic_armv7_a7` where a core has it) in CI
   against a glibc 2.23 armhf toolchain, plus our own console launchers and config to replace
   KMFD's. Needs hardware testing of video, audio and controllers.
-- The update check (item 4 above) must only consider `v*` tags: the release
+- The update check (item 3 above) must only consider `v*` tags: the release
   `emulators-km-2022-10-31` holds mirrored files, not an app version.
 
 Not planned: code signing and notarisation. The builds stay unsigned by choice (no yearly
