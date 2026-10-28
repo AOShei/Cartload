@@ -59,7 +59,7 @@ class PackageStore {
     }
   }
 
-  /** Downloads the latest package into the cache. */
+  /** Downloads the pinned package into the cache (fallback for the built-in copy). */
   async update(): Promise<void> {
     if (this.updating) {
       return;

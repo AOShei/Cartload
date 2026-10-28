@@ -1,7 +1,45 @@
 # data
 
-Binary blobs that the Rust crates embed at build time with `include_bytes!`. None of them is
-part of `hakchi.hmod`; all three come from the hakchi2 CE tree and are redistributed unchanged.
+Binary blobs that the Rust crates embed at build time with `include_bytes!`. `hakchi.hmod` is
+the kernel package itself; the other three are not part of it. All four come from the hakchi2
+CE tree or its releases and are redistributed unchanged.
+
+## hakchi.hmod
+
+| | |
+| --- | --- |
+| Origin | hakchi2 CE's release asset `supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod` (<https://github.com/TeamShinkansen/Hakchi2-CE/releases>); byte-identical to `https://hakchi.net/hakchi/hmods/hakchi-latest.hmod` and to CE's build output `mods/hmods/hakchi.hmod`, all three checked on 2026-10-28 |
+| Version | `hakchiVersion='v1.0.4-126'`, `bootVersion='1.0.3'`, `kernelVersion='3.4.113.29-madmonkey'` |
+| Size | 9 340 382 bytes |
+| MD5 | `2e163a25c98b4c05bed274817abb38da` |
+| SHA-256 | `003994b46504959895f40b0b9e91b16951ef4a638feb6312314c8fc4fdbff592` (pinned as `cartload_hmod::pinned::PINNED_SHA256`, checked by `cargo test -p cartload-hmod`) |
+| Embedded by | `crates/hmod` with its `bundled` feature, exposed as `cartload_hmod::pinned::bundled()`; the app writes it to `<cache dir>/cartload/hakchi.hmod` and `cartload-hmod bundled -o FILE` writes it anywhere |
+
+The hakchi kernel package that Cartload installs: madmonkey's hakchi, the last build of it,
+as hakchi2 CE ships it. Carrying it means installing hakchi needs no server; the download
+locations above remain as a fallback, and anything they serve is accepted only if its SHA-256
+is the pinned one.
+
+Contents and licenses (a gzip tar):
+
+- `boot/boot.img`: Linux 3.4.113 for the Allwinner R16 (Nintendo's published kernel source with
+  madmonkey's patches) and hakchi's ramdisk. GPL-2.0 (kernel), GPL-3.0 (hakchi scripts).
+- `boot/uboot.bin`: U-Boot. GPL-2.0.
+- `bin/`, `lib/`: sntool and the sunxi tools (GPL-2.0), kexec (kexec-tools, GPL-2.0),
+  e2fsprogs libraries (GPL-2.0 / LGPL-2.0), xdelta3 (Apache-2.0), fbgrab and aplay (GPL-2.0).
+- `lib/modules/`: kernel modules, GPL-2.0.
+- `lib/firmware/rtlwifi/rtl8188fufw.bin`: Realtek RTL8188FU Wi-Fi firmware, a binary blob under
+  Realtek's redistribution terms as carried by linux-firmware; not GPL.
+- `install`, `uninstall`, `etc/preinit.d/`, `var/version`: hakchi scripts, GPL-3.0.
+
+Source: hakchi's build tree is <https://github.com/madmonkey1907/hakchi> (GPL-3.0). Its
+submodules hold the kernel (<https://github.com/madmonkey1907/sun-nontendocm-kernel>),
+sunxi-tools, e2fsprogs and the boot-image tools; U-Boot is only a patch there
+(`r16-uboot/r16-uboot.diff`) against an upstream tree its readme names. Its public history ends in April 2019 at `fd525ac` (`v1.0.3` plus 47 commits);
+the source of the exact v1.0.4-126 build (April 2020) has not been found published. Before a
+Cartload release carries this file, the corresponding source has to be obtainable from the
+release (GPL-2 section 3 and GPL-3 section 6): at least an archived copy of that tree with its
+submodules, and ideally the exact v1.0.4-126 tree from hakchi's maintainers.
 
 ## fes1.bin
 

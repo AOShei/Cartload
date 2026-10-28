@@ -6,7 +6,9 @@
 
   /* Installing hakchi on a console that does not have it, in one card: how to put the
      console in FEL mode with what the app sees right now, then the kernel package and the
-     install button side by side. The install's progress opens in the progress window. */
+     install button side by side. The package is built into the app; the download is only a
+     fallback for when it cannot be written out. The install's progress opens in the progress
+     window. */
   const watch = $derived(consoleWatch(consoleStore.report));
   const pkg = $derived(packageStore.status?.package ?? null);
   const busy = $derived(flowStore.running || flowStore.starting);
@@ -18,7 +20,7 @@
       return "Another task is running on the console.";
     }
     if (!pkg) {
-      return "Download the kernel package first.";
+      return "The kernel package is not ready.";
     }
     if (!watch.ready) {
       return "Waiting for the console in FEL mode.";
@@ -41,7 +43,7 @@
   <div class="footer">
     <div class="package">
       {#if packageStore.loading && !packageStore.status}
-        <span class="muted"><span class="spinner" aria-hidden="true"></span> Checking for the kernel package…</span>
+        <span class="muted"><span class="spinner" aria-hidden="true"></span> Preparing the kernel package…</span>
       {:else if packageStore.updating}
         <span class="muted num">
           <span class="spinner" aria-hidden="true"></span>
@@ -49,14 +51,10 @@
         </span>
       {:else if pkg}
         <span class="ok"><Icon name="check" size={16} /></span>
-        <span>Kernel package <strong class="num">{pkg.version}</strong> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}</span></span>
-        <button type="button" class="btn btn-quiet btn-sm" onclick={() => void packageStore.update()} disabled={busy}>
-          <Icon name="download" size={14} />
-          Update
-        </button>
+        <span>Kernel package <strong class="num">{pkg.version}</strong> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ", built in"}</span></span>
       {:else}
         <div class="missing">
-          <span>No kernel package yet: a 9 MB download from the hakchi project's servers.</span>
+          <span>The built-in kernel package could not be prepared. It can be downloaded instead (9 MB).</span>
           {#if packageStore.status?.problem}
             <span class="problem">The copy on disk cannot be used: {packageStore.status.problem}</span>
           {/if}
@@ -68,9 +66,6 @@
           <Icon name="download" size={16} />
           {packageStore.error ? "Try again" : "Download"}
         </button>
-      {/if}
-      {#if pkg && packageStore.error}
-        <span class="problem">Update failed; the copy on disk is still usable.</span>
       {/if}
     </div>
 

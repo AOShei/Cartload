@@ -3,7 +3,7 @@
 use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
-use cartload_hmod::{DOWNLOAD_URLS, EntryKind, Package, Progress, basemods, fetch_from};
+use cartload_hmod::{DOWNLOAD_URLS, EntryKind, Package, Progress, basemods, fetch_from, pinned};
 use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -51,7 +51,7 @@ enum Command {
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
     },
-    /// Download the latest package, verify it and write it atomically.
+    /// Download the pinned package (hakchi v1.0.4-126), verify it and write it atomically.
     Fetch {
         /// Where to write the package.
         #[arg(long, value_name = "PATH", default_value = "hakchi-latest.hmod")]
@@ -60,6 +60,16 @@ enum Command {
         /// Source to download from instead of the built-in list; repeatable, tried in order.
         #[arg(long, value_name = "URL")]
         url: Vec<String>,
+
+        /// Accept any valid kernel package, not only the pinned one.
+        #[arg(long)]
+        any: bool,
+    },
+    /// Write the built-in kernel package (hakchi v1.0.4-126) to a file, or describe it.
+    Bundled {
+        /// Write the package here.
+        #[arg(short, long, value_name = "FILE")]
+        output: Option<PathBuf>,
     },
     /// Write the built-in fes1.bin (FEL DRAM init binary) to a file, or describe it.
     Fes1 {
@@ -118,7 +128,8 @@ async fn main() -> Result<()> {
             entry,
             output,
         } => extract(&path, &entry, output.as_deref()),
-        Command::Fetch { dest, url } => fetch(&dest, &url).await,
+        Command::Fetch { dest, url, any } => fetch(&dest, &url, any).await,
+        Command::Bundled { output } => bundled(output.as_deref()),
         Command::Fes1 { output } => fes1(output.as_deref()),
         Command::BaseMods {
             fetch,
@@ -290,14 +301,15 @@ fn extract(path: &std::path::Path, entry: &str, output: Option<&std::path::Path>
     Ok(())
 }
 
-async fn fetch(dest: &std::path::Path, urls: &[String]) -> Result<()> {
+async fn fetch(dest: &std::path::Path, urls: &[String], any: bool) -> Result<()> {
     let urls: Vec<&str> = if urls.is_empty() {
         DOWNLOAD_URLS.to_vec()
     } else {
         urls.iter().map(String::as_str).collect()
     };
     let mut last_percent = None;
-    let fetched = fetch_from(&urls, dest, |Progress { done, total }| {
+    let sha256 = (!any).then_some(pinned::PINNED_SHA256);
+    let fetched = fetch_from(&urls, dest, sha256, |Progress { done, total }| {
         let percent = total.and_then(|t| (done * 100).checked_div(t));
         let step = percent.map(|p| p / 10);
         if step != last_percent {
@@ -396,6 +408,28 @@ async fn base_mods(fetch: bool, cache: Option<PathBuf>, names: &[String]) -> Res
                 file.path, file.size, file.md5
             );
         }
+    }
+    Ok(())
+}
+
+fn bundled(output: Option<&std::path::Path>) -> Result<()> {
+    let bytes = pinned::bundled();
+    match output {
+        Some(file) => {
+            pinned::install_bundled(file)?;
+            println!(
+                "wrote hakchi {} ({} bytes) to {}",
+                pinned::PINNED_VERSION,
+                bytes.len(),
+                file.display()
+            );
+        }
+        None => println!(
+            "hakchi {}: {} bytes, SHA-256 {}, built in from data/hakchi.hmod (GPL)",
+            pinned::PINNED_VERSION,
+            bytes.len(),
+            pinned::PINNED_SHA256
+        ),
     }
     Ok(())
 }

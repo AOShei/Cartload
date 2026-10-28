@@ -42,7 +42,7 @@ dirs = "7"
 # The device crates without their CLIs; hmod and library keep their HTTP fetchers.
 cartload-fel.workspace = true
 cartload-console.workspace = true
-cartload-hmod = { workspace = true, features = ["fetch"] }
+cartload-hmod = { workspace = true, features = ["fetch", "bundled"] }
 cartload-library = { workspace = true, features = ["fetch"] }
 cartload-flow.workspace = true
 

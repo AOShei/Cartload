@@ -8,11 +8,15 @@ use std::{
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, info, warn};
 
-use crate::{Error, Failures, Package, Result, Version};
+use sha2::{Digest, Sha256};
 
-/// The release asset hakchi2 CE ships (hakchi v1.0.4-126, April 2020). Tried first.
+use crate::{Error, Failures, Package, Result, Version, pinned};
+
+/// The release asset hakchi2 CE ships (hakchi v1.0.4-126, April 2020), the pinned package
+/// ([`pinned`]). Tried first.
 pub const GITHUB_URL: &str = "https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod";
-/// hakchi.net's "latest" package, hakchi2 CE's update location. Tried second.
+/// hakchi.net's "latest" package, hakchi2 CE's update location; the same bytes as of
+/// 2026-10-28. Tried second.
 pub const HAKCHI_NET_URL: &str = "https://hakchi.net/hakchi/hmods/hakchi-latest.hmod";
 /// Known locations of the package, in the order [`fetch_latest`] tries them.
 pub const DOWNLOAD_URLS: [&str; 2] = [GITHUB_URL, HAKCHI_NET_URL];
@@ -43,33 +47,40 @@ pub struct Fetched {
     pub version: Version,
 }
 
-/// Download the latest package into `dest` and return its hakchi version (e.g. `v1.0.4-126`).
+/// Download the pinned package into `dest` and return its hakchi version (`v1.0.4-126`).
 ///
 /// Tries the [`DOWNLOAD_URLS`] in order. The download goes to a temporary file next to `dest`,
-/// is opened and checked to contain the boot files and a version, and only then renamed over
-/// `dest`. See [`fetch_from`] for progress reporting and the details.
+/// is checked against [`pinned::PINNED_SHA256`] and to contain the boot files and a version,
+/// and only then renamed over `dest`. See [`fetch_from`] for progress reporting and the details.
 pub async fn fetch_latest(dest: impl AsRef<Path>) -> Result<String> {
-    fetch_from(&DOWNLOAD_URLS, dest.as_ref(), |_| {})
-        .await
-        .map(|fetched| fetched.version.hakchi)
+    fetch_from(
+        &DOWNLOAD_URLS,
+        dest.as_ref(),
+        Some(pinned::PINNED_SHA256),
+        |_| {},
+    )
+    .await
+    .map(|fetched| fetched.version.hakchi)
 }
 
 /// Download a package from the first of `urls` that works, verify it and write it to `dest`.
 ///
-/// Each source is tried in turn; a failed request, an error status, a short body or a download
-/// that does not open as a kernel package (see [`Package::validate`]) moves on to the next one.
+/// Each source is tried in turn; a failed request, an error status, a short body, a download
+/// whose SHA-256 is not `sha256` (when given) or one that does not open as a kernel package
+/// (see [`Package::validate`]) moves on to the next one.
 /// Nothing is left behind on failure. On success `dest` is replaced atomically: data is written
 /// to `<dest>.partial` in the same directory, synced, verified and then renamed. Parent
 /// directories are created as needed. `progress` is called after every received chunk.
 pub async fn fetch_from(
     urls: &[&str],
     dest: &Path,
+    sha256: Option<&str>,
     mut progress: impl FnMut(Progress),
 ) -> Result<Fetched> {
     let client = client()?;
     let mut failures = Failures::default();
     for url in urls {
-        match fetch_one(&client, url, dest, &mut progress).await {
+        match fetch_one(&client, url, dest, sha256, &mut progress).await {
             Ok(fetched) => {
                 info!(
                     url,
@@ -106,6 +117,7 @@ async fn fetch_one(
     client: &reqwest::Client,
     url: &str,
     dest: &Path,
+    sha256: Option<&str>,
     progress: &mut impl FnMut(Progress),
 ) -> Result<Fetched> {
     let partial = partial_path(dest)?;
@@ -132,7 +144,7 @@ async fn fetch_one(
             .map_err(|source| io_error("create directory", parent, source))?;
     }
 
-    let result = write_and_verify(response, url, &partial, total, progress).await;
+    let result = write_and_verify(response, url, &partial, total, sha256, progress).await;
     let (len, version) = match result {
         Ok(ok) => ok,
         Err(error) => {
@@ -152,18 +164,21 @@ async fn fetch_one(
     })
 }
 
-/// Stream the body into `partial`, sync it, then open it as a package and validate it.
+/// Stream the body into `partial`, sync it, check its SHA-256 when one is expected, then open
+/// it as a package and validate it.
 async fn write_and_verify(
     mut response: reqwest::Response,
     url: &str,
     partial: &Path,
     total: Option<u64>,
+    sha256: Option<&str>,
     progress: &mut impl FnMut(Progress),
 ) -> Result<(u64, Version)> {
     let mut file = tokio::fs::File::create(partial)
         .await
         .map_err(|source| io_error("create", partial, source))?;
     let mut done = 0u64;
+    let mut hasher = Sha256::new();
     progress(Progress { done, total });
     while let Some(chunk) = response
         .chunk()
@@ -173,6 +188,7 @@ async fn write_and_verify(
         file.write_all(&chunk)
             .await
             .map_err(|source| io_error("write", partial, source))?;
+        hasher.update(&chunk);
         done += chunk.len() as u64;
         progress(Progress { done, total });
     }
@@ -189,6 +205,16 @@ async fn write_and_verify(
         .await
         .map_err(|source| io_error("sync", partial, source))?;
     drop(file);
+
+    let actual = format!("{:x}", hasher.finalize());
+    if let Some(expected) = sha256
+        && actual != expected
+    {
+        return Err(Error::NotPinnedDownload {
+            url: url.to_string(),
+            sha256: actual,
+        });
+    }
 
     // Opening decompresses the whole archive; keep that off the async threads.
     let path = partial.to_path_buf();
@@ -302,7 +328,7 @@ mod tests {
         let dest = dir.path().join("downloads").join("hakchi.hmod");
 
         let mut seen = Vec::new();
-        let fetched = fetch_from(&[&first, &second], &dest, |p| seen.push(p))
+        let fetched = fetch_from(&[&first, &second], &dest, None, |p| seen.push(p))
             .await
             .unwrap();
 
@@ -326,9 +352,48 @@ mod tests {
         let dest = dir.path().join("hakchi.hmod");
         std::fs::write(&dest, b"old contents").unwrap();
 
-        let fetched = fetch_from(&[&url], &dest, |_| {}).await.unwrap();
+        let fetched = fetch_from(&[&url], &dest, None, |_| {}).await.unwrap();
         assert_eq!(fetched.len, package.len() as u64);
         assert_eq!(std::fs::read(&dest).unwrap(), package);
+        assert_eq!(leftovers(dir.path()), ["hakchi.hmod"]);
+    }
+
+    #[tokio::test]
+    async fn only_the_expected_package_is_kept() {
+        let other = crate::test_support::archive(&[
+            crate::test_support::Spec::File("boot/boot.img", b"ANDROID!other"),
+            crate::test_support::Spec::File("boot/uboot.bin", b"uboot"),
+            crate::test_support::Spec::File("var/version", b"hakchiVersion='v9'\n"),
+        ]);
+        let package = sample();
+        let base = serve(vec![(200, other), (200, package.clone())]).await;
+        let first = format!("{base}/swapped.hmod");
+        let second = format!("{base}/mirror.hmod");
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("hakchi.hmod");
+
+        let expected = pinned::sha256_hex(&package);
+        let fetched = fetch_from(&[&first, &second], &dest, Some(&expected), |_| {})
+            .await
+            .unwrap();
+        assert_eq!(fetched.url, second);
+        assert_eq!(std::fs::read(&dest).unwrap(), package);
+        assert_eq!(leftovers(dir.path()), ["hakchi.hmod"]);
+
+        // Nothing matching: every source fails and nothing is left behind.
+        let base = serve(vec![(200, sample())]).await;
+        let url = format!("{base}/x.hmod");
+        let dest = dir.path().join("other.hmod");
+        let error = fetch_from(&[&url], &dest, Some(pinned::PINNED_SHA256), |_| {})
+            .await
+            .unwrap_err();
+        let Error::AllSourcesFailed(failures) = &error else {
+            panic!("{error}");
+        };
+        assert!(
+            matches!(&failures.0[0].1, Error::NotPinnedDownload { sha256, .. } if *sha256 == expected),
+            "{error}"
+        );
         assert_eq!(leftovers(dir.path()), ["hakchi.hmod"]);
     }
 
@@ -345,7 +410,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("hakchi.hmod");
 
-        let error = fetch_from(&[&first, &second], &dest, |_| {})
+        let error = fetch_from(&[&first, &second], &dest, None, |_| {})
             .await
             .unwrap_err();
         let Error::AllSourcesFailed(failures) = &error else {
@@ -386,7 +451,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("hakchi.hmod");
 
-        let error = fetch_from(&[&failing, &closed], &dest, |_| {})
+        let error = fetch_from(&[&failing, &closed], &dest, None, |_| {})
             .await
             .unwrap_err();
         let Error::AllSourcesFailed(failures) = &error else {
@@ -404,7 +469,7 @@ mod tests {
     #[tokio::test]
     async fn no_sources_is_an_error() {
         let dir = tempfile::tempdir().unwrap();
-        let error = fetch_from(&[], &dir.path().join("x.hmod"), |_| {})
+        let error = fetch_from(&[], &dir.path().join("x.hmod"), None, |_| {})
             .await
             .unwrap_err();
         assert_eq!(
@@ -417,7 +482,7 @@ mod tests {
     async fn destination_needs_a_file_name() {
         let base = serve(vec![]).await;
         let url = format!("{base}/x.hmod");
-        let error = fetch_from(&[&url], Path::new(""), |_| {})
+        let error = fetch_from(&[&url], Path::new(""), None, |_| {})
             .await
             .unwrap_err();
         let Error::AllSourcesFailed(failures) = &error else {

@@ -144,6 +144,14 @@ inside the tar carry no `./` prefix in that file, but CE accepts both forms and 
 (`hakchi_gui/data/fes1.bin`, 14 048 bytes, starts with the Allwinner `eGON.BT0` header), not in
 the hmod; Cartload embeds it from `data/fes1.bin`. Source for the kernel side: madmonkey1907/hakchi (GPL-3).
 
+Cartload pins this one package: SHA-256
+`003994b46504959895f40b0b9e91b16951ef4a638feb6312314c8fc4fdbff592`, 9 340 382 bytes
+(`cartload_hmod::pinned`). On 2026-10-28 the GitHub asset, `hakchi-latest.hmod` and CE's build
+output were still that file. The app carries it (`data/hakchi.hmod`) and writes it to
+`<cache dir>/cartload/hakchi.hmod` whenever the cached file is missing or differs; a cached
+file with another hash is never used, and the download (a fallback) keeps only a file with the
+pinned hash. `CARTLOAD_HMOD` still accepts any valid package, for development.
+
 ## Device-side `hakchi` script
 
 The console does the heavy lifting. The app runs `hakchi <subcommand>` over SSH. Subcommands used

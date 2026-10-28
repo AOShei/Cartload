@@ -654,9 +654,397 @@ what is written to NAND applies. The headless equivalent of each section is the
 ### Prerequisites
 
 - Everything from "Console page" (udev rule, link-local profile, the Wayland variable).
-- No `~/.cache/cartload/hakchi.hmod` for section 1 (move it aside); the package from
-  "Install kernel" for the others, either downloaded in section 1 or pointed at with
-  `CARTLOAD_HMOD=/path/to/hakchi.hmod` when the host is offline.
+- For section 1, move `~/.cache/cartload/hakchi.hmod` aside. The other sections use the
+  package the app carries, which needs no network.
+- Console connected over USB, powered off, stock firmware, for section 2; the states named in
+  the other sections.
+
+### 1. Built-in package (no console needed)
+
+With the network off and no `~/.cache/cartload/hakchi.hmod`, open the Console page. Expected:
+the "Install hakchi" card shows "Kernel package v1.0.4-126 · 8.9 MB, built in" with no
+Download or Update button, and the log (Ctrl+L) shows `built-in kernel package written to the
+cache`. `~/.cache/cartload/hakchi.hmod` exists with SHA-256 `003994b4…fdbff592` (md5
+`2e163a25c98b4c05bed274817abb38da`). Overwrite it with any other file (`echo x >
+~/.cache/cartload/hakchi.hmod`) and reopen the Console page: the log shows the same line again
+and the file is the pinned one again. With hakchi installed, the "hakchi" card shows "Package
+v1.0.4-126, 8.9 MB, built in", also without a button.
+
+### 2. Install from stock firmware
+
+```
+cargo run -p cartload-flow -- install --hmod "$HMOD"
+```
+
+Every step prints `[ n/13] name: description`, its log lines indented, then `=> done (time)`,
+`=> already done: reason` or `=> not needed: reason`. Expected per step on a NES or SNES
+Classic Mini (`-v` adds the debug lines, among them the `sunxi-part` output):
+
+1. `memboot`: `waiting up to 120 s for a console in FEL mode: hold Reset, switch Power on,
+   release Reset after two seconds`. Do that now. Within a second of the device appearing:
+   `FEL device 1f3a:efe8 on bus ...`, `membooting hakchi v1.0.4-126 (...) through FEL`,
+   `preparing the boot images`, `verifying the FEL device`, `initialising DRAM with fes1.bin`,
+   `uploading the boot image`, `boot image: ... / 4587520 bytes (...%)` up to 100 %,
+   `starting u-boot (boota)`, `uploaded 4587520 bytes and ran boota 47400000; ...`. The
+   console screen stays black. A few seconds.
+2. `wait-console`: `waiting up to 120 s for the console on the USB network`, then within
+   about 10 to 15 s `the console answers SSH at 169.254.13.37:22`. On the host `lsusb` shows
+   `04e8:6863` and `1f3a:efe8` is gone.
+3. `detect`: `console: minimal memboot shell (hwid 0461872a872802079d2818c76c118000)`.
+4. `check-md`: `=> not needed: not a Mega Drive partition layout`.
+5. `grow`: `growing the data partition (nandX) from A to B` (or `growing the data partition
+   (sunxi-part grow)` when the dry-run output is not parseable), then `data partition nandX is
+   now B`. Record the sizes and, with `-v`, the raw `sunxi-part` lines: the parser follows
+   hakchi2 CE's `(mbr|nand[a-z]):label:sectors` and has not seen real output yet.
+   If `UDISK is still listed` appears, the grow did not take and the step ends `not needed`.
+6. `reboot-grown`: `uploading hakchi2 CE's kexec.static (722876 bytes) and detached-fallback
+   (1873 bytes)`, `kexec.static: ... / 722876 bytes (100%)`, `uploading the boot image for kexec
+   (4585472 bytes)`, progress, `kexec: the console drops off the network now and comes back in
+   the memboot shell`. With `-v` a `uistop exited with ... (ignored, as hakchi2 CE does)` line
+   may precede the uploads: the memboot shell has no UI to stop. The step does what hakchi2
+   CE's `GrowTask` does with `rebootToRecovery` (`MembootTasks.Memboot`): `uistop`, `mkdir -p
+   /tmp/cartload`, upload `kexec.static` as `/tmp/cartload/kexec` and `detached-fallback`,
+   `chmod +x` both, upload the package's `boot.img`, then run `cd /tmp/cartload; /bin/sh
+   /tmp/cartload/detached-fallback recovery /tmp/cartload/boot.img` through a launcher that is
+   detached from the SSH session. On the host `hakchi0` disappears and comes back. **Untested
+   on hardware**: the test console's data partition was already grown, so this step was
+   skipped (section "Results"). If the console hangs here (power LED off, no USB device),
+   power-cycle it and rerun the command: step 1 then goes through FEL and the grow is already
+   done.
+7. `wait-console`: `the console left the USB network`, then `the console answers SSH at ...`
+   within about 20 s.
+8. `detect`: the memboot shell again, same hwid.
+9. `prepare`: `=> done` with no log lines (three commands: the two `echo >> /hakchi/config`
+   and `mkdir -p /hakchi/transfer/`).
+10. `upload`: `uploading .../hakchi.hmod (9340382 bytes, hakchi v1.0.4-126 (...))` and
+    `hakchi.hmod: ... / 9340382 bytes (...%)` up to 100 %. A few seconds over USB.
+11. `install`: `running the installer on the console; it takes a few minutes and the
+    connection drops when the console reboots`, then `console: ...` lines echoing the
+    installer (`installing hakchi...`, `package hakchi installed`, ...). The console shows
+    hakchi's default image during the install and then reboots into the normal menu. Any
+    `flash md5 mismatch!` or `flash boot0 failed!` line stops the flow. `invalid image on nand at
+    sector: 68` on stderr is normal: the installer checking for an existing stock kernel backup.
+12. `wait-console`: offline, then back within 180 s.
+13. `verify`: `console: hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey) installed
+    on SNES Classic Mini (EUR) (hwid ...)`, `installed: ...`, `games storage
+    /var/lib/hakchi/games: ...`. Then `install finished: 13 steps in N min`.
+
+Afterwards `cargo run -p cartload-console -- info` prints the "Console connect" output and
+`cargo run -p cartload-flow -- dump-kernel kernel.img` can read the stock kernel the installer
+backed up. Record: console model and region, total time, the step 5 sizes, the installer lines
+from step 11.
+
+### 3. Resume
+
+Interrupt the run with Ctrl-C during step 10 (`upload`), then rerun the same command. Expected
+first lines: `[ 1/13] memboot` `=> already done: the console is already in the memboot shell`,
+`[ 2/13] wait-console` `=> already done: the console is already reachable`, `detect` done,
+`check-md` not needed, `grow` `=> already done: no UDISK partition left; ...`, `reboot-grown`
+`=> already done: the partition table did not change in this run`, `wait-console` already,
+`detect` done, `prepare` `=> already done: cf_install and cf_update are set and
+/hakchi/transfer exists`, then `upload` runs (or is already done when the interrupted upload
+had completed and the md5 matches) and the install continues as in section 2.
+
+### 4. Repair from a running hakchi kernel
+
+Same command with the console booted normally. Expected difference in step 1: `found hakchi
+v1.0.4-126 (...) installed on ...`, `membooting the package's boot.img with kexec from the
+running kernel`, `uploading hakchi2 CE's kexec.static (722876 bytes) and detached-fallback
+(1873 bytes)`, `kexec.static: ... (100%)`, `uploading the boot image for kexec (4585472
+bytes)`, progress, `kexec: the console drops off the network now ...`; no Reset button, no
+FEL. The console's menu goes away at `uistop` before the uploads. The sequence is the one of
+section 2 step 6 (hakchi2 CE's `Memboot`: its own `kexec.static` and `detached-fallback`
+under `/tmp/cartload`, not the console's `hakchi recovery`). **Untested on hardware** in this
+form: the first run (2026-10-21) used the console's own `hakchi recovery` and hung the console
+(power LED off, no USB device, a power cycle recovered it); the switch to CE's tools has not
+been run since. If it hangs again, power-cycle the console and record the `-v` output. Step 2
+reports `the console left the USB network` first. Step 5 is `already done` (no UDISK), step 6
+too. Steps 9 to 13 as in section 2; the installer prints `updating hakchi...` lines instead of
+`installing`.
+
+### 5. Negative checks
+
+Only with **no console attached** (an attached hakchi console would be membooted):
+
+- `cargo run -p cartload-flow -- --wait-fel 5 install --hmod "$HMOD"`: step 1 fails after
+  5 s with `a console in FEL mode (USB 1f3a:efe8) appearing did not happen within 5 s; power
+  the console off, hold Reset, ...`, then `rerun the same command to resume`, exit 1.
+- `install --hmod Cargo.toml`: `reading Cargo.toml: hakchi.hmod: Cargo.toml is not a readable
+  gzip tar archive: invalid gzip header`, exit 1, nothing else runs.
+
+### Memboot only
+
+```
+cargo run -p cartload-flow -- memboot --hmod "$HMOD"
+```
+
+Steps 1 to 3 of the install (`memboot`, `wait-console`, `detect`), console in FEL mode as in
+section 2. Ends with `console: minimal memboot shell (hwid ...)` and `memboot finished: 3 steps
+in ...`; `cargo run -p cartload-console -- exec -- cat /hakchi/config` then shows
+`export cf_memboot='y'`. Nothing is written to NAND; power-cycle the console to leave the shell.
+From a running hakchi kernel the first step kexecs instead (section 4).
+
+### Dump stock kernel
+
+```
+cargo run -p cartload-flow -- dump-kernel kernel.img
+```
+
+On an installed console booted normally (no `--hmod` needed): step 1 `membooting the kernel from
+NAND with kexec from the running kernel`, steps 2 and 3 as above, step 4 `wrote kernel.img:
+N bytes, kernel-dp-sneseur-release-v2.0.14-0-gd8b65c6.img (SNES Classic Mini (EUR))` (the image
+name follows the console's stock firmware version; `not a known stock kernel image (md5 ...)`
+means a dump that hakchi2 CE would not accept either: record the md5), step 5 `rebooting the
+console`, step 6 `the console left the USB network`. The console then boots hakchi normally.
+Rerunning with the same file: step 4 `=> already done: kernel.img already holds ...`.
+
+### Uninstall
+
+```
+cargo run -p cartload-flow -- uninstall
+```
+
+On an installed console booted normally: steps 1 to 3 as for the dump, 4 `stock kernel from
+the console's backup: N bytes, kernel-dp-...`, 5 `uploading the stock kernel (...)`, progress,
+`flashing the stock kernel (hakchi flashBoot2, verified by MD5)`, 6 `console: uninstalling
+hakchi...`, `console: done.`, 7 `rebooting the console`, 8 `the console left the USB network`.
+The console boots the stock firmware: its menu appears and `lsusb` shows `1f3a:efe8` (normal
+boot) and no `04e8:6863`. `install` from section 2 puts hakchi back. A console with no backup
+(`no stock kernel backup on the console: ...`) needs `--stock-kernel kernel.img` from an earlier
+dump; a file whose md5 is unknown is refused unless `--force-stock-kernel` is given.
+
+### Base mods
+
+```
+cargo run -p cartload-hmod -- base-mods
+cargo run -p cartload-flow -- --dry-run base-mods
+cargo run -p cartload-flow -- base-mods
+```
+
+Installs hakchi2 CE's `tiny7zx` mod (the 7z extractor compressed games need) on a console
+booted into its hakchi kernel; `--mods tiny7zx,font_remount` adds CE's extended title font. The
+files are downloaded from the CE repository at the pinned commit into the cache
+(`~/.cache/cartload/basemods/<commit>/<name>.hmod/`) the first time, checked against the MD5s
+in the catalog, and reused afterwards (`--offline` refuses to download). This **writes to the
+hakchi rootfs overlay** (`/var/lib/hakchi/rootfs/bin/tiny7zx`, `/var/lib/hakchi/hmod/
+uninstall-tiny7zx`) and reboots the console; the kernel partitions are untouched.
+
+Expected: `cartload-hmod base-mods` lists both mods with sizes and MD5s and `3 of 3 files
+missing` until fetched (`--fetch` downloads 30 116 bytes for tiny7zx in under a second; verified
+2026-10-21 against the live repository, every file's MD5 matching the local CE checkout). The
+dry run prints `mods:     tiny7zx from ... (https://github.com/TeamShinkansen/Hakchi2-CE at
+4fb3092c29cd)`, `tiny7zx: cached`, `flow:     base-mods (6 steps)` and the steps
+`wait-console`, `detect`, `base-mods`, `wait-console`, `detect`, `verify-mods`. The real run,
+on a console with CE's base mods already installed: step 3 `=> already done: tiny7zx: 1 file(s)
+in /var/lib/hakchi/rootfs with the expected MD5, registered in /var/lib/hakchi/hmod` and no
+reboot; step 6 `tiny7zx is on the console's PATH at /bin/tiny7zx`. On a console without the mod:
+step 3 `uploaded tiny7zx.hmod (3 files, 30116 bytes)`, `console: installing tiny7zx...`,
+`console: creating uninstall for tiny7zx...`, `console: package tiny7zx installed`,
+`installed tiny7zx; rebooting the console so the new files are seen`, then the console drops off
+the network and comes back (step 4), is identified (step 5) and step 6 reports the path. After
+that, `cargo run -p cartload-console -- exec -- hakchi pack_list` lists `tiny7zx`. Negative:
+`--mods clovercon` is refused with the list of known mods; `--offline` with an empty cache fails
+with `is not cached; download it first`; in the memboot shell step 2 fails with `expected a
+console booted into its installed hakchi kernel`.
+
+### Results
+
+| Date | Console | Host | Install | Resume | Repair | Memboot | Dump | Uninstall | Base mods | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini EUR, hakchi v1.0.4-126 already installed | EndeavourOS, Linux 6.18 | ok (FEL) | | | kexec from running kernel through the console's own `hakchi recovery`: console hung, LED off, power-cycle recovered it. Replaced since (task 13) by hakchi2 CE's sequence with its own `kexec.static` and `detached-fallback`; that sequence was verified on 2026-10-21 evening with `memboot` from the running kernel: console back in the memboot shell in 8.7 s, flow 13.7 s total (c4e9609). FEL memboot also OK a second time. kexec from the memboot shell after a grow still untested | | | | first run panicked opening the FEL device (nusb needed its tokio feature, fixed 16fffd4); second run through FEL ran all 13 steps, installer printed "invalid image on nand at sector: 68" which the flow wrongly took as fatal (fixed 77e83e5); the console came back installed and `cartload-console info` verified it. grow/reboot-grown were skipped (partition already grown), so kexec from the memboot shell is still untested. haveBackup2 and isOriginalBoot2 both fail on this console: no stock kernel backup at sector 68 |
+
+## Sync one game
+
+Crate: `crates/library`, binary `cartload-library`. `import`, `list` and `menu` never touch the
+console. `plan` connects, runs the hakchi2 CE connect sequence, reads the firmware's launch
+entries (`cat` of each `CLV-P-*.desktop` in the squashfs, cached under `originals/` in the
+library) and lists the games storage (`find`/`stat`); it changes nothing except that
+`mkdir -p` of the per-console games directory, which already exists on a synced console. `sync`
+**modifies the games storage**: it stops the menu, unmounts the games overlay, removes the files,
+symlinks and emptied directories named in the plan, uploads the plan's files over FTP, sets their
+times, runs the link script, writes the config and runs `hakchi overmount_games; uistart`. Save
+states and everything outside `<storage>/<system code>/` are untouched. A console synced with
+hakchi2 CE keeps working after a Cartload sync and vice versa (same layout); the first Cartload
+sync after a CE sync re-uploads every file because the timestamps differ. SNES and NES games are
+compressed by default (the ROM goes up as `<rom>.7z`, like CE's "Compress games"), so the
+console must have CE's `tiny7zx` mod ("Base mods" above); `sync` checks `which tiny7zx` before
+touching anything and `cartload-library compress --off <CODE>` turns compression off per game.
+
+### Prerequisites
+
+- Everything from "Console connect".
+- A SNES ROM (`.sfc`/`.smc`) or NES ROM (`.nes`). The run below uses Chrono Trigger (USA),
+  CRC-32 `2D206BF7` after copier header removal, which hakchi2 CE's trace also used.
+- A scratch library so the default one is not touched: `export CARTLOAD_LIBRARY=/tmp/cartload-lib`.
+
+### 1. Import and inspect (no console needed)
+
+```
+cargo run -p cartload-library -- import "Chrono Trigger.smc"
+cargo run -p cartload-library -- list
+cargo run -p cartload-library -- menu --console snes-eur
+```
+
+Expected: the first download of `romfiles.xml.gz` (518 698 bytes, 19 932 records) into the
+cache, then `CLV-U-ZJSQU  Chrono Trigger  [Super Nintendo Entertainment System] matched,
+4194400 bytes packed to 2850539 (67%)` (about a second for the packing). The game directory
+holds `Chrono_Trigger.sfrom` (4 194 400 bytes = 48 + 4 194 304 + 48), `Chrono_Trigger.sfrom.7z`
+(2 850 539 bytes; hakchi2 CE's own archive of the same file is 2 850 560), `CLV-U-ZJSQU.desktop`
+(its `Exec` names the `.7z`), `CLV-U-ZJSQU.png`, `CLV-U-ZJSQU_small.png` and `game.json`
+(`"compress": true`). `list` shows `Chrono_Trigger.sfrom.7z`. `menu` prints the game alone (no
+firmware entries are cached yet) and `1 menu directories on the console`.
+
+```
+cargo run -p cartload-library -- compress --off CLV-U-ZJSQU
+cargo run -p cartload-library -- compress CLV-U-ZJSQU
+```
+
+Expected: `uncompressed: 4194400 bytes` with the `.7z` removed and the entry naming the `.sfrom`,
+then `compressed: 4194400 bytes packed to 2850539 (67%)` with the archive rebuilt (identical
+bytes: the packing is deterministic). `compress --all` reports `(unchanged)`.
+
+### 2. Plan against the console
+
+```
+cargo run -p cartload-library -- plan
+```
+
+Expected on a European SNES Classic Mini: `console: SNES Classic Mini (EUR) [snes-eur],
+storage /var/lib/hakchi/games`, `cached the firmware's launch entries count=21`, then
+`1 games (1 compressed), 21 firmware games, 2 folders in 31 files (2973696 bytes on the
+console)`, `upload 31 files (2867841 bytes)` and the free space line. The upload list has the
+21 `./000/CLV-P-*/CLV-P-*.desktop` entries with the same sizes hakchi2 CE uploads (CLV-P-SAAAE
+600 bytes, CLV-P-SABTE 796 bytes, ...), the `More games...` folder `CLV-S-00001` in `000`, the
+game's files under `./.storage/CLV-U-ZJSQU/` (`Chrono_Trigger.sfrom.7z`, 2850539 bytes) and its
+entry (578 bytes, the size of CE's own entry for the compressed game plus or minus the
+`country` line) plus the `Original games` back folder `CLV-S-00000` in `001`. On a console
+hakchi2 CE synced before, the plan also removes CE's `_mdmini.png` and `metadata.json` files and
+the 21 `autoplay` symlinks (recreated by the link script); CE's `.7z` at the same path is
+replaced by Cartload's, which differs in size and time. With compression off the game's line is
+`Chrono_Trigger.sfrom` (4194400 bytes) and the total `4321280 bytes on the console`. Verified
+2026-10-21 on the console of the trace, read-only, in both forms.
+
+### 3. Sync
+
+```
+cargo run -p cartload-library -- sync
+```
+
+Confirm with `y`. Expected: first `1 compressed games; the console extracts them with
+/bin/tiny7zx` (the `which tiny7zx` check; a console without the mod stops here with
+`1 compressed game(s) need the tiny7zx mod on the console` and nothing changed), then the nine
+steps `stop-ui`, `umount`, `diff`, `cleanup`, `upload` (progress lines, about 2.9 MB in a
+second over USB), `link`, `config`, `finish`, `done`, then `uploaded 31 files (2867841 bytes),
+removed ... games mounted: true`. The TV shows the stock menu with the 21 original games and a
+"More games..." folder on the right; inside it Chrono Trigger (placeholder cover) and an
+"Original games" folder leading back. Starting the game must work (the wrapper extracts the
+archive to `/tmp/rom` first; the console takes a moment longer than with a raw ROM) and offer 3
+save slots. `cargo run -p cartload-console -- info` then reports about 2.9 MB used by the
+current games collection. `compress --off CLV-U-ZJSQU` followed by `sync` must replace the
+archive with the 4.2 MB `.sfrom` and the game must still start.
+
+### 4. Second sync and removal
+
+- `sync` again: the plan says `upload 0 files`, `keep 31`, nothing to remove; the sync still
+  relinks and remounts. Expected to finish in a few seconds with the menu unchanged.
+- `remove CLV-U-ZJSQU`, then `sync`: the plan removes the game's three files and its entry and
+  the two folders (`More games...` no longer has content), and the menu shows only the 21
+  original games.
+- Negative: with the console off, `plan --console snes-eur` prints `no console answered;
+  planning against an empty snes-eur console` and lists every file as an upload; `sync` exits 1
+  with `no console answered`.
+
+### Results
+
+| Date | Console | Import | Plan | Sync | Second sync | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | OK (Chrono Trigger, code and .sfrom size as in the CE trace) | OK, read-only, 21 firmware entries cached | not run (user absent) | not run | the entries the plan generates have the sizes of CE's uploads |
+| 2026-10-21 | same console | OK, compressed: 2 850 539-byte .7z in 0.9 s; compress --off/on round-trips | OK, read-only: 31 uploads, 2 973 696 bytes total, CE's .7z at the same path replaced | not run (user absent) | not run | `which tiny7zx` on the console answers /bin/tiny7zx (read-only check) |
+| 2026-10-23 | same console | OK (a batch of SNES ROMs from the desktop app) | OK | OK: first sync from the app, games play on the console | not run | reported by the user; the back-link tile showed as a plain grey square, fixed the same day with an arrow glyph |
+
+## Console page (desktop app)
+
+Crate: `src-tauri`, binary `cartload-app`; headless equivalent `cargo run -p cartload-app
+--example watch`. The app's watcher looks at the USB bus and the USB network link every 2 s,
+opens one SSH session when a hakchi kernel answers and runs the hakchi2 CE identification
+sequence once (`hakchi` script calls, `cat`, `df`, `du`, `ls`; see "Console connect" above for
+the `save_config` side effect). A device with the FEL ids is opened once for the FEL version
+query (read-only) when it appears. Nothing else is sent unless the build has the `dev-exec`
+feature and you type a command yourself.
+
+### Prerequisites
+
+- The udev rule and NetworkManager profile from "FEL memboot".
+- `pnpm install`, then `pnpm build` and `cargo build -p cartload-app`, or `pnpm tauri dev`.
+- On Wayland hosts where the window dies with `Gdk-Message: Error 71 (Protocol error)
+  dispatching to Wayland display`, run with `WEBKIT_DISABLE_DMABUF_RENDERER=1` (a WebKitGTK
+  issue with some GPU drivers; seen on the 2026-10-21 host).
+
+### 1. Nothing attached
+
+Start the app with no console attached (or with it switched off). Expected: within 2 s the
+status card reads "Nothing found. Connect the console with USB and turn it on." with the
+hint about holding Reset, the status bar shows the same line with a grey dot, and the log
+panel (Ctrl+L) shows "console watcher started". No toast.
+
+### 2. Installed hakchi kernel
+
+Switch the console on. Expected, in order and without any click: "hakchi kernel found on USB:
+waiting for its network link…" (blue, cartridge pulsing) as soon as `04e8:6863` enumerates,
+"Console found at 169.254.13.37:22: connecting…", "… identifying…", then the green card
+"SNES Classic Mini, EUR, hakchi v1.0.4-126, 311 MB free" (model, region, versions and free
+space as the console reports them), "Ready. Open the Library page to add and sync games.",
+the primary button "Open Library", and the details list (model, region, hardware id, hakchi,
+kernel, boot, firmware, games storage, storage sizes, games on console, save states, original
+games, address, link). The log shows the SSH session line and, with "Show details" on, each
+command of the identification sequence. "Refresh" (or F5) re-runs the sequence and keeps the
+card green.
+
+Unplug the USB cable: the card goes back to "Nothing found" within 2 s and the log says
+"console no longer reachable; closing the session". Plug it back in: the sequence above runs
+again by itself.
+
+### 3. FEL mode
+
+With the console off, hold Reset and switch it on. Expected: "Console attached over USB:
+checking for FEL mode…" for a moment, then the green "Console in FEL mode: ready to install
+the kernel." with the chip "Allwinner R16" in the details and the primary button "Install
+kernel". Power-cycle the console into normal boot: "Console left FEL mode: waiting for the
+hakchi kernel to come up…" and then, if hakchi is installed, the connected card as in step 2;
+otherwise "Nothing found" after 45 s.
+
+### 4. Stock firmware in normal boot
+
+A console without hakchi, switched on normally, enumerates with the FEL ids too. Expected:
+"Console attached over USB, but not in FEL mode." (amber) with the instruction to hold Reset,
+and "Check FEL mode" as the primary button, which repeats the query and reports the result in
+a toast.
+
+### Results
+
+| Date | Console | Host | 1 | 2 | 3 | 4 | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | Linux 6.18.57, Wayland, hakchi0 169.254.68.74 | not run (console attached all day) | OK: connected card and details in 2.4 s, both in the app and the `watch` example | not run | not run | native Wayland needed `WEBKIT_DISABLE_DMABUF_RENDERER=1`; GDK_BACKEND=x11 also works |
+
+## hakchi setup on the Console page (desktop app)
+
+Since the Console and Kernel pages were merged, the stages below are the Console page's
+"Install hakchi" card (stage 1 its FEL instructions, stages 2 and 3 its last line) and each flow's steps, log and result appear in the progress
+window instead of the page's right column. Read "the Kernel page" in this section that way.
+
+Crate: `src-tauri`, binary `cartload` (package `cartload-app`). The Kernel page runs the flows of "Install kernel"
+above through the app's `FlowRunner`: the same `cartload-flow` steps, the same time limits,
+observed as a step list with timing, the log of the run beneath, and a failure card with the
+likely cause and the next action. While a flow runs the console watcher is paused and the
+status bar reads "Installing hakchi: step n of 13, …". Everything in "Install kernel" about
+what is written to NAND applies. The headless equivalent of each section is the
+`cartload-flow` command named there; the app adds nothing to the device-side sequence.
+
+### Prerequisites
+
+- Everything from "Console page" (udev rule, link-local profile, the Wayland variable).
+- For section 1, move `~/.cache/cartload/hakchi.hmod` aside. The other sections use the
+  package the app carries, which needs no network.
 - Console connected over USB, powered off, stock firmware, for section 2; the states named in
   the other sections.
 

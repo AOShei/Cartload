@@ -24,7 +24,7 @@
   /** Kernel flows boot hakchi, so they need the console reachable and the package. */
   const canStart = $derived(watch.ready && pkg !== null && !busy);
   const reason = $derived(
-    busy ? "Another task is running on the console." : !watch.ready ? "Connect the console first." : !pkg ? "Download the kernel package first." : "",
+    busy ? "Another task is running on the console." : !watch.ready ? "Connect the console first." : !pkg ? "The kernel package is not ready." : "",
   );
   let confirmReset = $state(false);
 
@@ -56,17 +56,19 @@
     <div class="package">
       <span class="muted small">
         {#if pkg}
-          Package <span class="num">{pkg.version}</span>, {formatBytes(pkg.len)}
+          Package <span class="num">{pkg.version}</span>, {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ", built in"}
         {:else if packageStore.updating}
           Downloading the package…
         {:else}
-          No kernel package downloaded.
+          The built-in kernel package could not be prepared.
         {/if}
       </span>
-      <button type="button" class="btn btn-quiet btn-sm" onclick={() => void packageStore.update()} disabled={busy || packageStore.updating}>
-        {#if packageStore.updating}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="download" size={14} />{/if}
-        {pkg ? "Update" : "Download"}
-      </button>
+      {#if !pkg}
+        <button type="button" class="btn btn-quiet btn-sm" onclick={() => void packageStore.update()} disabled={busy || packageStore.updating}>
+          {#if packageStore.updating}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="download" size={14} />{/if}
+          Download
+        </button>
+      {/if}
     </div>
   {/if}
   </div>

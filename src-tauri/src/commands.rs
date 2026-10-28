@@ -329,8 +329,8 @@ pub async fn package_info() -> Result<PackageStatus, CommandError> {
     Ok(package::status().await)
 }
 
-/// Downloads the latest kernel package into the cache, with `package-download` progress
-/// events, and returns the new status.
+/// Downloads the pinned kernel package into the cache (the fallback for the built-in copy),
+/// with `package-download` progress events, and returns the new status.
 #[tauri::command]
 pub async fn package_update(
     app: AppHandle,

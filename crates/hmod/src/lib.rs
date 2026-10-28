@@ -8,8 +8,10 @@
 //! normalises them so callers always use `boot/boot.img` style names.
 //!
 //! - [`Package`] opens a package on disk, lists it and reads entries.
-//! - [`fetch_latest`] downloads the current package from the known locations (feature `fetch`,
+//! - [`fetch_latest`] downloads the pinned package from the known locations (feature `fetch`,
 //!   on by default).
+//! - [`pinned`] names the one package Cartload installs (hakchi v1.0.4-126) by size and SHA-256,
+//!   and with the `bundled` feature (on by default) embeds it, so no download is needed.
 //! - [`basemods`] knows hakchi2 CE's base mods (`tiny7zx` for compressed games,
 //!   `font_remount`): a catalog with sizes and MD5s, a cache, a downloader (feature `fetch`)
 //!   and the tar stream the console's `pack_install` takes.
@@ -25,6 +27,7 @@ mod error;
 mod fetch;
 pub mod modhub;
 mod package;
+pub mod pinned;
 mod version;
 
 #[cfg(feature = "fetch")]

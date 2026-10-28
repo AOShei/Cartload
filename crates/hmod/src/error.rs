@@ -182,11 +182,42 @@ pub enum Error {
     },
 
     /// The destination path has no file name to derive the temporary file name from.
-    #[cfg(feature = "fetch")]
+    #[cfg(any(feature = "fetch", feature = "bundled"))]
     #[error("destination {} has no file name", path.display())]
     BadDestination {
         /// The destination given.
         path: PathBuf,
+    },
+
+    /// A package file is not the one Cartload installs ([`crate::pinned`]).
+    #[error(
+        "{} is not the hakchi {} kernel package (expected {} bytes, SHA-256 {}; found {len} bytes{})",
+        path.display(),
+        crate::pinned::PINNED_VERSION,
+        crate::pinned::PINNED_LEN,
+        crate::pinned::PINNED_SHA256,
+        if sha256.is_empty() { String::new() } else { format!(", SHA-256 {sha256}") }
+    )]
+    NotPinned {
+        /// The file checked.
+        path: PathBuf,
+        /// Its size.
+        len: u64,
+        /// Its SHA-256, empty when the size already ruled it out.
+        sha256: String,
+    },
+
+    /// The download from `url` is a valid package but not the pinned one.
+    #[cfg(feature = "fetch")]
+    #[error(
+        "download from {url} is not the hakchi {} kernel package Cartload installs (SHA-256 {sha256})",
+        crate::pinned::PINNED_VERSION
+    )]
+    NotPinnedDownload {
+        /// The URL requested.
+        url: String,
+        /// SHA-256 of what arrived.
+        sha256: String,
     },
 
     /// Every download source failed; the per-source errors are inside.

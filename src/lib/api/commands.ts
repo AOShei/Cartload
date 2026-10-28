@@ -99,7 +99,7 @@ export function packageInfo(): Promise<PackageStatus> {
   return call<PackageStatus>("package_info");
 }
 
-/** Downloads the latest kernel package; progress follows as `package-download` events. */
+/** Downloads the pinned kernel package (the fallback when the built-in copy cannot be written); progress follows as `package-download` events. */
 export function packageUpdate(): Promise<PackageStatus> {
   return call<PackageStatus>("package_update");
 }
