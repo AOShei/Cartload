@@ -4,7 +4,7 @@
   import Icon from "./Icon.svelte";
 
   /* Asks about removing an emulator module, opened by `modulesStore.requestRemove` from
-     Settings. While games in the library still need the module it explains that they go
+     the Console page. While games in the library still need the module it explains that they go
      first and offers to show them in the Library; otherwise it asks to confirm. */
   const removal = $derived(modulesStore.removal);
   const blocked = $derived(removal !== null && removal.games.length > 0);
@@ -23,7 +23,7 @@
 >
   {#if removal}
     {#if removal.unmanaged}
-      <p>{removal.title} is on the console, but no package on it has an uninstall record for it, so there is nothing Cartload can run to remove it. It may be part of another package (hakchi2 CE's RetroArch carries its NES cores, for example): removing that package removes it too.</p>
+      <p>{removal.title} came with another package and cannot be removed on its own (hakchi2 CE's RetroArch carries its NES cores, for example). Removing that package removes it too.</p>
     {:else if blocked}
       {@const count = removal.games.length}
       <div class="warning">
@@ -43,14 +43,11 @@
       </ul>
     {:else}
       <p>
-        Cartload runs the uninstall script of {removal.records.length === 1 ? "the package" : "the packages"}
-        {#each removal.records as record, i (record)}{i > 0 ? ", " : ""}<span class="mono">{record}</span>{/each}
-        on the console and reboots it once. Packages installed by hakchi2 CE are removed the same way.
+        {removal.title} is removed from the console, which then restarts once.
         {#if removal.alsoRemoved.length > 0}
           Every core needs RetroArch, so the installed cores go too: {removal.alsoRemoved.join(", ")}.
         {/if}
       </p>
-      <p class="muted small">No game in the library uses it. If you removed games without syncing since, sync first so the console's menu does not keep games that can no longer start.</p>
     {/if}
   {/if}
   {#snippet actions()}
@@ -90,9 +87,5 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-  }
-
-  .small {
-    font-size: var(--text-sm);
   }
 </style>
