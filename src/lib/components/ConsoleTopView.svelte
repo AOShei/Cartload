@@ -147,12 +147,10 @@
     <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
     <circle cx="52" cy="191" r="1.8" fill="#8a8a8e" />
     <rect x="62" y="176" width="70" height="22" rx="4" fill="#5a4a9c" stroke="#3f3374" />
-    <line x1="68" y1="181" x2="126" y2="181" stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
     <text class="lbl on-bar" x="97" y="189.5" text-anchor="middle">POWER</text>
     <!-- reset bar -->
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="9" />
     <rect x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="4" fill="#5a4a9c" stroke="#3f3374" />
-    <line x1={reset.x + 6} y1={reset.y + 5} x2={reset.x + reset.w - 6} y2={reset.y + 5} stroke="#7d6fc0" stroke-width="2" stroke-linecap="round" />
     <text class="lbl on-bar" x={reset.x + reset.w / 2} y={reset.y + 13.5} text-anchor="middle">RESET</text>
   {:else if shape === "nes"}
     <!-- NES Classic Mini, seen from the front, since its buttons are on the front face:
