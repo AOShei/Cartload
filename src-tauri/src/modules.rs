@@ -36,6 +36,9 @@ pub struct ModuleView {
     pub cached_bytes: Option<u64>,
     /// Installed on the connected console (`None` when no console answered).
     pub installed: Option<bool>,
+    /// Installed with an uninstall record under its hub name, so Cartload can remove it
+    /// (`None` when no console answered).
+    pub removable: Option<bool>,
 }
 
 /// The catalog with its state.
@@ -78,6 +81,50 @@ pub fn installed_check(module: &Module) -> String {
         .join(" && ")
 }
 
+/// Exit code 0 when the console has the module's uninstall record (what `pack_install`
+/// writes and `hakchi pack_uninstall` runs).
+pub fn registered_check(module: &Module) -> String {
+    format!("[ -f '/var/lib/hakchi/hmod/uninstall-{}' ]", module.item)
+}
+
+/// The modules removing `ids` takes off the console: RetroArch takes every core with it,
+/// since none of them runs without it.
+pub fn removal(ids: &[String]) -> Result<Vec<&'static Module>, CommandError> {
+    let mut modules = resolve(ids)?;
+    if modules.iter().any(|m| m.id == modhub::RETROARCH.id) {
+        modules = modhub::CATALOG.to_vec();
+    }
+    modules.dedup_by_key(|m| m.id);
+    Ok(modules)
+}
+
+/// The refusal when games of the library still need modules that are being removed.
+pub fn removal_blocked(modules: &[&Module], games: &[String]) -> Option<CommandError> {
+    if games.is_empty() {
+        return None;
+    }
+    let titles = modules
+        .iter()
+        .map(|m| m.title)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let shown = games.iter().take(5).cloned().collect::<Vec<_>>().join(", ");
+    let more = if games.len() > 5 {
+        format!(" and {} more", games.len() - 5)
+    } else {
+        String::new()
+    };
+    Some(
+        CommandError::new(format!(
+            "{} game{} in the library still need{} {titles}: {shown}{more}. Remove them from              the library (or switch them to the built-in emulator) and sync first.",
+            games.len(),
+            if games.len() == 1 { "" } else { "s" },
+            if games.len() == 1 { "s" } else { "" },
+        ))
+        .with_detail(games.join("\n")),
+    )
+}
+
 /// The catalog with cache state and, when a session is given, what the console has.
 pub async fn status(session: Option<&Session>) -> ModulesStatus {
     let cache = modhub::default_cache_dir();
@@ -97,6 +144,15 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             },
             None => None,
         };
+        let removable = match (session, installed) {
+            (Some(session), Some(true)) => session
+                .exec(&registered_check(module))
+                .await
+                .ok()
+                .map(|output| output.success()),
+            (_, Some(false)) => Some(false),
+            _ => None,
+        };
         let cached_bytes = cache.as_deref().and_then(|c| module.cached_size(c));
         modules.push(ModuleView {
             id: module.id.to_string(),
@@ -109,6 +165,7 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             cached: cached_bytes.is_some(),
             cached_bytes,
             installed,
+            removable,
         });
     }
     ModulesStatus {
@@ -183,6 +240,34 @@ mod tests {
             "which retroarch-clover >/dev/null && which nes >/dev/null"
         );
         assert_eq!(installed_check(&modhub::FCEUMM), "which fceumm >/dev/null");
+    }
+
+    #[test]
+    fn removing_retroarch_takes_every_core() {
+        let ids = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let one = removal(&ids(&["snes9x"])).expect("known id");
+        assert_eq!(one.iter().map(|m| m.id).collect::<Vec<_>>(), ["snes9x"]);
+        let all = removal(&ids(&["retroarch"])).expect("known id");
+        assert_eq!(all.len(), modhub::CATALOG.len());
+        assert_eq!(
+            registered_check(&modhub::SNES9X),
+            "[ -f '/var/lib/hakchi/hmod/uninstall-_km_snes9x_xtreme' ]"
+        );
+    }
+
+    #[test]
+    fn removal_is_blocked_by_the_games_that_need_it() {
+        assert!(removal_blocked(&[&modhub::SNES9X], &[]).is_none());
+        let one =
+            removal_blocked(&[&modhub::SNES9X], &["Earthbound".to_string()]).expect("blocked");
+        assert!(
+            one.message
+                .starts_with("1 game in the library still needs SNES core")
+        );
+        let games: Vec<String> = (1..=7).map(|i| format!("Game {i}")).collect();
+        let many = removal_blocked(&[&modhub::SNES9X], &games).expect("blocked");
+        assert!(many.message.contains("7 games in the library still need"));
+        assert!(many.message.contains("Game 5 and 2 more"));
     }
 
     #[test]

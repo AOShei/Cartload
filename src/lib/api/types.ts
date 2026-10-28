@@ -165,7 +165,8 @@ export type FlowKind =
   | { kind: "memboot" }
   | { kind: "uninstall"; stock_kernel?: string | null; force_stock_kernel?: boolean }
   | { kind: "dump_kernel"; path: string }
-  | { kind: "install_modules"; ids: string[] };
+  | { kind: "install_modules"; ids: string[] }
+  | { kind: "remove_modules"; ids: string[] };
 
 export type StepState = "pending" | "running" | "done" | "failed" | "skipped";
 
@@ -293,6 +294,9 @@ export interface GameView {
   cover: string;
   thumbnail: string;
   system_name: string;
+  /** Emulator modules the game needs on the console the library is for: empty for the
+   *  built-in emulator, else `retroarch` and the core (`snes9x`). */
+  modules: string[];
 }
 
 export interface LibraryView {
@@ -563,6 +567,8 @@ export interface ModuleView {
   cached: boolean;
   cached_bytes: number | null;
   installed: boolean | null;
+  /** Installed with an uninstall record Cartload can run. */
+  removable: boolean | null;
 }
 
 export interface ModulesStatus {

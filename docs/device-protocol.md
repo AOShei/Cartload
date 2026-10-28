@@ -256,6 +256,14 @@ written to `$installpath/hmod/uninstall-<name>`; `hakchi pack_list` prints those
 `mount_base` and then boots normally; Cartload installs on the booted kernel and reboots, so the
 files written into the overlay's upper directory are seen by the running system.
 
+Removing a mod (hakchi2 CE `ModTasks.UninstallHmod`): `hakchi pack_uninstall '<name>'` sources
+`uninstall-<name>` from `$rootfs` (the generated `rm -f "$rootfs/..."` and
+`rmdir --ignore-fail-on-non-empty` lines, after the mod's own uninstall commands), deletes the
+record, and prints `uninstalling <name>...` / `package <name> uninstalled`; it exits 0 and
+prints nothing when the mod has no record. A mod whose `uninstall` file says `no-uninstall`
+gets no record and cannot be removed this way. Cartload reboots afterwards, as for an install
+(source: `b0030_package` in the `hakchi.hmod` ramdisk).
+
 ## Sync sequence (verified, see docs/reference/hakchi-ce-sync-trace.log)
 
 1. Build the menu tree locally (folders, resized art, desktop entries).

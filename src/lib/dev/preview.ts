@@ -430,6 +430,8 @@ function previewGame(index: number, placeholderEvery: number): GameView {
     cover: previewCover(name, system, placeholder),
     thumbnail: previewCover(name, system, placeholder),
     system_name: system === "snes" ? "SNES" : "NES",
+    // The fixture console is a SNES Classic: NES games run through RetroArch there.
+    modules: system === "nes" ? ["retroarch", "fceumm"] : [],
   };
 }
 
@@ -694,6 +696,7 @@ export function previewModules(): ModulesStatus {
     cached: name === "cached" || name === "installed",
     cached_bytes: name === "cached" || name === "installed" ? cachedBytes : null,
     installed: connected ? name === "installed" && installed : null,
+    removable: connected ? name === "installed" && installed : null,
   });
   return {
     cache_dir: "/home/user/.cache/cartload/mods",

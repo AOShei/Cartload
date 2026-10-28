@@ -12,7 +12,7 @@ use std::{
     sync::{Arc, Mutex, PoisonError},
 };
 
-use cartload_console::ConsoleInfo;
+use cartload_console::{ConsoleFamily, ConsoleInfo, ConsoleType};
 use cartload_library::{
     Game, HashDb, Library, Menu, MenuOptions,
     art::{self, ApiKey, ArtEvent, ArtOptions, ArtReport, Client, HttpTransport},
@@ -50,6 +50,9 @@ pub struct GameView {
     pub thumbnail: String,
     /// Short system name (`SNES`, `NES`).
     pub system_name: String,
+    /// The emulator modules the game needs on the console the library is for: empty for
+    /// the built-in emulator, else `retroarch` and the core (`snes9x`).
+    pub modules: Vec<String>,
 }
 
 /// The library as a whole.
@@ -403,12 +406,14 @@ impl LibraryState {
         *self.busy.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Every game with its size and cover URL.
-    pub fn view(&self) -> Result<LibraryView, CommandError> {
+    /// Every game with its size, cover URL and the modules it needs on the console the
+    /// library is for.
+    pub fn view(&self, status: &ConsoleStatus) -> Result<LibraryView, CommandError> {
+        let family = self.family(status)?;
         let mut games = Vec::new();
         let mut total_size = 0;
         for game in self.library.games()? {
-            let view = self.game_view(game)?;
+            let view = self.game_view(game, family)?;
             total_size += view.size;
             games.push(view);
         }
@@ -419,8 +424,8 @@ impl LibraryState {
         })
     }
 
-    /// One game with its size and cover URL.
-    pub fn game_view(&self, game: Game) -> Result<GameView, CommandError> {
+    /// One game with its size, cover URL and the modules it needs on a console of `family`.
+    pub fn game_view(&self, game: Game, family: ConsoleFamily) -> Result<GameView, CommandError> {
         let files = self.library.game_files(&game)?;
         let size = files.iter().map(|f| f.size).sum();
         let version = |name: &str| {
@@ -437,6 +442,10 @@ impl LibraryState {
         );
         Ok(GameView {
             system_name: short_system_name(game.system).to_string(),
+            modules: cartload_library::modules_needed(&game, family)
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
             size,
             cover,
             thumbnail,
@@ -445,7 +454,11 @@ impl LibraryState {
     }
 
     /// Saves an edit and returns the game.
-    pub fn update(&self, edit: &GameEdit) -> Result<GameView, CommandError> {
+    pub fn update(
+        &self,
+        edit: &GameEdit,
+        status: &ConsoleStatus,
+    ) -> Result<GameView, CommandError> {
         let mut game = self.library.game(&edit.code)?;
         apply_edit(&mut game, edit)?;
         if let Some(compress) = edit.compress
@@ -461,7 +474,7 @@ impl LibraryState {
         }
         self.library.save(&game)?;
         info!(code = game.code, name = game.name, "game updated");
-        self.game_view(game)
+        self.game_view(game, self.family(status)?)
     }
 
     /// Removes games and takes them out of the edited tree.
@@ -483,6 +496,39 @@ impl LibraryState {
             return Ok(Some(code.clone()));
         }
         Ok(self.library.config()?.last_console)
+    }
+
+    /// The console family the library is for (the console of [`Self::system_code`]):
+    /// whether NES or SNES games need RetroArch there.
+    pub fn family(&self, status: &ConsoleStatus) -> Result<ConsoleFamily, CommandError> {
+        Ok(self
+            .system_code(status)?
+            .map_or(ConsoleFamily::Unknown, |code| {
+                ConsoleType::from_system_code(&code).family()
+            }))
+    }
+
+    /// The names of the games that need any of the emulator modules `ids` on the console the
+    /// library is for, sorted.
+    pub fn games_needing(
+        &self,
+        ids: &[&str],
+        status: &ConsoleStatus,
+    ) -> Result<Vec<String>, CommandError> {
+        let family = self.family(status)?;
+        let mut names: Vec<String> = self
+            .library
+            .games()?
+            .into_iter()
+            .filter(|game| {
+                cartload_library::modules_needed(game, family)
+                    .iter()
+                    .any(|m| ids.contains(m))
+            })
+            .map(|game| game.name)
+            .collect();
+        names.sort_by_key(|name| name.to_lowercase());
+        Ok(names)
     }
 
     /// The library's games and the firmware games of `system_code`, as the menu builder
@@ -969,10 +1015,15 @@ impl LibraryState {
     }
 
     /// Uses an image file as the cover of a game.
-    pub fn set_cover(&self, code: &str, path: &Path) -> Result<GameView, CommandError> {
+    pub fn set_cover(
+        &self,
+        code: &str,
+        path: &Path,
+        status: &ConsoleStatus,
+    ) -> Result<GameView, CommandError> {
         let set = art::set_cover_from_file(&self.library, code, path, &CoverOptions::default())?;
         info!(code, cover = ?set.cover_size, "cover set from a file");
-        self.game_view(self.library.game(code)?)
+        self.game_view(self.library.game(code)?, self.family(status)?)
     }
 
     /// The HTTP response of the cover protocol for `path` (`/<code>/<file>`).
@@ -1217,6 +1268,40 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
+    async fn nes_games_need_retroarch_only_for_a_snes_console() {
+        let (dir, state) = temp_state();
+        import_two(dir.path(), &state).await;
+        let view = state.view(&no_console()).unwrap();
+        assert!(view.games.iter().all(|g| g.modules.is_empty()));
+        assert!(
+            state
+                .games_needing(&["fceumm"], &no_console())
+                .unwrap()
+                .is_empty()
+        );
+
+        let mut config = state.library().config().unwrap();
+        config.last_console = Some("snes-eur".to_string());
+        state.library().save_config(&config).unwrap();
+        let view = state.view(&no_console()).unwrap();
+        assert!(
+            view.games
+                .iter()
+                .all(|g| g.modules == ["retroarch", "fceumm"])
+        );
+        assert_eq!(
+            state.games_needing(&["fceumm"], &no_console()).unwrap(),
+            ["Alpha Game", "Beta"]
+        );
+        assert!(
+            state
+                .games_needing(&["snes9x"], &no_console())
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
     async fn import_walks_folders_and_reports_per_file() {
         let (dir, state) = temp_state();
         let report = import_two(dir.path(), &state).await;
@@ -1229,7 +1314,7 @@ pub(crate) mod tests {
             report.files[2].outcome,
             Some(ImportOutcome::Skipped { .. })
         ));
-        let view = state.view().unwrap();
+        let view = state.view(&no_console()).unwrap();
         assert_eq!(view.games.len(), 2);
         let names: Vec<&str> = view.games.iter().map(|g| g.game.name.as_str()).collect();
         assert!(names.contains(&"Alpha Game") && names.contains(&"Beta"));
@@ -1285,7 +1370,7 @@ pub(crate) mod tests {
             args: "--guest-overscan-dimensions 0,0,9,3".into(),
             compress: None,
         };
-        let view = state.update(&edit).unwrap();
+        let view = state.update(&edit, &no_console()).unwrap();
         assert_eq!(view.game.name, "Alpha");
         assert_eq!(view.game.publisher, "UNKNOWN");
         assert_eq!(view.game.release_date, "1991-07-04");
@@ -1294,22 +1379,28 @@ pub(crate) mod tests {
         edit.release_date = "July 1991".into();
         assert!(
             state
-                .update(&edit)
+                .update(&edit, &no_console())
                 .unwrap_err()
                 .message
                 .contains("YYYY-MM-DD")
         );
         edit.release_date = String::new();
         edit.players = 3;
-        assert!(state.update(&edit).unwrap_err().message.contains("1 or 2"));
+        assert!(
+            state
+                .update(&edit, &no_console())
+                .unwrap_err()
+                .message
+                .contains("1 or 2")
+        );
         edit.players = 1;
         edit.name = "  ".into();
-        assert!(state.update(&edit).is_err());
+        assert!(state.update(&edit, &no_console()).is_err());
         edit.name = "Alpha".into();
         edit.application = String::new();
-        assert!(state.update(&edit).is_err());
+        assert!(state.update(&edit, &no_console()).is_err());
         edit.application = "/bin/x".into();
-        let view = state.update(&edit).unwrap();
+        let view = state.update(&edit, &no_console()).unwrap();
         assert_eq!(view.game.release_date, "1900-01-01");
         assert!(!view.game.simultaneous, "one player is never simultaneous");
     }

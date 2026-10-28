@@ -55,6 +55,11 @@ pub enum FlowKind {
         /// Catalog ids (`retroarch`, `fceumm`, `snes9x`).
         ids: Vec<String>,
     },
+    /// Uninstall emulator modules from the running hakchi kernel.
+    RemoveModules {
+        /// Catalog ids; `retroarch` takes every core with it.
+        ids: Vec<String>,
+    },
 }
 
 impl FlowKind {
@@ -66,6 +71,7 @@ impl FlowKind {
             Self::Uninstall { .. } => flows::UNINSTALL,
             Self::DumpKernel { .. } => flows::DUMP_KERNEL,
             Self::InstallModules { .. } => flows::MODS,
+            Self::RemoveModules { .. } => flows::REMOVE_MODS,
         }
     }
 
@@ -77,6 +83,7 @@ impl FlowKind {
             Self::Uninstall { .. } => "Returning the console to its original system",
             Self::DumpKernel { .. } => "Saving the stock kernel",
             Self::InstallModules { .. } => "Installing emulator modules",
+            Self::RemoveModules { .. } => "Removing emulator modules",
         }
     }
 
@@ -98,6 +105,7 @@ impl FlowKind {
             Self::Uninstall { .. } => flows::uninstall_kernel(),
             Self::DumpKernel { path } => flows::dump_stock_kernel(path.clone()),
             Self::InstallModules { .. } => flows::install_mods(),
+            Self::RemoveModules { .. } => flows::remove_mods(),
         }
     }
 
@@ -140,6 +148,8 @@ pub fn step_label(name: &str) -> &str {
         "dump-stock-kernel" => "Save the stock kernel",
         "mods" => "Install the emulator modules",
         "verify-emulators" => "Verify the emulator modules",
+        "remove-emulators" => "Remove the emulator modules",
+        "verify-removed" => "Verify the modules are gone",
         other => other,
     }
 }
@@ -561,13 +571,15 @@ impl FlowRunner {
     }
 
     /// Starts `kind`. `package` is attached to the context when given; flows that need one
-    /// are refused without it. A flow of the same kind that failed or was stopped is retried
+    /// are refused without it. `mods` are the modules to install, `removals` the hub names
+    /// of those to uninstall. A flow of the same kind that failed or was stopped is retried
     /// with its context, so finished work is skipped.
     pub fn start(
         self: &Arc<Self>,
         kind: FlowKind,
         package: Option<HmodPackage>,
         mods: Vec<ModArchive>,
+        removals: Vec<String>,
     ) -> Result<FlowSnapshot, CommandError> {
         let mut slot = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
         if let Slot::Running(running) = &*slot {
@@ -590,6 +602,7 @@ impl FlowRunner {
                 if !mods.is_empty() {
                     ctx.mods = mods;
                 }
+                ctx.remove_mods = removals;
                 ctx
             }
             _ => {
@@ -597,12 +610,17 @@ impl FlowRunner {
                 if let Some(package) = package {
                     ctx = ctx.with_hmod(package);
                 }
-                ctx.with_mods(mods)
+                ctx.with_mods(mods).with_removals(removals)
             }
         };
         if matches!(kind, FlowKind::InstallModules { .. }) && ctx.mods.is_empty() {
             return Err(CommandError::new(
                 "No emulator module is loaded. Download the modules first.",
+            ));
+        }
+        if matches!(kind, FlowKind::RemoveModules { .. }) && ctx.remove_mods.is_empty() {
+            return Err(CommandError::new(
+                "No emulator module was chosen for removal.",
             ));
         }
         kind.apply_options(&mut ctx.options);
@@ -1120,7 +1138,7 @@ mod tests {
     async fn install_without_a_package_is_refused() {
         let (runner, recorder, _) = runner(Duration::from_millis(50));
         let error = runner
-            .start(FlowKind::Install, None, Vec::new())
+            .start(FlowKind::Install, None, Vec::new(), Vec::new())
             .unwrap_err();
         assert!(error.message.contains("hakchi.hmod"), "{}", error.message);
         assert_eq!(runner.snapshot().state, FlowState::Idle);
@@ -1131,7 +1149,7 @@ mod tests {
     async fn a_failed_flow_reports_the_cause_and_releases_the_watcher() {
         let (runner, recorder, state) = runner(Duration::from_millis(50));
         let first = runner
-            .start(FlowKind::Memboot, Some(package()), Vec::new())
+            .start(FlowKind::Memboot, Some(package()), Vec::new(), Vec::new())
             .unwrap();
         assert_eq!(first.state, FlowState::Running);
         assert_eq!(first.steps.len(), 3);
@@ -1172,7 +1190,9 @@ mod tests {
         }
 
         // A retry of the same kind keeps the package and runs again from the start.
-        let again = runner.start(FlowKind::Memboot, None, Vec::new()).unwrap();
+        let again = runner
+            .start(FlowKind::Memboot, None, Vec::new(), Vec::new())
+            .unwrap();
         assert_eq!(again.state, FlowState::Running);
         assert!(again.failure.is_none());
         let snapshot = wait_until(&runner, |s| s.state != FlowState::Running).await;
@@ -1180,7 +1200,7 @@ mod tests {
 
         // A different kind that needs a package gets a fresh context, so it is refused.
         let error = runner
-            .start(FlowKind::Install, None, Vec::new())
+            .start(FlowKind::Install, None, Vec::new(), Vec::new())
             .unwrap_err();
         assert!(error.message.contains("hakchi.hmod"));
     }
@@ -1189,10 +1209,10 @@ mod tests {
     async fn only_one_flow_at_a_time_and_cancel_stops_a_waiting_step() {
         let (runner, _, state) = runner(Duration::from_secs(60));
         runner
-            .start(FlowKind::Memboot, Some(package()), Vec::new())
+            .start(FlowKind::Memboot, Some(package()), Vec::new(), Vec::new())
             .unwrap();
         let error = runner
-            .start(FlowKind::Memboot, Some(package()), Vec::new())
+            .start(FlowKind::Memboot, Some(package()), Vec::new(), Vec::new())
             .unwrap_err();
         assert!(error.message.contains("in progress"), "{}", error.message);
 

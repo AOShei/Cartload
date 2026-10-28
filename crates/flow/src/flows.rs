@@ -8,8 +8,8 @@ use crate::{
     steps::{
         CheckMegaDrive, DetectState, DumpStockKernel, FlashStockKernel, GrowPartition,
         InstallBaseMods, InstallMods, Memboot, PrepareInstall, ReadStockKernel, Reboot,
-        RebootAfterGrow, RemoveInstall, RunInstaller, UploadHmod, VerifyBaseMods, VerifyInstall,
-        VerifyMods, WaitForConsole, WaitOffline,
+        RebootAfterGrow, RemoveInstall, RemoveMods, RunInstaller, UploadHmod, VerifyBaseMods,
+        VerifyInstall, VerifyMods, VerifyRemoved, WaitForConsole, WaitOffline,
     },
 };
 
@@ -25,6 +25,8 @@ pub const DUMP_KERNEL: &str = "dump-kernel";
 pub const BASE_MODS: &str = "base-mods";
 /// Name of [`install_mods`].
 pub const MODS: &str = "mods";
+/// Name of [`remove_mods`].
+pub const REMOVE_MODS: &str = "remove-mods";
 
 /// Install (or repair) the hakchi kernel. Needs the package in the context.
 ///
@@ -82,6 +84,18 @@ pub fn install_mods() -> Flow<Context> {
         .step(WaitForConsole)
         .step(DetectState::any())
         .step(VerifyMods)
+}
+
+/// Uninstall emulator modules ([`Context::with_removals`]) from a console running its hakchi
+/// kernel: identify it, `hakchi pack_uninstall` each one, reboot, check they are gone.
+pub fn remove_mods() -> Flow<Context> {
+    Flow::new(REMOVE_MODS)
+        .step(WaitForConsole)
+        .step(DetectState::expect_installed())
+        .step(RemoveMods)
+        .step(WaitForConsole)
+        .step(DetectState::any())
+        .step(VerifyRemoved)
 }
 
 /// Memboot only, for recovery: the console ends up in the memboot shell with SSH open.
@@ -174,6 +188,17 @@ mod tests {
             ]
         );
         assert_eq!(
+            names(remove_mods()),
+            [
+                "wait-console",
+                "detect",
+                "remove-emulators",
+                "wait-console",
+                "detect",
+                "verify-removed",
+            ]
+        );
+        assert_eq!(
             names(uninstall_kernel()),
             [
                 "memboot",
@@ -203,6 +228,7 @@ mod tests {
             uninstall_kernel(),
             install_base_mods(),
             install_mods(),
+            remove_mods(),
         ] {
             for step in flow.steps() {
                 assert!(

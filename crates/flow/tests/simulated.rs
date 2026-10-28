@@ -263,6 +263,31 @@ impl Sim {
         {
             return exit(self.mods_registered.contains(name));
         }
+        // Mod Hub modules, by any name: their record, and `pack_uninstall`.
+        if let Some(name) = command
+            .strip_prefix("[ -f '/var/lib/hakchi/hmod/uninstall-")
+            .and_then(|rest| rest.strip_suffix("' ]"))
+            .filter(|name| name.starts_with("_km_"))
+        {
+            return exit(self.mods_registered.contains(name));
+        }
+        if let Some(name) = command
+            .strip_prefix("hakchi pack_uninstall '")
+            .and_then(|rest| rest.strip_suffix('\''))
+        {
+            assert!(
+                self.installed && !self.memboot_shell,
+                "mods uninstall on the booted kernel"
+            );
+            if !self.mods_registered.remove(name) {
+                return ok("");
+            }
+            self.rootfs_files
+                .retain(|path, _| !path.contains(&format!("/{name}/")));
+            return ok(&format!(
+                "uninstalling {name}...\npackage {name} uninstalled\n"
+            ));
+        }
         if command == commands::which("tiny7zx") {
             let present = self
                 .rootfs_files
@@ -1444,6 +1469,76 @@ async fn base_mods_flow_uploads_installs_reboots_and_verifies() {
     );
     assert_eq!(count(&backend.log()[before..], commands::REBOOT), 0);
     assert_eq!(count(&backend.log()[before..], commands::PACKS_INSTALL), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn remove_mods_uninstalls_the_registered_ones_reboots_and_verifies() {
+    let mut sim = Sim::installed();
+    sim.mods_registered.insert("_km_snes9x_xtreme".to_string());
+    sim.mods_registered
+        .insert("_km_retroarch_1910_ozone".to_string());
+    sim.mods_registered.insert("tiny7zx".to_string());
+    let backend = SimBackend::new(sim);
+    let (ctx, mut events) = context(&backend, None);
+    // mupen64 is not on the console: nothing to do for it.
+    let mut ctx = ctx.with_removals(vec![
+        "_km_snes9x_xtreme".to_string(),
+        "_km_mupen64_xtreme".to_string(),
+    ]);
+    let mut flow = flows::remove_mods();
+
+    flow.run(&mut ctx).await.expect("modules removed");
+
+    assert_eq!(
+        outcomes(&flow),
+        expected(&[
+            ("wait-console", "already"),
+            ("detect", "done"),
+            ("remove-emulators", "done"),
+            ("wait-console", "done"),
+            ("detect", "done"),
+            ("verify-removed", "done"),
+        ])
+    );
+    let log = backend.log();
+    assert_in_order(
+        &log,
+        &[
+            &commands::pack_uninstall("_km_snes9x_xtreme"),
+            commands::REBOOT,
+            console_commands::VERSIONS,
+            &commands::mod_registered("/var/lib/hakchi", "_km_snes9x_xtreme"),
+        ],
+    );
+    assert_eq!(
+        count(&log, &commands::pack_uninstall("_km_mupen64_xtreme")),
+        0
+    );
+    assert_eq!(count(&log, commands::REBOOT), 1);
+    backend.with(|sim| {
+        assert!(!sim.mods_registered.contains("_km_snes9x_xtreme"));
+        assert!(sim.mods_registered.contains("_km_retroarch_1910_ozone"));
+        assert!(sim.mods_registered.contains("tiny7zx"));
+    });
+    let mut saw_console_line = false;
+    while let Ok(event) = events.try_recv() {
+        if let Event::Log { message, .. } = event {
+            saw_console_line |= message == "console: package _km_snes9x_xtreme uninstalled";
+        }
+    }
+    assert!(saw_console_line);
+
+    // A second run finds nothing registered and does not reboot.
+    let before = backend.log().len();
+    let (ctx, _events) = context(&backend, None);
+    let mut ctx = ctx.with_removals(vec!["_km_snes9x_xtreme".to_string()]);
+    let mut flow = flows::remove_mods();
+    flow.run(&mut ctx).await.expect("second run");
+    assert_eq!(
+        outcomes(&flow)[2],
+        ("remove-emulators".to_string(), "already".to_string())
+    );
+    assert_eq!(count(&backend.log()[before..], commands::REBOOT), 0);
 }
 
 #[tokio::test(start_paused = true)]

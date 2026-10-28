@@ -989,3 +989,27 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
    runs the flow.
 2. Import a `.z64` ROM, sync, start it. Record which game and how it runs; slow or broken
    games are expected.
+
+### 8. Remove a core
+
+1. With the SNES core installed and one SNES game set to RetroArch in the library, Settings →
+   Emulators → **Remove** on SNES. Expected: the button is active; the dialog "Remove these
+   games first" names the game, and **Show these games** opens the Library filtered to
+   "SNES core (Snes9x)" across all folders, with that game listed.
+2. Remove the game from the library (or set it to the built-in emulator), sync, then
+   **Remove** again. Expected: the confirmation dialog; **Remove** runs "Removing emulator
+   modules" on the Kernel page (six steps, one reboot); the console log shows
+   `package _km_snes9x_xtreme uninstalled`; afterwards Settings shows **Install** for SNES and
+   `hakchi pack_list` no longer lists `_km_snes9x_xtreme`, while RetroArch and the other cores
+   still start their games.
+3. On a SNES Classic with NES games in the library, **Remove** on NES (FCEUmm). Expected: the
+   dialog lists every NES game, since they all run through RetroArch there.
+
+### 9. Remove RetroArch
+
+1. With RetroArch and at least one core installed and no game using RetroArch, **Remove** on
+   RetroArch. Expected: the confirmation names the installed cores that go with it; after the
+   flow Settings shows **Install** for RetroArch and every core, and the built-in emulators
+   still run their games.
+2. A module installed by hakchi2 CE under another name (no `uninstall-_km_…` record): the
+   dialog "Cartload cannot remove this" and no flow starts.

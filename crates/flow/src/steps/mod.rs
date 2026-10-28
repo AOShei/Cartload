@@ -25,7 +25,9 @@ pub use install::{PrepareInstall, RunInstaller, UploadHmod};
 pub use kernel::{DumpStockKernel, FlashStockKernel, ReadStockKernel, RemoveInstall};
 pub use md::CheckMegaDrive;
 pub use memboot::Memboot;
-pub use mods::{InstallBaseMods, InstallMods, VerifyBaseMods, VerifyMods};
+pub use mods::{
+    InstallBaseMods, InstallMods, RemoveMods, VerifyBaseMods, VerifyMods, VerifyRemoved,
+};
 pub use reboot::Reboot;
 pub use verify::VerifyInstall;
 pub use wait::{WaitForConsole, WaitOffline};
@@ -175,6 +177,11 @@ pub mod commands {
             "[ -f {} ]",
             sh_quote(&format!("{installpath}/hmod/uninstall-{name}"))
         )
+    }
+    /// Runs a mod's uninstall script and drops its record (hakchi2 CE
+    /// `ModTasks.UninstallHmod`); succeeds, doing nothing, when the mod is not registered.
+    pub fn pack_uninstall(name: &str) -> String {
+        format!("hakchi pack_uninstall {}", sh_quote(name))
     }
     /// Exit code 0 (and the path on stdout) when `binary` is on the console's `PATH`.
     pub fn which(binary: &str) -> String {

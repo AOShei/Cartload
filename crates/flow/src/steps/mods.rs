@@ -413,6 +413,139 @@ impl Step<Context> for VerifyMods {
     }
 }
 
+/// The modules to remove that the console still has registered.
+async fn registered_removals(ctx: &Context) -> Result<Vec<String>> {
+    let (_, installpath) = hakchi_paths(ctx);
+    let mut registered = Vec::new();
+    for name in &ctx.remove_mods {
+        if ctx
+            .succeeds(&commands::mod_registered(&installpath, name))
+            .await?
+        {
+            registered.push(name.clone());
+        }
+    }
+    Ok(registered)
+}
+
+/// Runs `hakchi pack_uninstall` for every module in [`Context::remove_mods`] the console has
+/// registered (the uninstall script `pack_install` wrote deletes the module's files from the
+/// rootfs overlay), then reboots the console.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RemoveMods;
+
+#[async_trait]
+impl Step<Context> for RemoveMods {
+    fn name(&self) -> &str {
+        "remove-emulators"
+    }
+
+    fn description(&self) -> &str {
+        "Uninstall the emulator modules, then reboot"
+    }
+
+    async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
+        if ctx.remove_mods.is_empty() || !registered_removals(ctx).await?.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(format!(
+            "{} not registered on the console",
+            ctx.remove_mods.join(", ")
+        )))
+    }
+
+    async fn run(&self, ctx: &mut Context) -> Result<Outcome> {
+        if ctx.remove_mods.is_empty() {
+            return Err(Error::Precondition(
+                "no emulator module was named for removal".to_string(),
+            ));
+        }
+        if !ctx.state.is_installed() || ctx.state.is_memboot_shell() {
+            return Err(Error::WrongState(format!(
+                "modules are uninstalled on a console booted into its hakchi kernel, not {}",
+                ctx.state.describe()
+            )));
+        }
+        let names = registered_removals(ctx).await?;
+        for name in &names {
+            let command = commands::pack_uninstall(name);
+            let output = ctx
+                .exec_with(&command, None, ctx.options.flash_timeout)
+                .await?;
+            for line in output
+                .stdout_lossy()
+                .lines()
+                .chain(output.stderr_lossy().lines())
+            {
+                let line = line.trim_end();
+                if !line.is_empty() {
+                    ctx.reporter.info(format!("console: {line}"));
+                }
+            }
+            if !output.success() {
+                return Err(device_failure(&command, &output));
+            }
+        }
+        let left = registered_removals(ctx).await?;
+        if !left.is_empty() {
+            return Err(Error::Device(format!(
+                "the console still has {} registered after pack_uninstall; see its output above",
+                left.join(", ")
+            )));
+        }
+        ctx.reporter.info(format!(
+            "uninstalled {}; rebooting the console",
+            names.join(", ")
+        ));
+        if let Err(error) = ctx
+            .exec_with(commands::REBOOT, None, std::time::Duration::from_secs(10))
+            .await
+        {
+            ctx.reporter
+                .debug(format!("reboot command returned {error} (expected)"));
+        }
+        ctx.expect_cycle = true;
+        ctx.disconnect().await;
+        Ok(Outcome::Done)
+    }
+}
+
+/// After the reboot: none of the removed modules is registered any more.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct VerifyRemoved;
+
+#[async_trait]
+impl Step<Context> for VerifyRemoved {
+    fn name(&self) -> &str {
+        "verify-removed"
+    }
+
+    fn description(&self) -> &str {
+        "Check the emulator modules are gone"
+    }
+
+    async fn run(&self, ctx: &mut Context) -> Result<Outcome> {
+        if ctx.remove_mods.is_empty() {
+            return Ok(Outcome::NotNeeded("no modules were named".to_string()));
+        }
+        if ctx.console.is_none() {
+            ctx.refresh_state().await?;
+        }
+        let left = registered_removals(ctx).await?;
+        if !left.is_empty() {
+            return Err(Error::Device(format!(
+                "{} is still registered on the console; run the removal again",
+                left.join(", ")
+            )));
+        }
+        ctx.reporter.info(format!(
+            "{} no longer registered on the console",
+            ctx.remove_mods.join(", ")
+        ));
+        Ok(Outcome::Done)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

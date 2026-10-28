@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
         sink,
     ));
 
-    let view = library.view()?;
+    let view = library.view(&state.report().status)?;
     println!(
         "library: {} ({} games, {} bytes)",
         view.root,
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     );
     for game in &view.games {
         println!(
-            "  {}  {:<40} {}  {} bytes  art {}",
+            "  {}  {:<40} {}  {} bytes  art {}  emulator {}",
             game.game.code,
             game.game.name,
             game.system_name,
@@ -83,6 +83,11 @@ async fn main() -> Result<()> {
                 "placeholder"
             } else {
                 "yes"
+            },
+            if game.modules.is_empty() {
+                "built-in".to_string()
+            } else {
+                game.modules.join("+")
             }
         );
     }

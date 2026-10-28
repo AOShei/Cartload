@@ -453,13 +453,19 @@ pub enum Launch {
 
 /// The game with its launch entry adapted to the console: NES games on SNES-family consoles
 /// get [`RETROARCH_FLAG`], SNES games on NES-family consoles call the `/bin/snes` launcher.
-pub fn launch_on(mut game: crate::Game, paths: &DevicePaths) -> (crate::Game, Launch) {
+pub fn launch_on(game: crate::Game, paths: &DevicePaths) -> (crate::Game, Launch) {
+    launch_for(game, paths.family)
+}
+
+/// [`launch_on`] for a console of `family`, when only its family is known (the library
+/// views it without a console attached). [`ConsoleFamily::Unknown`] rewrites nothing.
+pub fn launch_for(mut game: crate::Game, family: ConsoleFamily) -> (crate::Game, Launch) {
     let flagged = game.args.split_whitespace().any(|a| a == RETROARCH_FLAG);
     match game.system {
         System::Nes if game.application.contains("clover-kachikachi") => {
             if flagged {
                 (game, Launch::Retroarch)
-            } else if paths.nes_needs_retroarch() {
+            } else if family == ConsoleFamily::Snes {
                 game.args = format!("{} {RETROARCH_FLAG}", game.args).trim().to_string();
                 (game, Launch::Redirected)
             } else {
@@ -467,7 +473,7 @@ pub fn launch_on(mut game: crate::Game, paths: &DevicePaths) -> (crate::Game, La
             }
         }
         System::Snes if game.application.contains("clover-canoe") => {
-            if paths.snes_needs_retroarch() {
+            if family == ConsoleFamily::Nes {
                 game.application = format!("/bin/{}", System::Snes.retroarch_launcher());
                 game.args = game
                     .args
@@ -492,6 +498,15 @@ pub fn launch_on(mut game: crate::Game, paths: &DevicePaths) -> (crate::Game, La
             }
         }
         _ => (game, Launch::Retroarch),
+    }
+}
+
+/// The emulator modules (`cartload_hmod::modhub` ids) a game needs on a console of `family`:
+/// none when the built-in emulator runs it, RetroArch and the system's core otherwise.
+pub fn modules_needed(game: &crate::Game, family: ConsoleFamily) -> Vec<&'static str> {
+    match launch_for(game.clone(), family).1 {
+        Launch::Builtin => Vec::new(),
+        Launch::Retroarch | Launch::Redirected => vec!["retroarch", game.system.core_module()],
     }
 }
 
@@ -1820,6 +1835,34 @@ mod tests {
         builtin.application = "/bin/nes".to_string();
         assert_eq!(launch_on(builtin, &nes).1, Launch::Retroarch);
         assert!(commands::has_retroarch(System::Nes).contains("fceumm"));
+    }
+
+    #[test]
+    fn modules_needed_follow_the_launch() {
+        let nes = game(
+            r#"{"code":"CLV-H-AAAAA","name":"X","system":"nes","rom_file":"X.nes","crc32":1,"application":"/bin/clover-kachikachi-wr","args":"--volume 75"}"#,
+        );
+        assert!(modules_needed(&nes, ConsoleFamily::Nes).is_empty());
+        assert!(modules_needed(&nes, ConsoleFamily::Unknown).is_empty());
+        assert_eq!(
+            modules_needed(&nes, ConsoleFamily::Snes),
+            ["retroarch", "fceumm"]
+        );
+        let snes = game(
+            r#"{"code":"CLV-U-AAAAA","name":"X","system":"snes","rom_file":"X.sfrom","crc32":1,"application":"/bin/clover-canoe-shvc-wr -rom","args":"--volume 100"}"#,
+        );
+        assert!(modules_needed(&snes, ConsoleFamily::Snes).is_empty());
+        assert_eq!(
+            modules_needed(&snes, ConsoleFamily::Nes),
+            ["retroarch", "snes9x"]
+        );
+        let gbc = game(
+            r#"{"code":"CLV-C-AAAAA","name":"X","system":"game-boy-color","rom_file":"X.gbc","crc32":1,"application":"/bin/gbc"}"#,
+        );
+        assert_eq!(
+            modules_needed(&gbc, ConsoleFamily::Unknown),
+            ["retroarch", "gambatte"]
+        );
     }
 
     #[test]

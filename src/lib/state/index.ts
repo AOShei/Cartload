@@ -18,8 +18,10 @@ export {
   samePath,
   baseName,
   DRAG_TYPE,
+  EMULATOR_FILTERS,
+  usesEmulator,
   type Tile,
   type ViewMode,
 } from "./library.svelte";
 export { syncStore, idleSync } from "./sync.svelte";
-export { modulesStore, withRetroarch } from "./modules.svelte";
+export { modulesStore, withRetroarch, type PendingRemoval } from "./modules.svelte";

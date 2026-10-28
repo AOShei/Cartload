@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import {
     diagnosticsReport,
@@ -36,6 +36,14 @@
     return status?.state === "connected" && status.info.can_interact && (consoleStore.report?.supported ?? true);
   });
   let diagnosticsBusy = $state(false);
+
+  /** Reads the modules again once a flow has ended and the console is back (an install or
+   *  a removal reboots it). */
+  $effect(() => {
+    if (consoleReady && !flowStore.running) {
+      untrack(() => void modulesStore.load());
+    }
+  });
 
   onMount(() => {
     void libraryStore.start();
@@ -256,23 +264,35 @@
                 {/if}
               </span>
             </div>
-            <button
-              type="button"
-              class="btn btn-sm"
-              onclick={() => void modulesStore.install(modulesStore.missing(withRetroarch(module.id)))}
-              disabled={downloading || flowStore.running || module.installed === true || !consoleReady}
-              title={consoleReady ? "Downloads the module and reboots the console once" : "Connect a console running hakchi"}
-            >
-              {#if downloading}<span class="spinner" aria-hidden="true"></span>{/if}
-              {module.installed === true ? "Installed" : "Install"}
-            </button>
+            {#if module.installed === true}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => modulesStore.requestRemove(module.id)}
+                disabled={flowStore.running || !consoleReady}
+                title={module.id === "retroarch" ? "Uninstalls RetroArch and its cores, then reboots the console once" : "Uninstalls the core and reboots the console once"}
+              >
+                Remove
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => void modulesStore.install(modulesStore.missing(withRetroarch(module.id)))}
+                disabled={downloading || flowStore.running || !consoleReady}
+                title={consoleReady ? "Downloads the module and reboots the console once" : "Connect a console running hakchi"}
+              >
+                {#if downloading}<span class="spinner" aria-hidden="true"></span>{/if}
+                Install
+              </button>
+            {/if}
           </li>
         {/each}
       </ul>
     {:else}
       <p class="muted"><span class="spinner" aria-hidden="true"></span> Reading the modules…</p>
     {/if}
-    <p class="muted small foot">Modules come from KMFDManic's Mod Hub. Installing needs a connected console running hakchi and reboots it once.</p>
+    <p class="muted small foot">Modules come from KMFDManic's Mod Hub. Installing or removing needs a connected console running hakchi and reboots it once.</p>
   </section>
   </div>
 

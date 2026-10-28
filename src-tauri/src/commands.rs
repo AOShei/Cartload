@@ -180,6 +180,8 @@ pub async fn diagnostics_save(
 /// the first of them.
 #[tauri::command]
 pub async fn flow_start(
+    state: State<'_, Arc<AppState>>,
+    library: State<'_, Arc<LibraryState>>,
     runner: State<'_, Arc<FlowRunner>>,
     kind: FlowKind,
 ) -> Result<FlowSnapshot, CommandError> {
@@ -193,13 +195,26 @@ pub async fn flow_start(
         FlowKind::InstallModules { ids } => crate::modules::load(ids)?,
         _ => Vec::new(),
     };
+    let removals = match &kind {
+        FlowKind::RemoveModules { ids } => {
+            let modules = crate::modules::removal(ids)?;
+            let module_ids: Vec<&str> = modules.iter().map(|m| m.id).collect();
+            let games = library.games_needing(&module_ids, &state.report().status)?;
+            if let Some(refusal) = crate::modules::removal_blocked(&modules, &games) {
+                return Err(refusal);
+            }
+            modules.iter().map(|m| m.item.to_string()).collect()
+        }
+        _ => Vec::new(),
+    };
     tracing::info!(
         kind = kind.name(),
         package = package.is_some(),
         modules = mods.len(),
+        removals = ?removals,
         "flow_start"
     );
-    runner.start(kind, package, mods)
+    runner.start(kind, package, mods, removals)
 }
 
 /// The emulator modules Cartload can install: cached here, installed on the console.
@@ -293,9 +308,10 @@ pub async fn package_update(
 /// Every game in the library with its size and cover URL.
 #[tauri::command]
 pub async fn library_list(
+    state: State<'_, Arc<AppState>>,
     library: State<'_, Arc<LibraryState>>,
 ) -> Result<LibraryView, CommandError> {
-    library.view()
+    library.view(&state.report().status)
 }
 
 /// Imports files and folders; one `library-import` event per file, before and after it.
@@ -321,10 +337,11 @@ pub async fn library_import(
 /// Saves the editable fields of a game.
 #[tauri::command]
 pub async fn library_update(
+    state: State<'_, Arc<AppState>>,
     library: State<'_, Arc<LibraryState>>,
     edit: GameEdit,
 ) -> Result<GameView, CommandError> {
-    library.update(&edit)
+    library.update(&edit, &state.report().status)
 }
 
 /// Removes games from the library (not from the console until the next sync).
@@ -406,11 +423,12 @@ pub async fn art_fetch(
 /// Uses an image file as the cover of a game.
 #[tauri::command]
 pub async fn art_set_cover(
+    state: State<'_, Arc<AppState>>,
     library: State<'_, Arc<LibraryState>>,
     code: String,
     path: PathBuf,
 ) -> Result<GameView, CommandError> {
-    library.set_cover(&code, &path)
+    library.set_cover(&code, &path, &state.report().status)
 }
 
 /// Where the TheGamesDB key comes from.

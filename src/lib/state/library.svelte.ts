@@ -124,6 +124,24 @@ export function baseName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+/** The emulator filter's choices: the built-in emulator, RetroArch with any core, and each
+ *  core module (the ids of the Emulators section in Settings). */
+export const EMULATOR_FILTERS: readonly { id: string; label: string }[] = [
+  { id: "builtin", label: "Built-in Emulator" },
+  { id: "retroarch", label: "RetroArch, any core" },
+  { id: "fceumm", label: "NES core (FCEUmm)" },
+  { id: "snes9x", label: "SNES core (Snes9x)" },
+  { id: "genesis", label: "Mega Drive core (Genesis Plus GX)" },
+  { id: "gambatte", label: "Game Boy core (Gambatte)" },
+  { id: "mgba", label: "Game Boy Advance core (mGBA)" },
+  { id: "mupen64", label: "N64 core (Mupen64Plus)" },
+];
+
+/** Whether a game runs on the emulator of a filter choice. */
+export function usesEmulator(view: GameView, id: string): boolean {
+  return id === "builtin" ? view.modules.length === 0 : view.modules.includes(id);
+}
+
 class LibraryStore {
   view = $state<LibraryView | null>(null);
   menu = $state<MenuView | null>(null);
@@ -137,6 +155,9 @@ class LibraryStore {
   selected = $state<string[]>([]);
   viewMode = $state<ViewMode>("grid");
   filter = $state("");
+  /** An emulator filter choice (`EMULATOR_FILTERS`), or "" for none. While one is set the
+   *  grid shows the matching games of the whole library, not one folder. */
+  emulatorFilter = $state("");
   importing = $state(false);
   importFiles = $state<ImportEvent[]>([]);
   importReport = $state<ImportReport | null>(null);
@@ -183,9 +204,17 @@ class LibraryStore {
   }
 
   /** What the console shows in the current folder: left folders, games by title, right
-   *  folders (back links are implicit). */
+   *  folders (back links are implicit). With an emulator filter: every game of the library
+   *  that uses that emulator, by title. */
   get tiles(): Tile[] {
     const games = this.games;
+    if (this.emulatorFilter) {
+      const id = this.emulatorFilter;
+      return [...games.values()]
+        .filter((view) => usesEmulator(view, id))
+        .map((view): Tile => ({ kind: "game", id: view.game.code, view }))
+        .sort((a, b) => tileSortKey(a).localeCompare(tileSortKey(b)));
+    }
     const originals = new Map((this.menu?.originals ?? []).map((o) => [o.code, o]));
     const left: Tile[] = [];
     const middle: Tile[] = [];
@@ -274,6 +303,8 @@ class LibraryStore {
           this.folder = path;
         }
       }
+      // `?emulator=fceumm` sets the emulator filter.
+      this.emulatorFilter = new URLSearchParams(location.search).get("emulator") ?? "";
       const imported = previewImport();
       if (imported) {
         this.importFiles = imported.files;
@@ -387,6 +418,32 @@ class LibraryStore {
     this.folder = path;
     this.clearSelection();
     this.filter = "";
+    this.emulatorFilter = "";
+  }
+
+  /** Sets the emulator filter ("" clears it); the selection starts over. */
+  setEmulatorFilter(id: string): void {
+    this.emulatorFilter = id;
+    this.clearSelection();
+  }
+
+  /** Shows the games that use an emulator module (from Settings, before removing it). */
+  showEmulator(id: string): void {
+    this.filter = "";
+    this.setEmulatorFilter(id);
+  }
+
+  /** How many games use each emulator filter choice. */
+  get emulatorCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const view of this.view?.games ?? []) {
+      for (const { id } of EMULATOR_FILTERS) {
+        if (usesEmulator(view, id)) {
+          counts[id] = (counts[id] ?? 0) + 1;
+        }
+      }
+    }
+    return counts;
   }
 
   goUp(): void {

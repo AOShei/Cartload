@@ -103,6 +103,14 @@ enum Command {
         #[command(flatten)]
         mods: ModsArgs,
     },
+    /// Uninstall emulator modules from a console running its hakchi kernel: hakchi
+    /// pack_uninstall each one, reboot, verify. Takes the names `hakchi pack_list` prints
+    /// (_km_snes9x_xtreme).
+    RemoveMods {
+        /// Module names, comma separated.
+        #[arg(value_name = "NAMES", value_delimiter = ',', required = true)]
+        names: Vec<String>,
+    },
     /// Memboot only (recovery): leave the console in the memboot shell with SSH open.
     Memboot {
         #[command(flatten)]
@@ -149,6 +157,7 @@ async fn main() -> Result<()> {
         reboot_wait: Duration::from_secs(cli.wait_reboot),
         ..FlowOptions::default()
     };
+    let mut removals = Vec::new();
     let (flow, hmod, mods) = match cli.command {
         Command::Install {
             hmod,
@@ -166,6 +175,10 @@ async fn main() -> Result<()> {
             }
         }
         Command::BaseMods { mods } => (flows::install_base_mods(), None, Some(mods)),
+        Command::RemoveMods { names } => {
+            removals = names;
+            (flows::remove_mods(), None, None)
+        }
         Command::Memboot { hmod } => (flows::memboot(), Some(hmod.hmod), None),
         Command::Uninstall {
             hmod,
@@ -225,7 +238,7 @@ async fn main() -> Result<()> {
     if let Some(package) = package {
         context = context.with_hmod(package);
     }
-    context = context.with_base_mods(base_mods);
+    context = context.with_base_mods(base_mods).with_removals(removals);
     let mut flow: Flow<Context> = flow.with_events(sender);
     let result = flow.run(&mut context).await;
     context.disconnect().await;

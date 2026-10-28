@@ -2,13 +2,22 @@
   import { tick } from "svelte";
   import Icon from "../Icon.svelte";
   import type { MenuItem, MenuPath } from "../../api/types";
-  import { DRAG_TYPE, breadcrumbs, formatBytes, libraryStore, type Tile } from "../../state";
+  import type { GameView } from "../../api/types";
+  import { DRAG_TYPE, EMULATOR_FILTERS, breadcrumbs, formatBytes, libraryStore, type Tile } from "../../state";
 
   const tiles = $derived(libraryStore.visibleTiles);
   const crumbs = $derived(libraryStore.menu ? breadcrumbs(libraryStore.menu.entries, libraryStore.folder) : []);
   const selectedSet = $derived(new Set(libraryStore.selected));
+  const emulatorLabel = $derived(EMULATOR_FILTERS.find((f) => f.id === libraryStore.emulatorFilter)?.label ?? "");
   const summary = $derived.by(() => {
     const all = libraryStore.tiles;
+    if (libraryStore.emulatorFilter) {
+      const parts = [`${all.length} game${all.length === 1 ? "" : "s"} in all folders`];
+      if (libraryStore.selected.length > 0) {
+        parts.push(`${libraryStore.selected.length} selected`);
+      }
+      return parts.join(" · ");
+    }
     const games = all.filter((t) => t.kind !== "folder").length;
     const folders = all.length - games;
     const parts = [`${games} game${games === 1 ? "" : "s"}`];
@@ -121,6 +130,21 @@
 
   function title(tile: Tile): string {
     return tile.kind === "game" ? tile.view.game.name : tile.kind === "original" ? tile.name : tile.folder.name;
+  }
+
+  /** The core each module plays, for the list's Emulator column. */
+  const CORE_NAMES: Record<string, string> = {
+    fceumm: "FCEUmm",
+    snes9x: "Snes9x",
+    genesis: "Genesis Plus GX",
+    gambatte: "Gambatte",
+    mgba: "mGBA",
+    mupen64: "Mupen64Plus",
+  };
+
+  function emulatorName(view: GameView): string {
+    const core = view.modules.find((m) => m !== "retroarch");
+    return core ? `RetroArch (${CORE_NAMES[core] ?? core})` : view.modules.length > 0 ? "RetroArch" : "Built-in";
   }
 
   function subtitle(tile: Tile): string {
@@ -316,6 +340,19 @@
     </nav>
     <span class="summary muted num">{summary}</span>
     <span class="spacer"></span>
+    <select
+      class="emulator-filter"
+      class:active={libraryStore.emulatorFilter !== ""}
+      aria-label="Show the games that use an emulator, from every folder"
+      title="Show the games that use an emulator, from every folder"
+      value={libraryStore.emulatorFilter}
+      onchange={(e) => libraryStore.setEmulatorFilter(e.currentTarget.value)}
+    >
+      <option value="">All emulators</option>
+      {#each EMULATOR_FILTERS as choice (choice.id)}
+        <option value={choice.id}>{choice.label} ({libraryStore.emulatorCounts[choice.id] ?? 0})</option>
+      {/each}
+    </select>
     <label class="filter">
       <Icon name="search" size={14} />
       <input type="search" placeholder="Filter" aria-label="Filter the games in this folder" bind:value={libraryStore.filter} />
@@ -336,7 +373,10 @@
 
   {#if tiles.length === 0}
     <div class="empty-note">
-      {#if libraryStore.filter.trim()}
+      {#if libraryStore.emulatorFilter}
+        <p>{libraryStore.filter.trim() ? `No game that uses ${emulatorLabel} matches “${libraryStore.filter.trim()}”.` : `No game in the library uses ${emulatorLabel}.`}</p>
+        <button type="button" class="btn" onclick={() => { libraryStore.filter = ""; libraryStore.setEmulatorFilter(""); }}>Show all games</button>
+      {:else if libraryStore.filter.trim()}
         <p>Nothing in this folder matches “{libraryStore.filter.trim()}”.</p>
         <button type="button" class="btn" onclick={() => (libraryStore.filter = "")}>Clear the filter</button>
       {:else}
@@ -438,6 +478,7 @@
           <tr>
             <th scope="col">Name</th>
             <th scope="col">System</th>
+            <th scope="col">Emulator</th>
             <th scope="col">Publisher</th>
             <th scope="col">Year</th>
             <th scope="col" class="num">Players</th>
@@ -476,15 +517,16 @@
               </td>
               {#if tile.kind === "game"}
                 <td>{tile.view.system_name}</td>
+                <td>{emulatorName(tile.view)}</td>
                 <td>{tile.view.game.publisher === "UNKNOWN" ? "" : tile.view.game.publisher}</td>
                 <td class="num">{tile.view.game.release_date.startsWith("1900") ? "" : tile.view.game.release_date.slice(0, 4)}</td>
                 <td class="num">{tile.view.game.players}</td>
                 <td class="num">{formatBytes(tile.view.size)}</td>
                 <td>{tile.view.game.placeholder_art ? "none" : "yes"}</td>
               {:else if tile.kind === "original"}
-                <td colspan="6" class="muted">Built into the console</td>
+                <td colspan="7" class="muted">Built into the console</td>
               {:else}
-                <td colspan="6" class="muted">{subtitle(tile)}</td>
+                <td colspan="7" class="muted">{subtitle(tile)}</td>
               {/if}
             </tr>
           {/each}
@@ -566,6 +608,15 @@
 
   .filter input {
     width: 144px;
+  }
+
+  .emulator-filter {
+    max-width: 220px;
+  }
+
+  .emulator-filter.active {
+    border-color: var(--accent);
+    color: var(--accent-strong);
   }
 
   .view-toggle {

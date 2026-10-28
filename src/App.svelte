@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { cubicOut } from "svelte/easing";
   import { fly } from "svelte/transition";
   import LogPanel from "./lib/components/LogPanel.svelte";
+  import ModuleRemoveDialog from "./lib/components/ModuleRemoveDialog.svelte";
   import ModuleWarningDialog from "./lib/components/ModuleWarningDialog.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import StatusBar from "./lib/components/StatusBar.svelte";
@@ -12,13 +13,28 @@
   import KernelPage from "./lib/pages/KernelPage.svelte";
   import LibraryPage from "./lib/pages/LibraryPage.svelte";
   import SettingsPage from "./lib/pages/SettingsPage.svelte";
-  import { PAGES, app, consoleStore, logStore, navigation, preferences } from "./lib/state";
+  import { PAGES, app, consoleStore, libraryStore, logStore, navigation, preferences } from "./lib/state";
 
   onMount(() => {
     preferences.load();
     void app.load();
     void consoleStore.start();
     void logStore.start();
+  });
+
+  /** The library is read for one console (which games need RetroArch depends on it, and
+   *  the tree shows its firmware games): read it again when another console connects. */
+  const consoleCode = $derived.by((): string | null => {
+    const status = consoleStore.report?.status;
+    return status?.state === "connected" ? status.info.system_code : null;
+  });
+  $effect(() => {
+    const code = consoleCode;
+    untrack(() => {
+      if (code && libraryStore.loaded && libraryStore.menu && libraryStore.menu.system_code !== code) {
+        void libraryStore.load();
+      }
+    });
   });
 
   /** Ctrl+1..4 switch pages, Ctrl+L toggles the log, F5 looks again. */
@@ -73,6 +89,7 @@
 </div>
 <Toaster />
 <ModuleWarningDialog />
+<ModuleRemoveDialog />
 
 <style>
   .shell {

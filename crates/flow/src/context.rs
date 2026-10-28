@@ -155,6 +155,9 @@ pub struct Context {
     /// Emulator modules from the Mod Hub (RetroArch and cores) to install, when the flow
     /// installs any.
     pub mods: Vec<ModArchive>,
+    /// Names of emulator modules to uninstall (`_km_snes9x_xtreme`), when the flow removes
+    /// any.
+    pub remove_mods: Vec<String>,
     /// The open SSH session, if any.
     pub console: Option<Box<dyn Console>>,
     /// What the last state detection found.
@@ -188,6 +191,7 @@ impl std::fmt::Debug for Context {
                     .map(|m| m.name.as_str())
                     .collect::<Vec<_>>(),
             )
+            .field("remove_mods", &self.remove_mods)
             .field("connected", &self.console.is_some())
             .field("state", &self.state)
             .field("grew", &self.grew)
@@ -206,6 +210,7 @@ impl Context {
             hmod: None,
             base_mods: Vec::new(),
             mods: Vec::new(),
+            remove_mods: Vec::new(),
             console: None,
             state: ConsoleState::Offline,
             grew: false,
@@ -229,6 +234,12 @@ impl Context {
     /// Attaches emulator modules to install.
     pub fn with_mods(mut self, mods: Vec<ModArchive>) -> Self {
         self.mods = mods;
+        self
+    }
+
+    /// Names emulator modules to uninstall.
+    pub fn with_removals(mut self, names: Vec<String>) -> Self {
+        self.remove_mods = names;
         self
     }
 

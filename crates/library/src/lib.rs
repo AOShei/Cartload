@@ -40,7 +40,9 @@ pub use hashdb::HashDb;
 pub use library::{CompressReport, ImportOptions, Imported, Library, LibraryConfig};
 pub use menu::{Menu, MenuOptions, Structure};
 pub use rom::System;
-pub use sync::{DevicePaths, SyncEvent, SyncPlan, SyncReport, collect, sync, sync_plan};
+pub use sync::{
+    DevicePaths, SyncEvent, SyncPlan, SyncReport, collect, modules_needed, sync, sync_plan,
+};
 
 /// Crate name and version, for CLI banners and diagnostics.
 pub const fn version() -> &'static str {
