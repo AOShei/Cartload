@@ -121,6 +121,9 @@
     <rect class="halo" x={reset.x - 7} y={reset.y - 7} width={reset.w + 14} height={reset.h + 14} rx="10" />
     <rect class="sfc-dark" x={reset.x} y={reset.y} width={reset.w} height={reset.h} rx="5" />
     <text class="lbl reset-on-dark" x={reset.x + reset.w / 2} y={reset.y + 29} text-anchor="middle">RESET</text>
+    <!-- the seams on the light front, inset from the plate's sides, down to the bottom edge -->
+    <line class="sfc-seam" x1="60" y1="256" x2="60" y2="296" />
+    <line class="sfc-seam" x1="240" y1="256" x2="240" y2="296" />
     <!-- the LED on the light front -->
     <rect x="214" y="274" width="9" height="4" rx="2" fill="#bdbdbf" stroke="#8a8b8f" />
   {:else if shape === "snes-usa"}
@@ -238,6 +241,11 @@
   .sfc-dark {
     fill: #44454a;
     stroke: #2f3034;
+  }
+
+  .sfc-seam {
+    stroke: #a9a7a3;
+    stroke-width: 1.5;
   }
 
   .sfc-tick {
