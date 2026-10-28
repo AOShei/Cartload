@@ -33,14 +33,21 @@ Contents and licenses (a gzip tar):
   Realtek's redistribution terms as carried by linux-firmware; not GPL.
 - `install`, `uninstall`, `etc/preinit.d/`, `var/version`: hakchi scripts, GPL-3.0.
 
-Source: hakchi's build tree is <https://github.com/madmonkey1907/hakchi> (GPL-3.0). Its
+Source: hakchi's build tree is <https://github.com/madmonkey1907/hakchi> (GPL-3.0), forked
+(master) to <https://github.com/AOShei/hakchi>; the kernel is forked to
+<https://github.com/AOShei/sun-nontendocm-kernel>. Both were also submitted to Software
+Heritage's "Save code now" on 2026-10-28. Its
 submodules hold the kernel (<https://github.com/madmonkey1907/sun-nontendocm-kernel>),
 sunxi-tools, e2fsprogs and the boot-image tools; U-Boot is only a patch there
 (`r16-uboot/r16-uboot.diff`) against an upstream tree its readme names. Its public history ends in April 2019 at `fd525ac` (`v1.0.3` plus 47 commits);
-the source of the exact v1.0.4-126 build (April 2020) has not been found published. Before a
-Cartload release carries this file, the corresponding source has to be obtainable from the
-release (GPL-2 section 3 and GPL-3 section 6): at least an archived copy of that tree with its
-submodules, and ideally the exact v1.0.4-126 tree from hakchi's maintainers.
+the source of the exact v1.0.4-126 build (April 2020) is not published anywhere we could find
+(GitHub, the 36 forks, hakchi.net, Software Heritage; checked 2026-10-28). The version number
+is hakchi's total commit count from a tree that was never pushed: public commits already name
+v1.0.4-121 to -130 in 2018 and 2019, the shipped kernel is `3.4.113.29` where the public kernel
+tree is at `.24`, and the build supports the Mega Drive Mini (September 2019), which no public
+commit does. About a fifth of the shipped ramdisk scripts differ from public master. Decision
+(2026-10-28): ship with the closest public source linked (the forks above) and revisit if
+anyone asks; building our own kernel from the public tree is on the roadmap.
 
 ## tiny7zx.hmod/
 

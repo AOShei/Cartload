@@ -167,7 +167,8 @@ export type FlowKind =
   | { kind: "dump_kernel"; path: string }
   | { kind: "install_modules"; ids: string[] }
   | { kind: "update_modules"; ids: string[] }
-  | { kind: "remove_modules"; ids: string[] };
+  | { kind: "remove_modules"; ids: string[] }
+  | { kind: "base_mods" };
 
 export type StepState = "pending" | "running" | "done" | "failed" | "skipped";
 
@@ -497,6 +498,8 @@ export interface SyncPlanView {
   planned_at: number;
   retroarch: RetroarchView[];
   warnings: string[];
+  /** Compressed games meet a console without 7z support: the sync adds it first. */
+  needs_7z: boolean;
 }
 
 /** The games of one system that run through RetroArch. */

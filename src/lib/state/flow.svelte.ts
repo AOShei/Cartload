@@ -41,6 +41,8 @@ export function flowTitle(kind: FlowKind | null): string {
       return "Update emulators";
     case "remove_modules":
       return "Remove emulators";
+    case "base_mods":
+      return "Add 7z support";
     case "install":
     default:
       return "Install hakchi";
@@ -49,7 +51,12 @@ export function flowTitle(kind: FlowKind | null): string {
 
 /** Whether a flow may boot the console through FEL, which needs the user at the console. */
 export function touchesKernel(kind: FlowKind | null): boolean {
-  return kind?.kind !== "install_modules" && kind?.kind !== "update_modules" && kind?.kind !== "remove_modules";
+  return (
+    kind?.kind !== "install_modules" &&
+    kind?.kind !== "update_modules" &&
+    kind?.kind !== "remove_modules" &&
+    kind?.kind !== "base_mods"
+  );
 }
 
 /** What a finished flow did, as a heading and one sentence. */
@@ -84,6 +91,11 @@ export function flowOutcome(kind: FlowKind | null): { heading: string; text: str
       return {
         heading: "The emulators are removed.",
         text: "The console rebooted without them. The built-in emulators and your other cores are untouched.",
+      };
+    case "base_mods":
+      return {
+        heading: "7z support is added.",
+        text: "The console restarted with it. Compressed games start from its menu after the sync.",
       };
     case "install":
     default:
@@ -208,6 +220,14 @@ class FlowStore {
     } finally {
       this.starting = false;
     }
+  }
+
+  /** Resolves with the final snapshot once no flow is starting or running. */
+  async settled(): Promise<FlowSnapshot> {
+    while (this.starting || this.running) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    return this.snapshot;
   }
 
   /** Asks the running flow to stop. */

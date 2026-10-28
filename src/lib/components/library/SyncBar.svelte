@@ -137,6 +137,9 @@
       {/if}
       {@render changeLists(plan, false)}
       <p class="muted">{plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} already on the console stay as they are. The console's menu restarts when the sync ends.</p>
+      {#if plan.needs_7z}
+        <p class="muted">Compressed games need 7z support, which this console does not have yet. It is added first; the console restarts once.</p>
+      {/if}
       <div class="panel-actions">
         <button type="button" class="btn btn-primary" onclick={() => syncStore.run()} disabled={!canSync}>
           {#if syncStore.starting}<span class="spinner on-accent" aria-hidden="true"></span>{:else}<Icon name="sync" size={16} />{/if}
@@ -251,10 +254,13 @@
             <button type="button" class="btn btn-sm" onclick={() => { changesOpen = false; void modulesStore.install(missingModules); }} disabled={modulesStore.downloading.length > 0}>
               Install RetroArch and the {missingCores.length === 1 ? `${missingCores[0]!.name} core` : "cores"}
             </button>
-            <span class="muted">From KMFD's Mod Hub; the console reboots once.</span>
+            <span class="muted">The console restarts once.</span>
           </li>
         {/if}
       </ul>
+    {/if}
+    {#if plan.needs_7z}
+      <p class="muted">Compressed games need 7z support, which this console does not have yet. The sync adds it first; the console restarts once.</p>
     {/if}
     {#each plan.retroarch.filter((r) => r.redirected > 0 && r.installed !== false) as use (use.system)}
       <p class="muted">{use.redirected} {use.name} game{use.redirected === 1 ? "" : "s"} will run through RetroArch: this console has no {use.name} emulator of its own.</p>

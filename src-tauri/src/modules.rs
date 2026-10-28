@@ -26,7 +26,7 @@ pub struct ModuleView {
     pub short: String,
     /// One sentence.
     pub purpose: String,
-    /// Rough download size.
+    /// Download size (the pinned file's).
     pub approx_bytes: u64,
     /// A caution to show before installing.
     pub warning: Option<String>,
@@ -230,7 +230,7 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             title: module.title.to_string(),
             short: module.short.to_string(),
             purpose: module.purpose.to_string(),
-            approx_bytes: module.approx_bytes,
+            approx_bytes: module.len,
             warning: module.warning.map(str::to_string),
             cached: cached_bytes.is_some(),
             cached_bytes,
@@ -291,9 +291,9 @@ fn installed(status: &ModulesStatus) -> Vec<&'static Module> {
         .collect()
 }
 
-/// The first half of the update check, with no console involved: brings the cache of the
-/// installed modules up to date with the hub, downloading what changed. False when the hub
-/// could not be reached.
+/// The first half of the update check, with no console involved: makes sure the cache holds
+/// the pinned file of each installed module, downloading what is missing. False when neither
+/// the mirror nor the hub could be reached.
 pub async fn refresh_installed(status: &ModulesStatus) -> bool {
     let modules = installed(status);
     let Some(cache) = modhub::default_cache_dir() else {
@@ -305,7 +305,7 @@ pub async fn refresh_installed(status: &ModulesStatus) -> bool {
     match modhub::refresh(&modules, &cache, |_| {}).await {
         Ok(_) => true,
         Err(error) => {
-            warn!(%error, "could not bring the modules up to date with the hub");
+            warn!(%error, "could not download the pinned modules");
             false
         }
     }
@@ -359,8 +359,8 @@ async fn module_differs(
     Ok(update)
 }
 
-/// Downloads the hub's current file of every module in `ids` whose cache is missing or
-/// older, reporting progress.
+/// Downloads the pinned file of every module in `ids` whose cache is missing or different,
+/// reporting progress.
 pub async fn refresh(
     ids: &[String],
     mut progress: impl FnMut(ModuleDownload) + Send,

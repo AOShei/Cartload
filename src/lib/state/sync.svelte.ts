@@ -2,6 +2,7 @@ import { syncPlan, syncRun, syncStatus } from "../api/commands";
 import { AppError, inTauri, on } from "../api/tauri";
 import type { SyncPlanView, SyncSnapshot } from "../api/types";
 import { previewSync } from "../dev/preview";
+import { flowStore } from "./flow.svelte";
 import { libraryStore } from "./library.svelte";
 import { toasts } from "./toasts.svelte";
 
@@ -151,6 +152,10 @@ class SyncStore {
     this.reviewing = false;
     this.starting = true;
     try {
+      const plan = this.plan ?? (await this.makePlan());
+      if (plan?.needs_7z && !(await this.add7z())) {
+        return;
+      }
       const snapshot = await syncRun();
       this.set(snapshot);
       if (snapshot.state === "done" && snapshot.report) {
@@ -168,6 +173,28 @@ class SyncStore {
       this.starting = false;
       this.schedulePlan();
     }
+  }
+
+  /** Adds 7z support to the console (the `base_mods` flow, one restart), then waits until
+      the console answers again. False when the flow did not finish. */
+  private async add7z(): Promise<boolean> {
+    if (!(await flowStore.begin({ kind: "base_mods" }))) {
+      return false;
+    }
+    const done = await flowStore.settled();
+    if (done.state !== "done") {
+      return false;
+    }
+    // The watcher reconnects after the flow; the sync needs its session.
+    for (let attempt = 0; attempt < 45; attempt++) {
+      this.plan = null;
+      if (await this.makePlan()) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    toasts.error("7z support was added, but the console did not answer again. Try the sync once more.");
+    return false;
   }
 
   /** Puts the result away; the bar shows the plan again. */

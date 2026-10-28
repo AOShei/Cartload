@@ -1039,14 +1039,26 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
 ### 11. 7z support (tiny7zx)
 
 On a console without tiny7zx (`which tiny7zx` fails; a console set up by hakchi2 CE already
-has it), add a game, set "Compress for the console" in its details and open the sync. Expected:
-the sync plan warns "1 compressed game needs 7z support (tiny7zx), which is not on this
-console. Reinstall hakchi on the Console page to add it, …", and starting the sync stops with
-the same advice. On the Console page click Reinstall. Expected: after "Verify the install" the
-steps "Add 7z support" (the log shows `uploaded tiny7zx.hmod (3 files, 30116 bytes)`), "Wait
-for the console", "Identify the console" and "Verify 7z support" (`tiny7zx is on the console's
-PATH at /bin/tiny7zx`). The sync then runs and the compressed game starts on the console.
-Reinstall on a console that already has tiny7zx skips "Add 7z support" as already done.
+has it), add a game (compression is on by default for NES and SNES ROMs) and open the sync.
+Expected: "Show changes" and the sync panel say "Compressed games need 7z support, which this
+console does not have yet. … the console restarts once." Click "Sync now". Expected: the progress
+window opens on "Add 7z support" with six steps: "Wait for the console", "Identify the console",
+"Add 7z support" (the log shows `uploaded tiny7zx.hmod (3 files, 30116 bytes)`), "Wait for the
+console", "Identify the console", "Verify 7z support" (`tiny7zx is on the console's PATH at
+/bin/tiny7zx`), then "7z support is added.". The sync starts by itself once the console answers
+and the compressed game starts on the console. A second sync does not add it again.
+
+Install and Reinstall also add it: after "Verify the install" the steps "Add 7z support",
+"Wait for the console", "Identify the console" and "Verify 7z support" run; on a console that
+already has tiny7zx "Add 7z support" is skipped as already done.
+
+### 12. Emulator downloads come from the mirror
+
+Delete `~/.cache/cartload/mods/` and install a core from the Console page. Expected: the log
+shows `downloaded module` with a `github.com/AOShei/Cartload/releases/download/emulators-km-2022-10-31/`
+URL and the pinned `sha256`. With github.com blocked (for example `127.0.0.1 github.com` in
+`/etc/hosts`), the download falls back to hakchi.net and the log shows a `module download failed`
+warning for the mirror first.
 
 ## Console page and progress window (desktop app)
 

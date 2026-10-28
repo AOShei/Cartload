@@ -95,6 +95,9 @@ pub struct SyncPlanView {
     pub retroarch: Vec<RetroarchView>,
     /// Things the sync will do but that may not work on the console (missing RetroArch, ...).
     pub warnings: Vec<String>,
+    /// Compressed games are in the plan and the console has no 7z support (`tiny7zx`): the
+    /// app adds it (the `base_mods` flow, one restart) before it syncs.
+    pub needs_7z: bool,
 }
 
 /// The games of one system that run through RetroArch.
@@ -164,6 +167,7 @@ impl SyncPlanView {
                 })
                 .collect(),
             warnings: Vec::new(),
+            needs_7z: false,
         }
     }
 }
@@ -474,14 +478,7 @@ impl SyncRunner {
             }
         }
         if plan.needs_extractor() && !session.exec(commands::WHICH_EXTRACTOR).await?.success() {
-            let n = plan.collection.compressed;
-            view.warnings.push(format!(
-                "{n} compressed game{} need{} 7z support (tiny7zx), which is not on this console. \
-                 Reinstall hakchi on the Console page to add it, or turn compression off for {}.",
-                if n == 1 { "" } else { "s" },
-                if n == 1 { "s" } else { "" },
-                if n == 1 { "that game" } else { "those games" },
-            ));
+            view.needs_7z = true;
         }
         info!(
             uploads = view.uploads.len(),

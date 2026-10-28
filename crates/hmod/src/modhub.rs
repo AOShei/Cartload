@@ -2,8 +2,13 @@
 //! (`https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/`): RetroArch and the
 //! libretro cores Cartload knows how to use. The hub is a plain directory tree: `<item>/link`
 //! holds the download URL of the `.hmod` (a gzip tar), `<item>/md5` its checksum, as hakchi2
-//! CE's `ModHub.Repository` reads them. Downloads are cached under the user's cache
-//! directory and verified against the hub's MD5 before use.
+//! CE's `ModHub.Repository` reads them.
+//!
+//! Each module is pinned to one file by size and SHA-256 (KMFD's set of 2022-10-31, the
+//! hub's current files on 2026-10-28). The same files are mirrored as assets of the Cartload
+//! release [`MIRROR_TAG`]; a download tries the mirror first and the hub second, and keeps
+//! only a file with the pinned hash. Downloads are cached under the user's cache directory, and
+//! a cached file is used only while it still has the pinned hash.
 //!
 //! The catalog is deliberately short: RetroArch and one core per system the library knows
 //! (NES, SNES, Mega Drive / Genesis, the Game Boy family, N64). Each core module also puts
@@ -15,6 +20,11 @@ use crate::{Error, Result};
 
 /// The hub's `.repo/` directory.
 pub const HUB_URL: &str = "https://hakchi.net/KMFDManic/NESC-SNESC-Modifications/.repo/";
+/// The Cartload release whose assets mirror the pinned module files, one `<item>.hmod` each.
+pub const MIRROR_TAG: &str = "emulators-km-2022-10-31";
+/// Where the mirrored files are downloaded from.
+pub const MIRROR_URL: &str =
+    "https://github.com/AOShei/Cartload/releases/download/emulators-km-2022-10-31/";
 
 /// One module Cartload can install.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,8 +41,10 @@ pub struct Module {
     pub purpose: &'static str,
     /// Binaries the module puts on the console's `PATH`; checked after the install.
     pub binaries: &'static [&'static str],
-    /// Rough download size, for the UI before the download starts.
-    pub approx_bytes: u64,
+    /// Size of the pinned file in bytes.
+    pub len: u64,
+    /// Lowercase hex SHA-256 of the pinned file.
+    pub sha256: &'static str,
     /// A caution the app shows before installing, when the module has one.
     pub warning: Option<&'static str>,
 }
@@ -46,7 +58,8 @@ pub const RETROARCH: Module = Module {
     short: "RetroArch 1.9.10",
     purpose: "The frontend every core runs in.",
     binaries: &["retroarch-clover", "nes"],
-    approx_bytes: 10_600_000,
+    len: 10_557_798,
+    sha256: "c6a2dd4b8e1078703b5c420946146ee55ddf46105adc6f0b7d3b541567390575",
     warning: None,
 };
 
@@ -58,7 +71,8 @@ pub const FCEUMM: Module = Module {
     short: "NES",
     purpose: "The FCEUmm core.",
     binaries: &["fceumm"],
-    approx_bytes: 760_000,
+    len: 761_432,
+    sha256: "b9b8111880241c18f67f7c690610766e77d1ace5ad5ce2f304662d0feb5b75a2",
     warning: None,
 };
 
@@ -70,7 +84,8 @@ pub const SNES9X: Module = Module {
     short: "SNES",
     purpose: "The Snes9x core.",
     binaries: &["snes9x", "snes"],
-    approx_bytes: 3_100_000,
+    len: 3_111_882,
+    sha256: "dbb9676ac9ebebe3aa3ef563cd27a87f6357a836ab24ac82f5e98380e4420ad9",
     warning: None,
 };
 
@@ -83,7 +98,8 @@ pub const GENESIS: Module = Module {
     short: "Mega Drive / Genesis",
     purpose: "The Genesis Plus GX core.",
     binaries: &["md"],
-    approx_bytes: 1_650_000,
+    len: 1_651_776,
+    sha256: "ed11d594accecdd2da4a280af2872a86a2cd602e0852cf58d2150c74fec85f59",
     warning: None,
 };
 
@@ -95,7 +111,8 @@ pub const GAMBATTE: Module = Module {
     short: "Game Boy and Color",
     purpose: "The Gambatte core.",
     binaries: &["gb", "gbc"],
-    approx_bytes: 300_000,
+    len: 302_078,
+    sha256: "c1b6167db93c8ec7278018c8ebc11daf803428897c2e9feb7afd7f81e38d6f3a",
     warning: None,
 };
 
@@ -107,7 +124,8 @@ pub const MGBA: Module = Module {
     short: "Game Boy Advance",
     purpose: "The mGBA core.",
     binaries: &["gba"],
-    approx_bytes: 260_000,
+    len: 261_366,
+    sha256: "a0a88af35872aec3a1e47156745b41a90f2d56d888eaf273cacccf41b285c5be",
     warning: None,
 };
 
@@ -120,7 +138,8 @@ pub const MUPEN64: Module = Module {
     short: "N64",
     purpose: "The Mupen64Plus core.",
     binaries: &["n64"],
-    approx_bytes: 1_360_000,
+    len: 1_357_651,
+    sha256: "9d17435d1ead76887009679ef51ad5e193aaeb5035f57dfa3cc8123b351e66d5",
     warning: Some(
         "N64 emulation is too heavy for this console's chip. A few lighter games are playable; \
          most run slowly, stutter or show graphics and sound glitches, and some do not start. \
@@ -173,15 +192,21 @@ impl Module {
         format!("{HUB_URL}{}.hmod/link", self.item)
     }
 
-    /// URL of the hub's `md5` file for this module.
-    pub fn md5_url(&self) -> String {
-        format!("{HUB_URL}{}.hmod/md5", self.item)
+    /// URL of the mirrored copy of the pinned file.
+    pub fn mirror_url(&self) -> String {
+        format!("{MIRROR_URL}{}.hmod", self.item)
     }
 
-    /// Whether the module is cached (no checksum: the hub's MD5 is only known online and was
-    /// checked when the file was written).
+    /// Whether `bytes` are the pinned file.
+    pub fn is_pinned(&self, bytes: &[u8]) -> bool {
+        bytes.len() as u64 == self.len && crate::pinned::sha256_hex(bytes) == self.sha256
+    }
+
+    /// Whether the cache holds the pinned file (size first, then the SHA-256).
     pub fn is_cached(&self, cache_root: &Path) -> bool {
-        self.cached_path(cache_root).is_file()
+        let path = self.cached_path(cache_root);
+        std::fs::metadata(&path).is_ok_and(|m| m.len() == self.len)
+            && crate::pinned::file_sha256(&path).is_ok_and(|sha| sha == self.sha256)
     }
 
     /// Size of the cached file, when it exists.
@@ -191,14 +216,7 @@ impl Module {
             .map(|m| m.len())
     }
 
-    /// Lowercase hex MD5 of the cached file, when it exists.
-    pub fn cached_md5(&self, cache_root: &Path) -> Option<String> {
-        std::fs::read(self.cached_path(cache_root))
-            .ok()
-            .map(|bytes| md5_hex(&bytes))
-    }
-
-    /// Reads the cached module.
+    /// Reads the cached module; it must be the pinned file.
     pub fn load(&self, cache_root: &Path) -> Result<ModArchive> {
         let path = self.cached_path(cache_root);
         let bytes = std::fs::read(&path).map_err(|source| {
@@ -215,6 +233,14 @@ impl Module {
                 }
             }
         })?;
+        if !self.is_pinned(&bytes) {
+            return Err(Error::ModuleChecksum {
+                name: self.id.to_string(),
+                path,
+                expected: self.sha256.to_string(),
+                actual: crate::pinned::sha256_hex(&bytes),
+            });
+        }
         Ok(ModArchive {
             id: self.id.to_string(),
             name: self.item.to_string(),
@@ -288,13 +314,6 @@ pub fn md5_hex(data: &[u8]) -> String {
     crate::basemods::md5_hex(data)
 }
 
-/// Parses the hub's `md5` file: the first 32 hex digits on it.
-pub fn parse_md5(text: &str) -> Option<String> {
-    let token = text.split_whitespace().next()?;
-    let token = token.to_ascii_lowercase();
-    (token.len() == 32 && token.chars().all(|c| c.is_ascii_hexdigit())).then_some(token)
-}
-
 /// Parses the hub's `link` file: one HTTPS URL.
 pub fn parse_link(text: &str) -> Option<String> {
     let link = text.trim();
@@ -309,10 +328,10 @@ mod download {
     use std::path::Path;
 
     use tokio::io::AsyncWriteExt;
-    use tracing::info;
+    use tracing::{info, warn};
 
-    use super::{Module, md5_hex, parse_link, parse_md5};
-    use crate::{Error, Result};
+    use super::{Module, parse_link};
+    use crate::{Error, Failures, Result};
 
     /// Download progress of one module.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -325,16 +344,26 @@ mod download {
         pub total: Option<u64>,
     }
 
-    /// Makes sure every module is cached, downloading the missing ones from the hub (the
-    /// `link` file gives the location, the `md5` file the checksum the download must have).
-    /// Each file is written to `<path>.partial`, verified and renamed; nothing is sent to the
-    /// console here.
+    /// Makes sure the cache holds the pinned file of every module, downloading the missing
+    /// (or different) ones from the mirror, or from the hub when the mirror fails. Each file
+    /// is written to `<path>.partial`, checked against the pin and renamed; nothing is sent
+    /// to the console here.
     pub async fn fetch(
         modules: &[&'static Module],
         cache_root: &Path,
-        mut progress: impl FnMut(ModuleProgress),
+        progress: impl FnMut(ModuleProgress),
     ) -> Result<()> {
+        refresh(modules, cache_root, progress).await.map(|_| ())
+    }
+
+    /// Like [`fetch`], returning the ids of the modules that were downloaded.
+    pub async fn refresh(
+        modules: &[&'static Module],
+        cache_root: &Path,
+        mut progress: impl FnMut(ModuleProgress),
+    ) -> Result<Vec<&'static str>> {
         let mut client = None;
+        let mut downloaded = Vec::new();
         for (index, module) in modules.iter().enumerate() {
             if module.is_cached(cache_root) {
                 continue;
@@ -344,35 +373,6 @@ mod download {
                 None => client.insert(crate::fetch::client()?),
             };
             fetch_one(client, module, cache_root, |done, total| {
-                progress(ModuleProgress { index, done, total });
-            })
-            .await?;
-        }
-        Ok(())
-    }
-
-    /// Like [`fetch`], but also downloads again every cached module whose file differs from
-    /// the hub's current one (by the hub's MD5), so the cache holds the latest of each.
-    /// Returns the ids of the modules that were downloaded.
-    pub async fn refresh(
-        modules: &[&'static Module],
-        cache_root: &Path,
-        mut progress: impl FnMut(ModuleProgress),
-    ) -> Result<Vec<&'static str>> {
-        let client = crate::fetch::client()?;
-        let mut downloaded = Vec::new();
-        for (index, module) in modules.iter().enumerate() {
-            if let Some(cached) = module.cached_md5(cache_root) {
-                let hub = parse_md5(&text(&client, &module.md5_url()).await?);
-                if hub.is_none_or(|hub| hub == cached) {
-                    continue;
-                }
-                info!(
-                    module = module.id,
-                    "the hub has a newer file than the cache"
-                );
-            }
-            fetch_one(&client, module, cache_root, |done, total| {
                 progress(ModuleProgress { index, done, total });
             })
             .await?;
@@ -403,18 +403,13 @@ mod download {
         })
     }
 
+    /// The mirror first, then the hub's `link`; the first download with the pinned hash wins.
     async fn fetch_one(
         client: &reqwest::Client,
         module: &'static Module,
         cache_root: &Path,
         mut progress: impl FnMut(u64, Option<u64>),
     ) -> Result<()> {
-        let link_text = text(client, &module.link_url()).await?;
-        let url = parse_link(&link_text).ok_or_else(|| Error::ModuleLink {
-            name: module.id.to_string(),
-            link: link_text.trim().to_string(),
-        })?;
-        let expected = parse_md5(&text(client, &module.md5_url()).await?);
         let dest = module.cached_path(cache_root);
         tokio::fs::create_dir_all(cache_root)
             .await
@@ -426,43 +421,75 @@ mod download {
         let mut partial = dest.as_os_str().to_owned();
         partial.push(".partial");
         let partial = std::path::PathBuf::from(partial);
-        let result = download(client, &url, &partial, &mut progress).await;
-        let bytes = match result {
-            Ok(bytes) => bytes,
-            Err(error) => {
+        let mut failures = Failures::default();
+        for source in [Source::Mirror, Source::Hub] {
+            let url = match source {
+                Source::Mirror => module.mirror_url(),
+                Source::Hub => match text(client, &module.link_url()).await {
+                    Ok(link_text) => match parse_link(&link_text) {
+                        Some(url) => url,
+                        None => {
+                            failures.0.push((
+                                module.link_url(),
+                                Error::ModuleLink {
+                                    name: module.id.to_string(),
+                                    link: link_text.trim().to_string(),
+                                },
+                            ));
+                            continue;
+                        }
+                    },
+                    Err(error) => {
+                        failures.0.push((module.link_url(), error));
+                        continue;
+                    }
+                },
+            };
+            let bytes = match download(client, &url, &partial, &mut progress).await {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    let _ = tokio::fs::remove_file(&partial).await;
+                    warn!(module = module.id, url, %error, "module download failed");
+                    failures.0.push((url, error));
+                    continue;
+                }
+            };
+            if !module.is_pinned(&bytes) {
                 let _ = tokio::fs::remove_file(&partial).await;
-                return Err(error);
+                let error = Error::ModuleChecksum {
+                    name: module.id.to_string(),
+                    path: dest.clone(),
+                    expected: module.sha256.to_string(),
+                    actual: crate::pinned::sha256_hex(&bytes),
+                };
+                warn!(module = module.id, url, %error, "module download is not the pinned file");
+                failures.0.push((url, error));
+                continue;
             }
-        };
-        let actual = md5_hex(&bytes);
-        if let Some(expected) = &expected
-            && expected != &actual
-        {
-            let _ = tokio::fs::remove_file(&partial).await;
-            return Err(Error::ModuleChecksum {
-                name: module.id.to_string(),
-                path: dest,
-                expected: expected.clone(),
-                actual,
-            });
+            tokio::fs::rename(&partial, &dest)
+                .await
+                .map_err(|source| Error::Io {
+                    op: "rename",
+                    path: partial.clone(),
+                    source,
+                })?;
+            info!(
+                module = module.id,
+                url,
+                path = %dest.display(),
+                len = bytes.len(),
+                sha256 = module.sha256,
+                "downloaded module"
+            );
+            return Ok(());
         }
-        tokio::fs::rename(&partial, &dest)
-            .await
-            .map_err(|source| Error::Io {
-                op: "rename",
-                path: partial.clone(),
-                source,
-            })?;
-        info!(
-            module = module.id,
-            url,
-            path = %dest.display(),
-            len = bytes.len(),
-            md5 = actual,
-            verified = expected.is_some(),
-            "downloaded module"
-        );
-        Ok(())
+        Err(Error::AllSourcesFailed(failures))
+    }
+
+    #[derive(Clone, Copy)]
+    enum Source {
+        Mirror,
+        Hub,
     }
 
     /// Streams `url` to `partial` and returns the bytes (modules are small enough to hold).
@@ -549,11 +576,6 @@ mod tests {
     #[test]
     fn hub_files_parse() {
         assert_eq!(
-            parse_md5("b57f77cc7693a74b1b0dddc720f00270  _km_retroarch_1910_ozone.hmod\n"),
-            Some("b57f77cc7693a74b1b0dddc720f00270".to_string())
-        );
-        assert_eq!(parse_md5("not a sum"), None);
-        assert_eq!(
             parse_link("https://hakchi.net/x/y.hmod\n"),
             Some("https://hakchi.net/x/y.hmod".to_string())
         );
@@ -605,11 +627,37 @@ mod tests {
         assert!(matches!(error, Error::ModuleNotCached { ref name, .. } if name == "fceumm"));
         assert!(!FCEUMM.is_cached(dir.path()));
         std::fs::write(FCEUMM.cached_path(dir.path()), b"gz bytes").expect("write");
-        assert!(FCEUMM.is_cached(dir.path()));
+        assert!(!FCEUMM.is_cached(dir.path()), "not the pinned file");
         assert_eq!(FCEUMM.cached_size(dir.path()), Some(8));
-        let archive = FCEUMM.load(dir.path()).expect("load");
+        let error = FCEUMM.load(dir.path()).expect_err("not pinned");
+        assert!(matches!(error, Error::ModuleChecksum { .. }), "{error}");
+
+        // A module pinned to these bytes loads.
+        let module = Module {
+            len: 8,
+            sha256: Box::leak(crate::pinned::sha256_hex(b"gz bytes").into_boxed_str()),
+            ..FCEUMM
+        };
+        assert!(module.is_cached(dir.path()));
+        let archive = module.load(dir.path()).expect("load");
         assert_eq!(archive.name, "_km_fceumm_xtreme");
         assert_eq!(archive.binaries, ["fceumm"]);
         assert_eq!(archive.bytes, b"gz bytes");
+    }
+
+    #[test]
+    fn every_module_is_pinned_and_mirrored() {
+        for module in CATALOG {
+            assert_eq!(module.sha256.len(), 64, "{}", module.id);
+            assert!(module.sha256.chars().all(|c| c.is_ascii_hexdigit()));
+            assert!(module.len > 0);
+            assert_eq!(
+                module.mirror_url(),
+                format!(
+                    "https://github.com/AOShei/Cartload/releases/download/{MIRROR_TAG}/{}.hmod",
+                    module.item
+                )
+            );
+        }
     }
 }

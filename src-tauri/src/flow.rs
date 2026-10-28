@@ -66,6 +66,9 @@ pub enum FlowKind {
         /// Catalog ids; `retroarch` takes every core with it.
         ids: Vec<String>,
     },
+    /// Add the built-in base mods (`tiny7zx`) to the running hakchi kernel; the sync runs it
+    /// first when compressed games meet a console without 7z support.
+    BaseMods,
 }
 
 impl FlowKind {
@@ -79,6 +82,7 @@ impl FlowKind {
             Self::InstallModules { .. } => flows::MODS,
             Self::UpdateModules { .. } => flows::UPDATE_MODS,
             Self::RemoveModules { .. } => flows::REMOVE_MODS,
+            Self::BaseMods => flows::BASE_MODS,
         }
     }
 
@@ -92,6 +96,7 @@ impl FlowKind {
             Self::InstallModules { .. } => "Installing emulator modules",
             Self::UpdateModules { .. } => "Updating emulator modules",
             Self::RemoveModules { .. } => "Removing emulator modules",
+            Self::BaseMods => "Adding 7z support",
         }
     }
 
@@ -115,6 +120,7 @@ impl FlowKind {
             Self::InstallModules { .. } => flows::install_mods(),
             Self::UpdateModules { .. } => flows::update_mods(),
             Self::RemoveModules { .. } => flows::remove_mods(),
+            Self::BaseMods => flows::install_base_mods(),
         }
     }
 
@@ -645,7 +651,7 @@ impl FlowRunner {
                 "The kernel package (hakchi.hmod) is missing.",
             ));
         }
-        if matches!(kind, FlowKind::Install) && ctx.base_mods.is_empty() {
+        if matches!(kind, FlowKind::Install | FlowKind::BaseMods) && ctx.base_mods.is_empty() {
             ctx.base_mods = basemods::BUNDLED
                 .iter()
                 .map(|m| m.load_bundled())
@@ -1112,6 +1118,8 @@ mod tests {
         assert_eq!(FlowKind::Install.name(), "install");
         assert_eq!(FlowKind::Install.steps().len(), 17);
         assert_eq!(FlowKind::Memboot.steps().len(), 3);
+        assert_eq!(FlowKind::BaseMods.steps().len(), 6);
+        assert_eq!(FlowKind::BaseMods.name(), "base-mods");
         let uninstall = FlowKind::Uninstall {
             stock_kernel: Some("k.img".into()),
             force_stock_kernel: true,

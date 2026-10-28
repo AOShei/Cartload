@@ -237,8 +237,11 @@ uncompressed file in RAM, which is where the 16 MiB limit comes from). CE transf
 mods (`basehmods.tar`: `clovercon`, `tiny7zx`, `font_remount`, `gamepath-cleanup`, `copyleft`,
 `ntfs-3g`) during the kernel install and installs them with the kernel. `font_remount` only
 binds an extended title font over the firmware's; it has nothing to do with compression. The
-mods are directories in CE's source tree (`hakchi_gui/mods/hmods/<name>.hmod/`), which is where
-Cartload downloads them from, pinned to a commit and checked by MD5.
+mods are directories in CE's source tree (`hakchi_gui/mods/hmods/<name>.hmod/`). The app
+carries `tiny7zx` (`data/tiny7zx.hmod/`) and installs it after every hakchi install; when a sync
+has compressed games and `which tiny7zx` fails, the app first runs the base-mods flow (upload,
+`hakchi packs_install`, reboot, verify) and then syncs. The `cartload-hmod base-mods` CLI can
+still download the mods from CE's tree, pinned to a commit and checked by MD5.
 
 On this console: `which tiny7zx` → `/bin/tiny7zx`; `/var/lib/hakchi/rootfs/bin/tiny7zx` is the
 same file; `/var/lib/hakchi/hmod/` holds one `uninstall-<name>` script per installed mod
@@ -281,9 +284,15 @@ package behind an emulator with `grep -lE '/bin/(snes9x|snes)"$' uninstall-*` in
 `/var/lib/hakchi/hmod`, leaving out RetroArch packages (records with `/bin/retroarch-clover`)
 when the emulator is a core.
 
-The records carry no version. To tell whether an installed emulator is the Mod Hub's current
-build, Cartload compares files: the hub's `<item>.hmod/md5` against the cached download
-(downloading again when it changed), then `md5sum` on the console of the three largest
+Cartload pins each module to one file by size and SHA-256 (KMFD's set of 2022-10-31, the hub's
+files on 2026-10-28; `crates/hmod/src/modhub.rs`) and mirrors those files as assets of the
+Cartload release `emulators-km-2022-10-31`. A download tries the mirror first and the hub's
+`link` second, and keeps only a file with the pinned hash; the hub's `md5` file is no longer
+read. A newer file on the hub is therefore never picked up until the pins change.
+
+The records carry no version. To tell whether an installed emulator is the build Cartload
+pins, Cartload compares files: the cached pinned download against `md5sum` on the console of
+the three largest
 programs in the package (`bin/`, `usr/bin/`, `*.so`; never fonts, artwork or settings files a
 user may edit), at the same paths from `/`. A missing or different file means an update. On the
 console checked 2026-10-28, CE's `mgba` has none of `_km_mgba`'s files (CE's core is

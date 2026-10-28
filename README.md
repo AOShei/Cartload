@@ -172,6 +172,15 @@ without the UI.
 ## License
 
 GPL-3.0-or-later. `data/README.md` lists the binaries embedded from hakchi and hakchi2 CE
-and their origin. Cartload is not affiliated with any console manufacturer; NES, SNES,
+and their origin.
+
+Cartload ships the hakchi kernel package v1.0.4-126 (GPL) unchanged. Its authors never
+published the source of that exact build; the closest published source, archived here, is
+[AOShei/hakchi](https://github.com/AOShei/hakchi) (fork of madmonkey1907/hakchi, last upstream
+commit `fd525ac`) and [AOShei/sun-nontendocm-kernel](https://github.com/AOShei/sun-nontendocm-kernel)
+(fork of madmonkey1907/sun-nontendocm-kernel, `f8c6e0b`). The emulator modules Cartload installs
+are KMFDManic's builds, mirrored unchanged on the
+[emulators-km-2022-10-31](https://github.com/AOShei/Cartload/releases/tag/emulators-km-2022-10-31)
+release with their licences. Cartload is not affiliated with any console manufacturer; NES, SNES,
 Famicom, Mega Drive, Genesis, Game Boy and N64 are the names of the systems it works
 with.

@@ -116,16 +116,19 @@ pub enum Error {
         path: PathBuf,
     },
 
-    /// A Mod Hub module's file does not have the MD5 the hub lists for it.
-    #[error("module {name}: {} has MD5 {actual}, the Mod Hub lists {expected}", path.display())]
+    /// A module's file is not the pinned one.
+    #[error(
+        "module {name}: {} has SHA-256 {actual}, Cartload expects {expected}",
+        path.display()
+    )]
     ModuleChecksum {
         /// The module id.
         name: String,
         /// The file.
         path: PathBuf,
-        /// MD5 from the hub.
+        /// The pinned SHA-256.
         expected: String,
-        /// MD5 of the file.
+        /// SHA-256 of the file.
         actual: String,
     },
 

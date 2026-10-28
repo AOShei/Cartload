@@ -598,6 +598,7 @@ function previewPlan(changes: number): SyncPlanView {
     planned_at: Date.now(),
     retroarch: [],
     warnings: [],
+    needs_7z: false,
   };
 }
 
