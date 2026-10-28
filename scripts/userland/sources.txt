@@ -1,0 +1,8 @@
+# Sources of the console userland (scripts/userland/build.sh, docs/userland.md).
+# file <name> <url> <sha256>      a tarball, checked before use
+# git  <dir>  <url> <commit>      a repository at a fixed commit
+
+file buildroot-2015.11.1.tar.bz2 https://buildroot.org/downloads/buildroot-2015.11.1.tar.bz2 6a027cc7ab93d90d4c0e3382c665917111dbcb4d5195976d588a1933482aea3f
+
+# The last commit before the shipped busybox's build time, 2018-04-10 20:38:05 GMT.
+git busybox https://git.busybox.net/busybox 3632cb15f16a7596a68dccfd66a2ad9496bf9fd9

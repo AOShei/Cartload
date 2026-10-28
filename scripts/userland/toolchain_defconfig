@@ -1,0 +1,17 @@
+# Buildroot 2015.11.1: the toolchain of hakchi v1.0.4-126's binaries (their .comment reads
+# "GCC: (Buildroot 2015.11.1) 4.9.3"; libc is "GNU C Library (Buildroot) 2.22"). Reduced from
+# hakchi.net's /hakchi/sdk/(dot)config by switching every package off. Its defaults already give
+# GCC 4.9.3, binutils 2.24 and kernel headers 4.3, as that config has.
+BR2_arm=y
+BR2_cortex_a7=y
+BR2_ARM_FPU_NEON_VFPV4=y
+BR2_SHARED_STATIC_LIBS=y
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+BR2_GLIBC_VERSION_2_22=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+BR2_GCC_ENABLE_LTO=y
+BR2_GCC_ENABLE_OPENMP=y
+BR2_GCC_ENABLE_GRAPHITE=y
+BR2_ENABLE_LOCALE_PURGE=y
+BR2_ENABLE_LOCALE_WHITELIST="C en_US.UTF-8"
+BR2_BACKUP_SITE="http://sources.buildroot.net"
