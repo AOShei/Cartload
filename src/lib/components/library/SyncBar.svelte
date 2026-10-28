@@ -53,14 +53,41 @@
     if (plan.deletions.length > 0) {
       parts.push(`${plan.deletions.length} to remove`);
     }
-    if (plan.link_deletions.length > 0) {
-      parts.push(`${plan.link_deletions.length} link${plan.link_deletions.length === 1 ? "" : "s"}`);
+    const links = plan.link_deletions.length + plan.link_additions.length;
+    if (links > 0) {
+      parts.push(`${links} link${links === 1 ? "" : "s"}`);
     }
     if (plan.empty_dirs.length > 0) {
       parts.push(`${plan.empty_dirs.length} empty folder${plan.empty_dirs.length === 1 ? "" : "s"}`);
     }
     return parts.join(" · ");
   });
+
+  /** `12 files` / `1 file`. */
+  function count(n: number, word: string): string {
+    return `${n} ${word}${n === 1 ? "" : "s"}`;
+  }
+
+  /** The upload line: files and the built-in games' links the sync makes. */
+  function addSummary(p: NonNullable<typeof plan>): string {
+    const files = `Upload ${count(p.uploads.length, "file")} (${formatBytes(p.upload_size)})`;
+    return p.link_additions.length > 0 ? `${files}, ${count(p.link_additions.length, "link")} for built-in games` : files;
+  }
+
+  /** The removal line, naming only what there is. */
+  function removeSummary(p: NonNullable<typeof plan>): string {
+    const parts: string[] = [];
+    if (p.deletions.length > 0) {
+      parts.push(count(p.deletions.length, "file"));
+    }
+    if (p.link_deletions.length > 0) {
+      parts.push(count(p.link_deletions.length, "old link"));
+    }
+    if (p.empty_dirs.length > 0) {
+      parts.push(count(p.empty_dirs.length, "empty folder"));
+    }
+    return parts.length > 0 ? `Remove ${parts.join(", ")}` : "Nothing to remove";
+  }
 
   let changesOpen = $state(false);
 
@@ -101,17 +128,21 @@
 {#snippet changeLists(p: NonNullable<typeof plan>)}
   <div class="columns">
     <details open>
-      <summary><Icon name="upload" size={14} /> Upload {p.uploads.length} file{p.uploads.length === 1 ? "" : "s"} ({formatBytes(p.upload_size)})</summary>
+      <summary><Icon name="upload" size={14} /> {addSummary(p)}</summary>
       <ul class="files mono">
         {#each p.uploads as file (file.path)}
           <li><span>{file.path.replace(/^\.\//, "")}</span><span class="num">{formatBytes(file.size)}</span></li>
-        {:else}
-          <li class="muted">Nothing to upload.</li>
         {/each}
+        {#each p.link_additions as path (path)}
+          <li><span>{path.replace(/^\.\//, "")}</span><span class="muted">link</span></li>
+        {/each}
+        {#if p.uploads.length + p.link_additions.length === 0}
+          <li class="muted">Nothing to upload.</li>
+        {/if}
       </ul>
     </details>
     <details open>
-      <summary><Icon name="trash" size={14} /> Remove {p.deletions.length} file{p.deletions.length === 1 ? "" : "s"}, reset {p.link_deletions.length} link{p.link_deletions.length === 1 ? "" : "s"}, remove {p.empty_dirs.length} empty folder{p.empty_dirs.length === 1 ? "" : "s"}</summary>
+      <summary><Icon name="trash" size={14} /> {removeSummary(p)}</summary>
       <ul class="files mono">
         {#each p.deletions as path (path)}
           <li><span>{path.replace(/^\.\//, "")}</span><span class="muted">file</span></li>
@@ -141,8 +172,8 @@
         <p>Nothing to transfer: the console already holds every file. Syncing anyway re-links the games and restarts the menu.</p>
       {/if}
       <ul class="counts">
-        <li><Icon name="upload" size={14} /> Upload {plan.uploads.length} file{plan.uploads.length === 1 ? "" : "s"} ({formatBytes(plan.upload_size)})</li>
-        <li><Icon name="trash" size={14} /> Remove {plan.deletions.length} file{plan.deletions.length === 1 ? "" : "s"}, reset {plan.link_deletions.length} link{plan.link_deletions.length === 1 ? "" : "s"}, remove {plan.empty_dirs.length} empty folder{plan.empty_dirs.length === 1 ? "" : "s"}</li>
+        <li><Icon name="upload" size={14} /> {addSummary(plan)}</li>
+        <li><Icon name="trash" size={14} /> {removeSummary(plan)}</li>
       </ul>
       <ul class="notes muted">
         <li>{plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} already on the console stay as they are. The console's menu restarts when the sync ends.</li>

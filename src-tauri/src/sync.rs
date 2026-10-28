@@ -71,6 +71,8 @@ pub struct SyncPlanView {
     pub deletions: Vec<String>,
     /// Remote symlinks to remove.
     pub link_deletions: Vec<String>,
+    /// Firmware game links the console lacks (the sync makes them).
+    pub link_additions: Vec<String>,
     /// Remote directories that end up empty.
     pub empty_dirs: Vec<String>,
     /// Files already on the console.
@@ -85,7 +87,7 @@ pub struct SyncPlanView {
     pub fits: bool,
     /// Whether the console already holds everything.
     pub noop: bool,
-    /// Uploads, deletions, unlinks and removed directories together.
+    /// Uploads, deletions, unlinks, new links and removed directories together.
     pub changes: usize,
     /// The console's storage.
     pub storage: Option<StorageView>,
@@ -136,6 +138,7 @@ impl SyncPlanView {
                 .collect(),
             deletions: plan.deletions.clone(),
             link_deletions: plan.link_deletions.clone(),
+            link_additions: plan.link_additions.clone(),
             empty_dirs: plan.empty_dirs.clone(),
             unchanged: plan.unchanged,
             total_size: plan.total_size(),
@@ -146,6 +149,7 @@ impl SyncPlanView {
             changes: plan.uploads.len()
                 + plan.deletions.len()
                 + plan.link_deletions.len()
+                + plan.link_additions.len()
                 + plan.empty_dirs.len(),
             storage: info.storage.as_ref().map(|s| StorageView {
                 total: s.usage.total,

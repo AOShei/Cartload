@@ -486,6 +486,8 @@ export interface SyncPlanView {
   uploads: FileView[];
   deletions: string[];
   link_deletions: string[];
+  /** Built-in games' links the console lacks; the sync makes them. */
+  link_additions: string[];
   empty_dirs: string[];
   unchanged: number;
   total_size: number;

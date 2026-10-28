@@ -704,6 +704,9 @@ fn print_plan(plan: &SyncPlan) {
     for path in &plan.link_deletions {
         println!("  unlink  {path}");
     }
+    for path in &plan.link_additions {
+        println!("  link    {path}");
+    }
     for dir in &plan.empty_dirs {
         println!("  rmdir   {dir}");
     }
@@ -723,6 +726,7 @@ async fn run_plan(library: &Library, connect: &Connect, args: &MenuArgs, json: b
             uploads: Vec<(&'a str, u64)>,
             deletions: &'a [String],
             link_deletions: &'a [String],
+            link_additions: &'a [String],
             empty_dirs: &'a [String],
             unchanged: usize,
             total_size: u64,
@@ -738,6 +742,7 @@ async fn run_plan(library: &Library, connect: &Connect, args: &MenuArgs, json: b
                 .collect(),
             deletions: &plan.deletions,
             link_deletions: &plan.link_deletions,
+            link_additions: &plan.link_additions,
             empty_dirs: &plan.empty_dirs,
             unchanged: plan.unchanged,
             total_size: plan.total_size(),

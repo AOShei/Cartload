@@ -291,6 +291,8 @@ pub struct Collection {
     pub files: Vec<LocalFile>,
     /// The script that links the firmware games' `autoplay` (and `pixelart`) directories.
     pub link_script: String,
+    /// The symlinks the link script makes, relative paths (`./000/CLV-P-SAAAE/autoplay`).
+    pub links: Vec<String>,
     /// Number of library games.
     pub games: usize,
     /// Number of firmware games.
@@ -380,6 +382,10 @@ pub fn collect(
                         text.into_bytes(),
                     ));
                     link_script.push_str(&link_line(paths, &upload_path, &dir, code));
+                    collection.links.push(format!("./{dir}/{code}/autoplay"));
+                    if paths.has_pixel_art {
+                        collection.links.push(format!("./{dir}/{code}/pixelart"));
+                    }
                     collection.originals += 1;
                 }
                 ExportedEntry::Folder(folder) => {
@@ -619,8 +625,11 @@ pub struct SyncPlan {
     pub uploads: Vec<LocalFile>,
     /// Remote files to remove (not in the collection), relative paths.
     pub deletions: Vec<String>,
-    /// Remote symlinks to remove (the link script recreates the needed ones), relative paths.
+    /// Remote symlinks the link script does not make, to remove, relative paths.
     pub link_deletions: Vec<String>,
+    /// Symlinks the link script makes that the console lacks, relative paths. The script runs
+    /// on every sync and remakes all its links; these are the ones that change something.
+    pub link_additions: Vec<String>,
     /// Remote directories that hold nothing once the deletions are done and get no upload,
     /// deepest first.
     pub empty_dirs: Vec<String>,
@@ -656,7 +665,19 @@ pub fn sync_plan(
         .filter(|r| !local_paths.contains(r.path.as_str()))
         .map(|r| r.path.clone())
         .collect();
-    let link_deletions: Vec<String> = remote_links.to_vec();
+    let expected_links: BTreeSet<&str> = collection.links.iter().map(String::as_str).collect();
+    let present_links: BTreeSet<&str> = remote_links.iter().map(String::as_str).collect();
+    let link_deletions: Vec<String> = remote_links
+        .iter()
+        .filter(|path| !expected_links.contains(path.as_str()))
+        .cloned()
+        .collect();
+    let link_additions: Vec<String> = collection
+        .links
+        .iter()
+        .filter(|path| !present_links.contains(path.as_str()))
+        .cloned()
+        .collect();
 
     // Directories known from the listings that keep no file and get none.
     let mut remote_dirs: BTreeSet<String> = BTreeSet::new();
@@ -694,6 +715,7 @@ pub fn sync_plan(
         uploads,
         deletions,
         link_deletions,
+        link_additions,
         empty_dirs,
         unchanged,
         available,
@@ -748,6 +770,7 @@ impl SyncPlan {
         self.uploads.is_empty()
             && self.deletions.is_empty()
             && self.link_deletions.is_empty()
+            && self.link_additions.is_empty()
             && self.empty_dirs.is_empty()
     }
 
@@ -795,13 +818,14 @@ impl SyncPlan {
             self.total_size()
         );
         out.push_str(&format!(
-            "upload {} files ({} bytes), keep {}, remove {} files, {} symlinks, {} directories\n",
+            "upload {} files ({} bytes), keep {}, remove {} files, {} symlinks, {} directories, link {}\n",
             self.uploads.len(),
             self.upload_size(),
             self.unchanged,
             self.deletions.len(),
             self.link_deletions.len(),
-            self.empty_dirs.len()
+            self.empty_dirs.len(),
+            self.link_additions.len()
         ));
         match self.available {
             Some(available) if self.fits() => {
@@ -1629,7 +1653,37 @@ mod tests {
             plan.deletions
                 .contains(&"./.storage/CLV-U-ZJSQU/Chrono_Trigger.sfrom.7z".to_string())
         );
-        assert_eq!(plan.link_deletions.len(), 21);
+        assert_eq!(
+            plan.link_deletions.len(),
+            21,
+            "CE's links are not this library's"
+        );
+        assert_eq!(plan.link_additions, collection.links);
+        assert!(
+            collection
+                .links
+                .contains(&"./000/CLV-P-SAAAE/autoplay".to_string())
+        );
+
+        // After the sync the console holds exactly the collection and its links: nothing to
+        // do, the firmware games' links included.
+        let synced: Vec<RemoteFile> = collection
+            .files
+            .iter()
+            .map(|f| RemoteFile {
+                path: f.path.clone(),
+                size: f.size,
+                mtime: Some(f.mtime),
+            })
+            .collect();
+        let again = sync_plan(
+            collection.clone(),
+            &synced,
+            &collection.links,
+            paths.clone(),
+            None,
+        );
+        assert!(again.is_noop(), "{}", again.summary());
         assert!(plan.empty_dirs.contains(&"./000/CLV-P-SADJE".to_string()));
         assert!(
             !plan.empty_dirs.contains(&"./000/CLV-P-SAAAE".to_string()),
@@ -1693,7 +1747,13 @@ mod tests {
                 mtime: Some(f.mtime + 2),
             })
             .collect();
-        let plan = sync_plan(collection.clone(), &remote, &[], paths.clone(), None);
+        let plan = sync_plan(
+            collection.clone(),
+            &remote,
+            &collection.links,
+            paths.clone(),
+            None,
+        );
         assert!(plan.is_noop());
         assert_eq!(plan.unchanged, collection.files.len());
         assert!(plan.fits(), "unknown free space does not block");
@@ -1705,7 +1765,13 @@ mod tests {
         let mut drifted = remote.clone();
         drifted[0].mtime = Some(drifted[0].mtime.unwrap() + 10);
         drifted[1].size += 1;
-        let plan = sync_plan(collection.clone(), &drifted, &[], paths.clone(), Some(1));
+        let plan = sync_plan(
+            collection.clone(),
+            &drifted,
+            &collection.links,
+            paths.clone(),
+            Some(1),
+        );
         assert_eq!(plan.uploads.len(), 2);
         assert!(!plan.fits());
         assert!(plan.summary().contains("NOT ENOUGH SPACE"));
@@ -2050,10 +2116,15 @@ mod tests {
             format_stat_time(kept.mtime)
         );
         let initial = sync_plan(collection.clone(), &[], &[], paths.clone(), Some(1 << 30));
+        // One link the library makes and one stale link left by hakchi2 CE.
         let expected = initial.refresh(
             &parse_listing(&listing),
-            &["./000/CLV-P-SAAAE/autoplay".to_string()],
+            &[
+                "./000/CLV-P-SAAAE/autoplay".to_string(),
+                "./000/CLV-P-SADJE/autoplay".to_string(),
+            ],
         );
+        assert_eq!(expected.link_deletions, ["./000/CLV-P-SADJE/autoplay"]);
         assert_eq!(expected.uploads.len(), collection.files.len() - 1);
         let cleanup = expected.cleanup_script();
         let up = "/var/lib/hakchi/games/snes-eur";
@@ -2064,7 +2135,7 @@ mod tests {
             (
                 &format!(r#"cd "{up}" && find . -type l"#),
                 None,
-                ok("./000/CLV-P-SAAAE/autoplay\n"),
+                ok("./000/CLV-P-SAAAE/autoplay\n./000/CLV-P-SADJE/autoplay\n"),
             ),
             (&commands::list_files(up), None, ok(&listing)),
             ("cat > /tmp/cleanup.sh", Some(cleanup.as_bytes()), ok("")),
@@ -2112,7 +2183,11 @@ mod tests {
             .collect();
         assert_eq!(steps, STEPS);
         assert!(cleanup.contains("rm './001/CLV-S-00000/CLV-S-00000_mdmini.png'\n"));
-        assert!(cleanup.contains("rm './000/CLV-P-SAAAE/autoplay'\n"));
+        assert!(cleanup.contains("rm './000/CLV-P-SADJE/autoplay'\n"));
+        assert!(
+            !cleanup.contains("CLV-P-SAAAE/autoplay"),
+            "the link script remakes its own links"
+        );
     }
 
     #[tokio::test]
