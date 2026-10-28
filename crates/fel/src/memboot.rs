@@ -146,13 +146,17 @@ pub enum ShellOverride {
     Network,
     /// Force the legacy clovershell protocol (`hakchi-clovershell`).
     Clovershell,
+    /// Drop the shell token: hakchi starts the console's own system and menu instead of
+    /// stopping in the memboot shell (`hakchi-shell` puts it in memboot mode). SSH then comes
+    /// from the installed system, as on a normal power-on.
+    Boot,
 }
 
 impl ShellOverride {
     /// The command line token this override adds.
     pub const fn token(self) -> Option<&'static str> {
         match self {
-            Self::Keep => None,
+            Self::Keep | Self::Boot => None,
             Self::Network => Some("hakchi-shell"),
             Self::Clovershell => Some("hakchi-clovershell"),
         }
@@ -160,17 +164,17 @@ impl ShellOverride {
 }
 
 /// Rewrite the command line for `shell`: drop any existing shell token and append the chosen
-/// one. Returns the new command line, or `None` when nothing was changed.
+/// one, if any. Returns the new command line, or `None` when nothing was changed.
 pub fn patch_cmdline(image: &mut [u8], shell: ShellOverride) -> Result<Option<String>> {
-    let Some(token) = shell.token() else {
+    if shell == ShellOverride::Keep {
         return Ok(None);
-    };
+    }
     let current = cmdline(image)?;
     let mut tokens: Vec<&str> = current
         .split_whitespace()
         .filter(|t| !SHELL_TOKENS.contains(t))
         .collect();
-    tokens.push(token);
+    tokens.extend(shell.token());
     let patched = tokens.join(" ");
     set_cmdline(image, &patched)?;
     Ok(Some(patched))
@@ -507,6 +511,14 @@ mod tests {
             None
         );
         assert_eq!(cmdline(&image).unwrap(), "root=/dev/nandb");
+    }
+
+    #[test]
+    fn patch_cmdline_boot_drops_the_shell_token() {
+        let mut image = tiny_image("root=/dev/nandb hakchi-shell quiet");
+        let patched = patch_cmdline(&mut image, ShellOverride::Boot).unwrap();
+        assert_eq!(patched.as_deref(), Some("root=/dev/nandb quiet"));
+        assert_eq!(cmdline(&image).unwrap(), "root=/dev/nandb quiet");
     }
 
     #[test]

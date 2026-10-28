@@ -54,17 +54,21 @@ the first run (about 25 s afterwards on 24 cores). The build is reproducible: da
 host in the kernel, the vendor drivers' `__DATE__`, Mali's build date and the archive times are
 all fixed to the kernel commit, so two builds of the same commits give the same bytes.
 
-Output: the kernel (`zImage`, `System.map`, `.config`), a `boot.img` and a test package
+Output: the kernel (`zImage`, `System.map`, `.config`), a `boot.img`, the modules
+(`target/kernel/stage/lib/modules/3.4.113.30-cartload`) and a test package
 `hakchi-3.4.113.30-cartload-test.hmod`. The boot image is the pinned package's, with the kernel
-replaced and a second ramdisk archive appended that puts this kernel's modules in
-`/lib/modules-ramfs`; hakchi links `/lib/modules/$(uname -r)` there when the NAND has no modules
-for the running kernel. The script first checks that repacking the package's own kernel and
+replaced and a second ramdisk archive appended that puts this kernel's NAND and SCSI drivers in
+`/lib/modules-ramfs`, as the package's ramdisk has madmonkey's. The other modules belong in
+`/lib/modules/3.4.113.30-cartload` on the console: hakchi links `/lib/modules/$(uname -r)` to the
+data partition's copy first and to `/lib/modules-ramfs` only when there is none. A ramdisk with
+every module (4.8 MB) does not start from u-boot at all. The script first checks that repacking the package's own kernel and
 ramdisk reproduces its `boot.img`.
 
 ## Testing
 
-**The test package is for memboot only.** Its `boot.img` is 6.8 MB, the boot partition takes 4 MB,
-and Cartload has no size check of its own yet. Never install it.
+**The test package is for memboot only.** Nothing has checked that its `boot.img` (4.7 MB) or its
+modules work with the install path, and Cartload has no boot-image size check of its own. Never
+install it.
 
 ```sh
 cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload-test.hmod
@@ -72,8 +76,11 @@ cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30
 
 boots it from RAM into hakchi's shell (from a running console through kexec, otherwise through
 FEL). Return with `sync; umount -ar; reboot -f` (plain `reboot` does nothing in that shell) or by
-power-cycling. Checklists and results: `docs/hardware-tests.md`, section "Cartload kernel".
+power-cycling. `cargo run -p cartload-fel -- memboot --hmod ... --shell boot` boots it through
+FEL into the console's own system and menu, with the modules on the console and USB device
+mode forced. Checklists and results: `docs/hardware-tests.md`, section "Cartload kernel".
 
-Still to do before the app can offer it: boot to the menu through FEL, then test video, audio,
-controllers, USB storage and Wi-Fi; a boot image that fits 4 MB (modules in the rootfs, not the
-ramdisk); the install and uninstall paths; the NES and Famicom Minis.
+On a SNES Classic Mini (EUR) it boots to the menu with Mali, the controller driver and the
+other modules working (2026-10-28). Still to do before the app can offer it: games, sound,
+controllers, USB storage and Wi-Fi; the install and uninstall paths (the modules go to the
+data partition, as in that test); the NES and Famicom Minis.

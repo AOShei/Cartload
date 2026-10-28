@@ -71,6 +71,8 @@ enum ShellArg {
     Network,
     /// Force the legacy clovershell protocol (hakchi-clovershell).
     Clovershell,
+    /// Drop the shell token: boot the console's own system and menu, not the memboot shell.
+    Boot,
 }
 
 impl From<ShellArg> for ShellOverride {
@@ -79,6 +81,7 @@ impl From<ShellArg> for ShellOverride {
             ShellArg::Keep => Self::Keep,
             ShellArg::Network => Self::Network,
             ShellArg::Clovershell => Self::Clovershell,
+            ShellArg::Boot => Self::Boot,
         }
     }
 }
@@ -265,7 +268,7 @@ async fn run_memboot(
         "the console should enumerate as 04e8:6863 within about 10 s and answer SSH at \
          169.254.13.37 (root, empty password)"
     );
-    if !report.cmdline.contains("hakchi-shell") {
+    if options.shell != ShellOverride::Boot && !report.cmdline.contains("hakchi-shell") {
         warn!("command line has no hakchi-shell token; the network shell may not start");
     }
     Ok(())

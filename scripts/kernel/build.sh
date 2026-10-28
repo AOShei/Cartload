@@ -22,12 +22,13 @@
 # Output (target/kernel/out):
 #   zImage, System.map, .config     the kernel
 #   boot.img                        the kernel with the package's ramdisk; an appended ramdisk
-#                                   archive replaces /lib/modules-ramfs with this kernel's
-#                                   modules, which hakchi loads when the NAND has none for it
+#                                   archive puts this kernel's NAND and SCSI drivers in
+#                                   /lib/modules-ramfs, as the package's ramdisk has madmonkey's
 #   hakchi-<release>-test.hmod      the package with that boot.img and this kernel's modules
+# and in target/kernel/stage/lib/modules/<release> the modules for the console's data partition.
 #
-# The test package is for memboot only (cartload-flow memboot --hmod ...). Its boot.img is
-# larger than the 4 MB boot partition; never install it.
+# The test package is for memboot only (cartload-flow memboot, cartload-fel memboot --shell
+# boot; docs/kernel.md). The install path has not been tried with it; never install it.
 set -euo pipefail
 
 KERNEL_REPO=https://github.com/AOShei/sun-nontendocm-kernel.git
@@ -111,8 +112,21 @@ if [ "${1:-}" = "--inside" ]; then
   cp arch/arm/boot/zImage System.map .config "$out/"
 
   echo "== boot.img"
+  # The ramdisk carries what the package's does: the NAND driver, which hakchi's init loads
+  # before anything is mounted, and the SCSI disk driver, with what they need. Everything else
+  # goes in /lib/modules/<release> on the console. With all modules in the ramdisk (4.8 MB) the
+  # console does not start from u-boot at all (no LED), though kexec boots it.
+  ramfs=/work/ramfs/lib/modules/$release
+  mkdir -p "$ramfs"
+  for m in kernel/drivers/block/nand/nand.ko kernel/drivers/scsi/sd_mod.ko; do
+    for f in "$m" $(sed -n "s|^$m: *||p" "$mods/modules.dep"); do
+      mkdir -p "$ramfs/$(dirname "$f")" && cp "$mods/$f" "$ramfs/$f"
+    done
+  done
+  cp "$mods/modules.order" "$mods/modules.builtin" "$ramfs/"
+  depmod -b /work/ramfs "$release"
   mkdir -p /work/overlay/lib32/modules-ramfs
-  cp -a "$mods/." /work/overlay/lib32/modules-ramfs/
+  cp -a "$ramfs/." /work/overlay/lib32/modules-ramfs/
   # The kernel unpacks concatenated archives in order, so this one overrides the package's
   # modules-ramfs while the package's ramdisk keeps its device nodes and owners. The package's
   # ramdisk is xz with CRC32 checks, as the kernel's decompressor needs; so is this one.
@@ -136,6 +150,7 @@ if [ "${1:-}" = "--inside" ]; then
   (cd /work/pkg && tar --owner=0 --group=0 --numeric-owner --sort=name --mtime="@$KERNEL_EPOCH" -cf - * \
     | gzip -n -9 >"$out/hakchi-$release-test.hmod")
 
+  echo "== ramdisk modules:" $(cd "$ramfs" && find . -name '*.ko' | sort)
   echo "== done: $release"
   ls -l "$out"
   exit 0

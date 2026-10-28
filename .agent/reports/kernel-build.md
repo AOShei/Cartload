@@ -21,13 +21,19 @@
 - Hardware (SNES EUR, user present): shell memboot works; NAND, USB network, SSH, Mali,
   clovercon; kernel warnings identical to the installed kernel. Ran with an earlier, equivalent
   build from the scratchpad (same sources; archives built with cpio instead of gen_init_cpio).
+- Menu (FEL, `cartload-fel memboot --shell boot`, new option): our kernel boots the console's
+  system to the SNES menu; mali in use, clovercon, uinput, zram, usb_storage loaded from the data
+  partition; fbgrab capture shows the menu. Needed: modules on the data partition (a ramdisk
+  with all modules does not start from u-boot), USB device mode forced by a preinit file
+  (`p0000_config_defaults` forces `cfg_usb_host='y'`). All test files removed afterwards and
+  the config restored, checked over SSH. This run used `build.sh`'s output.
 
 ## Left / uncertain
 
-- Booting to the menu: a full boot through kexec fails with the shipped kernel too, so it needs
-  a FEL memboot without the shell token (user must hold reset). Not run.
-- `build.sh`'s own output has not been booted on hardware yet (see above).
 - rtl8188fu without sunxi platform hooks; clovercon's source differs from the shipped one
-  (same parameters); Wi-Fi, audio, video and USB storage untested.
-- A 4 MB boot image (modules in the rootfs), install/uninstall, NES and Famicom: not started.
-- Cartload has no boot-image size check; a 6.8 MB image must never be flashed.
+  (same parameters).
+- Install and uninstall with this kernel (modules to the data partition), NES and Famicom: not
+  started.
+- Cartload has no boot-image size check; the test package must never be installed.
+- Two RTC lines in our FEL boot's log that the installed kernel's NAND boot lacks; probably FEL.
+- Games, sound, controllers, USB storage, Wi-Fi: not tested.

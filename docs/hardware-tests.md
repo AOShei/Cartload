@@ -1128,20 +1128,40 @@ installed kernel. Return with `sync; umount -ar; reboot -f`.
 
 ### 2. Boot to the menu through FEL
 
-Not run yet. Put the console in FEL mode (hold reset while switching on) and memboot the test
-package through FEL without the shell, so the console starts its normal system with this
-kernel. Expected over SSH: `ReedPlayer-Clover` running, `mali` and `clovercon` loaded, a
-framebuffer capture (`fbgrab`) showing the menu; with a controller plugged in, an input device
-for it in `/proc/bus/input/devices`. Then a game, sound and a USB stick.
+A RAM boot goes to the console's own system and menu when the command line has no shell token
+(`hakchi-shell` makes hakchi stop in the memboot shell). It only works through FEL: a full boot
+through kexec never comes up (see the results). It needs two temporary changes on the console,
+both under `/var/lib/hakchi` and undone afterwards:
 
-Note: a full boot through kexec from the running kernel
-(`detached-fallback reboot_kexec <boot.img>` without a shell token) does not work: the console
-comes up with its USB network device but never answers on it. It fails the same way with the
-pinned package's own `boot.img`, so it is the method, not the kernel. Use FEL.
+1. This kernel's modules in `/var/lib/hakchi/rootfs/lib/modules/3.4.113.30-cartload`
+   (`tar -C target/kernel/stage/lib/modules -cf - 3.4.113.30-cartload | cartload-console exec
+   --stdin 'tar -xf - -C /var/lib/hakchi/rootfs/lib/modules'`). The installed kernel ignores
+   them. The boot image's ramdisk only has the NAND and SCSI drivers, as the package's does.
+2. USB device mode, or the PC never gets a network link: `p0000_config_defaults` forces
+   `cfg_usb_host='y'` on every boot, so a file `rootfs/etc/preinit.d/p7019_cartload_usb`
+   containing `cfg_usb_host='n'` (runs after the defaults, before `p7020_usb`). Editing
+   `p0000_config` does not work. Remove the file afterwards and restore `p0000_config` (the boot
+   saves `'n'` into it).
+
+Then FEL mode (unplug, hold reset, plug in: the light stays off) and
+`cargo run -p cartload-fel -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload-test.hmod --shell boot`.
+Expected: the light comes on, SSH answers within about 20 s, `ReedPlayer-Clover` runs, `lsmod`
+lists `mali` (used), `clovercon`, `uinput`, `zram`, `usb_storage`, and `fbgrab` shows the menu.
+Without a network link, a boot script in `rootfs/etc/init.d` that writes `dmesg`, `ps`, `lsmod`
+and an `fbgrab` capture under `/var/lib/hakchi` after 60 s shows how far a boot got.
 
 Results, 2026-10-28, SNES Classic Mini EUR, kernel branch `cartload` at `1ed43a0f`, Linux:
 - 1: ok (kexec 4.8 s, console back in 10.2 s; NAND, USB network, SSH, Mali and clovercon as
   expected; warnings identical to the installed kernel's).
-- Full boot through kexec: no network, with this kernel and with the pinned package's kernel
-  alike; power-cycled back to the installed kernel both times.
-- 2: not run.
+- Full boot through kexec (`detached-fallback reboot_kexec <boot.img>`): no network, with this
+  kernel and with the pinned package's kernel alike; power-cycled back both times.
+- FEL full boot with all modules in the ramdisk (boot.img 6.8 MB, ramdisk 4.8 MB): the light
+  stays off, the kernel never starts. With the package's ramdisk (4.6 MB) the light comes on.
+  Keep the ramdisk near the package's size.
+- FEL full boot of the pinned package's kernel without device mode: light on, no USB link.
+- 2: ok. SSH after 16 s; `ReedPlayer-Clover` and `clover-mcp` running; `mali` used by 5,
+  `clovercon`, `uinput`, `zram`, `usb_storage`, `sd_mod` loaded from the data partition; the
+  `fbgrab` capture shows the SNES menu. Kernel log as the installed kernel's except two RTC
+  lines (`Rtc time will be wrong`, `unable to read the hardware clock`), probably from the FEL
+  start (compared against a NAND boot), not checked. Not tested: games, sound, controllers
+  (none plugged in), USB storage, Wi-Fi.
