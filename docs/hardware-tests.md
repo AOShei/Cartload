@@ -1032,7 +1032,11 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
    then Reinstall, Save the stock kernel and Factory reset side by side) and Emulators; on the
    right one panel with the tabs Detected and Technical details (and Command in a development
    build), exactly as tall as the left column; nothing scrolls at the default 1600 × 800
-   window. Left/Right switch the tabs once one has focus. With a stock console or FEL mode: the three setup steps on
+   window. Left/Right switch the tabs once one has focus. The left column's last card
+   (Emulators, or the setup's last step) stretches so both columns end on the same line at any
+   window size. Technical details shows the console's JSON in a dark read-only box with
+   coloured keys, strings, numbers and literals; its Copy button (top right) copies the text
+   and turns into "Copied" for a moment. With a stock console or FEL mode: the three setup steps on
    the left and Boot from memory, Save, Factory reset on the right.
 3. Settings has no Emulators section; the Linux setup row is there, and on the Console page
    only while it needs attention.

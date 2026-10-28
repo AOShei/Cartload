@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { consoleExec } from "../api/commands";
-  import { AppError } from "../api/tauri";
+  import { AppError, inTauri } from "../api/tauri";
   import type { ExecResult, StatusReport } from "../api/types";
+  import CodeBlock from "../components/console/CodeBlock.svelte";
   import EmulatorsCard from "../components/console/EmulatorsCard.svelte";
   import HakchiSetup from "../components/console/HakchiSetup.svelte";
   import MaintenanceCard from "../components/console/MaintenanceCard.svelte";
@@ -65,7 +66,9 @@
   });
 
   type Tab = "detected" | "technical" | "command";
-  let tab = $state<Tab>("detected");
+  // `?tab=technical` opens that tab in the browser preview.
+  const previewTab = !inTauri && typeof location !== "undefined" ? new URLSearchParams(location.search).get("tab") : null;
+  let tab = $state<Tab>(previewTab === "technical" || previewTab === "command" ? previewTab : "detected");
   const tabs = $derived.by((): { id: Tab; label: string }[] => {
     const list: { id: Tab; label: string }[] = [
       { id: "detected", label: "Detected" },
@@ -168,8 +171,11 @@
               <p class="muted">Nothing detected yet.</p>
             {/if}
           {:else if shown === "technical"}
-            <p class="muted lede">Raw data from the console, useful in bug reports.</p>
-            <pre class="raw">{status ? JSON.stringify(status, null, 2) : "No data yet."}</pre>
+            {#if status}
+              <CodeBlock text={JSON.stringify(status, null, 2)} />
+            {:else}
+              <p class="muted">No data yet.</p>
+            {/if}
           {:else}
             <p class="muted lede">Runs a shell line on the console (development build).</p>
             <form onsubmit={runCommand}>
@@ -201,7 +207,8 @@
      up): the status card, hakchi and the emulators (or the setup) on the left; on the right
      the information panel, exactly as tall as the left column: it fills its column without
      adding to the row's height, so the left column alone sets it, and its content scrolls
-     inside. The page scrolls when the left column is taller than the window. */
+     inside. Both reach the bottom of the window; the page scrolls when the left column is
+     taller than that. */
   .page {
     flex: 1;
     min-height: 0;
@@ -287,13 +294,6 @@
     font-size: var(--text-sm);
   }
 
-  .raw {
-    flex: 1;
-    margin: 0;
-    font-size: var(--text-sm);
-    user-select: text;
-  }
-
   form {
     display: flex;
     gap: var(--space-2);
@@ -317,12 +317,20 @@
   }
 
   @media (min-width: 1100px) {
+    /* The row is at least the page's height, so both columns reach the bottom of the window;
+       the left column's last card (Emulators, or the setup's last step) takes the space left
+       over. A left column taller than the window makes the row, and the page, taller. */
     .page {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(320px, 32%);
       grid-template-rows: auto;
-      align-items: start;
+      align-content: stretch;
       gap: var(--space-5);
+    }
+
+    /* The cards come from other components, so the selector reaches past this one's scope. */
+    .main > :global(:last-child) {
+      flex: 1 0 auto;
     }
 
     .side {

@@ -83,7 +83,7 @@ google-chrome --headless=new --window-size=1280,800 --hide-scrollbars \
 Fixtures: `?preview=disconnected|fel|booting|connected|stock` (Console), `&flow=
 idle|running|waiting-fel|removing|failed|done|cancelled&package=cached|none|problem` with
 `&window=open` for the progress window, `&modules=cached|installed` (Emulators),
-`&remove=<module>` (the removal dialog), `&emulator=<module>` (Library filter), `?page=library&library=some|
+`&remove=<module>` (the removal dialog), `&tab=technical|command` (Console info panel), `&emulator=<module>` (Library filter), `?page=library&library=some|
 empty|many&sync=none|plan|review|warning|running|done|failed&import=running|done`, `?page=settings`. `&theme=light|dark`
 forces a theme, `&log=open|closed` the activity log panel; on the Library page `&folder=4/1`
 opens a folder of the fixture (index path), `&select=N` selects its first N games (the detail

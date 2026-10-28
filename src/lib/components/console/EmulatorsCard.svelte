@@ -30,7 +30,7 @@
     <h2 id="emulators-heading">Emulators</h2>
     {#if modulesStore.loading}<span class="spinner" aria-hidden="true" title="Reading the console"></span>{/if}
   </div>
-  <p class="muted small">RetroArch and its cores run the systems the console has no emulator for. They install into hakchi's storage; the console's own emulators stay untouched.</p>
+  <p class="muted small">RetroArch and its cores run the systems the console has no emulator for. Installing or removing one reboots the console once.</p>
   {#if modulesStore.status}
     <ul class="modules">
       {#each modulesStore.status.modules as module (module.id)}
@@ -82,13 +82,9 @@
   {:else}
     <p class="muted"><span class="spinner" aria-hidden="true"></span> Reading the modules…</p>
   {/if}
-  <p class="muted small foot">
-    {#if !ready}
-      Connect the console running hakchi to install or remove emulators.
-    {:else}
-      From KMFDManic's Mod Hub. Installing or removing reboots the console once.
-    {/if}
-  </p>
+  {#if !ready}
+    <p class="muted small foot">Connect the console running hakchi to install or remove emulators.</p>
+  {/if}
 </section>
 
 <style>
