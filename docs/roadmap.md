@@ -9,7 +9,8 @@ The first sync from the app ran on a SNES Classic Mini (EUR) on 2026-10-23. `v0.
 released on 2026-10-23. `v0.2.0` adds the merged Console page, emulator updates and removal,
 7z support installed with hakchi and added by the sync when missing, and no dependence on the
 hakchi servers: the kernel package is built in and the emulators are mirrored, both pinned by
-SHA-256.
+SHA-256. `v0.2.1` (2026-10-28) replaces the unpublished v0.2.0 draft: it shows the 7z step in
+the sync panel and stops counting the built-in games' links as changes on every sync.
 
 Next, in order:
 

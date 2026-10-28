@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "cartload-app"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "cartload-console"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -488,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "cartload-fel"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "cartload-hmod",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "cartload-flow"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "cartload-hmod"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "cartload-library"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "cartload-console",

@@ -1066,8 +1066,10 @@ Results, 2026-10-28, SNES Classic Mini EUR, hakchi v1.0.4-126, Linux, v0.2.0 dev
 - 1 and the first half of 12 (Gambatte core from the mirror): ok. sha256 c1b6167d…, `mods` flow 6
   steps in 21 s, update check afterwards says up to date.
 - 11 (7z, tiny7zx removed by `hakchi pack_uninstall tiny7zx`): ok. 7z added in 21 s with one
-  restart, then the sync ran by itself (82 files uploaded, 12 removed). Run with the progress
-  window of that build; the sync panel showing the step instead is not yet run on hardware.
+  restart, then the sync ran by itself (82 files uploaded, 12 removed). Run again with the
+  step shown in the sync panel (no window): ok, 7z added in 21 s, then the sync. A plan made
+  after that sync is empty, the 21 built-in games' links included ("The console is up to
+  date.").
 
 ## Console page and progress window (desktop app)
 
