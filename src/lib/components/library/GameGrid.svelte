@@ -619,11 +619,22 @@
     color: var(--accent-strong);
   }
 
+  /* Every control in the toolbar is exactly the control height, whatever the engine's own
+     sizing of selects, search fields and buttons. */
+  .toolbar select,
+  .toolbar input,
+  .toolbar .btn,
+  .view-toggle {
+    height: var(--control);
+    min-height: var(--control);
+  }
+
   .view-toggle {
     display: flex;
+    align-items: center;
     gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--border);
+    padding: 0 3px;
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-s);
   }
 
