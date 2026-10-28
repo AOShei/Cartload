@@ -740,19 +740,21 @@ export function previewImport(): { files: ImportEvent[]; report: ImportReport | 
   return { files, report, importing: false };
 }
 
-/* Emulator modules: `?modules=none|cached|installed` (default: nothing installed). */
+/* Emulator modules: `?modules=none|cached|installed` (default: nothing installed); with
+   `installed`, RetroArch and the NES core have an update. */
 import type { ModulesStatus } from "../api/types";
 
 export function previewModules(): ModulesStatus {
   const name = typeof location !== "undefined" ? new URLSearchParams(location.search).get("modules") : null;
   const connected =
     typeof location !== "undefined" && new URLSearchParams(location.search).get("preview") === "connected";
-  const state = (cachedBytes: number, installed: boolean) => ({
+  const state = (cachedBytes: number, installed: boolean, update = false) => ({
     cached: name === "cached" || name === "installed",
     cached_bytes: name === "cached" || name === "installed" ? cachedBytes : null,
     installed: connected ? name === "installed" && installed : null,
     removable: connected ? name === "installed" && installed : null,
     records: [] as string[],
+    update: connected && name === "installed" && installed ? update : null,
   });
   return {
     cache_dir: "/home/user/.cache/cartload/mods",
@@ -767,7 +769,7 @@ export function previewModules(): ModulesStatus {
         purpose: "The frontend every core runs in.",
         approx_bytes: 10_600_000,
         warning: null,
-        ...state(10_557_798, true),
+        ...state(10_557_798, true, true),
       },
       {
         id: "fceumm",
@@ -777,7 +779,7 @@ export function previewModules(): ModulesStatus {
         purpose: "The FCEUmm core.",
         approx_bytes: 760_000,
         warning: null,
-        ...state(761_432, true),
+        ...state(761_432, true, true),
       },
       {
         id: "snes9x",

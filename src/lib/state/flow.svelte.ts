@@ -37,6 +37,8 @@ export function flowTitle(kind: FlowKind | null): string {
       return "Save the stock kernel";
     case "install_modules":
       return "Install emulators";
+    case "update_modules":
+      return "Update emulators";
     case "remove_modules":
       return "Remove emulators";
     case "install":
@@ -47,7 +49,7 @@ export function flowTitle(kind: FlowKind | null): string {
 
 /** Whether a flow may boot the console through FEL, which needs the user at the console. */
 export function touchesKernel(kind: FlowKind | null): boolean {
-  return kind?.kind !== "install_modules" && kind?.kind !== "remove_modules";
+  return kind?.kind !== "install_modules" && kind?.kind !== "update_modules" && kind?.kind !== "remove_modules";
 }
 
 /** What a finished flow did, as a heading and one sentence. */
@@ -72,6 +74,11 @@ export function flowOutcome(kind: FlowKind | null): { heading: string; text: str
       return {
         heading: "The emulators are installed.",
         text: "The console rebooted with them. Games that need them start from its menu after the next sync.",
+      };
+    case "update_modules":
+      return {
+        heading: "The emulators are updated.",
+        text: "The console rebooted with the new versions. Your games and their settings are unchanged.",
       };
     case "remove_modules":
       return {

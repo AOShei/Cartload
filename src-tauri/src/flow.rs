@@ -55,6 +55,11 @@ pub enum FlowKind {
         /// Catalog ids (`retroarch`, `fceumm`, `snes9x`).
         ids: Vec<String>,
     },
+    /// Replace emulator modules on the running hakchi kernel with the hub's current builds.
+    UpdateModules {
+        /// Catalog ids.
+        ids: Vec<String>,
+    },
     /// Uninstall emulator modules from the running hakchi kernel.
     RemoveModules {
         /// Catalog ids; `retroarch` takes every core with it.
@@ -71,6 +76,7 @@ impl FlowKind {
             Self::Uninstall { .. } => flows::UNINSTALL,
             Self::DumpKernel { .. } => flows::DUMP_KERNEL,
             Self::InstallModules { .. } => flows::MODS,
+            Self::UpdateModules { .. } => flows::UPDATE_MODS,
             Self::RemoveModules { .. } => flows::REMOVE_MODS,
         }
     }
@@ -83,6 +89,7 @@ impl FlowKind {
             Self::Uninstall { .. } => "Returning the console to its original system",
             Self::DumpKernel { .. } => "Saving the stock kernel",
             Self::InstallModules { .. } => "Installing emulator modules",
+            Self::UpdateModules { .. } => "Updating emulator modules",
             Self::RemoveModules { .. } => "Removing emulator modules",
         }
     }
@@ -105,6 +112,7 @@ impl FlowKind {
             Self::Uninstall { .. } => flows::uninstall_kernel(),
             Self::DumpKernel { path } => flows::dump_stock_kernel(path.clone()),
             Self::InstallModules { .. } => flows::install_mods(),
+            Self::UpdateModules { .. } => flows::update_mods(),
             Self::RemoveModules { .. } => flows::remove_mods(),
         }
     }
@@ -148,6 +156,7 @@ pub fn step_label(name: &str) -> &str {
         "dump-stock-kernel" => "Save the stock kernel",
         "mods" => "Install the emulator modules",
         "verify-emulators" => "Verify the emulator modules",
+        "update-emulators" => "Update the emulator modules",
         "remove-emulators" => "Remove the emulator modules",
         "verify-removed" => "Verify the modules are gone",
         other => other,
@@ -613,7 +622,11 @@ impl FlowRunner {
                 ctx.with_mods(mods).with_removals(removals)
             }
         };
-        if matches!(kind, FlowKind::InstallModules { .. }) && ctx.mods.is_empty() {
+        if matches!(
+            kind,
+            FlowKind::InstallModules { .. } | FlowKind::UpdateModules { .. }
+        ) && ctx.mods.is_empty()
+        {
             return Err(CommandError::new(
                 "No emulator module is loaded. Download the modules first.",
             ));

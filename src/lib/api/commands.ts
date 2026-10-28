@@ -109,6 +109,12 @@ export function modulesStatus(): Promise<ModulesStatus> {
   return call<ModulesStatus>("modules_status");
 }
 
+/** The module state with `update` filled in: the cache of the installed modules is brought
+ *  up to date with the Mod Hub and compared with the console's files. */
+export function modulesCheckUpdates(): Promise<ModulesStatus> {
+  return call<ModulesStatus>("modules_check_updates");
+}
+
 /** Downloads modules into the cache; progress follows as `module-download` events. */
 export function modulesFetch(ids: string[]): Promise<ModulesStatus> {
   return call<ModulesStatus>("modules_fetch", { ids });

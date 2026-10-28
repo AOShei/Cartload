@@ -263,22 +263,69 @@ async fn module_installed(ctx: &Context, m: &ModArchive) -> Result<Option<String
 }
 
 /// Uploads emulator modules from the Mod Hub (gzip tars, as downloaded), runs
-/// `hakchi packs_install`, and reboots the console.
+/// `hakchi packs_install`, and reboots the console. As an update it installs even modules
+/// the console has registered, after uninstalling the packages they replace
+/// ([`Context::remove_mods`]: the module's own older copy, or another installer's), so no
+/// file of the old build stays behind; one reboot covers both.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct InstallMods;
+pub struct InstallMods {
+    update: bool,
+}
+
+impl InstallMods {
+    /// Installs modules the console does not have.
+    pub const fn new() -> Self {
+        Self { update: false }
+    }
+
+    /// Replaces the console's copies of the modules with the ones in the context.
+    pub const fn update() -> Self {
+        Self { update: true }
+    }
+}
+
+/// Runs `hakchi pack_uninstall` for `name`, with the console's output in the log.
+async fn uninstall(ctx: &mut Context, name: &str) -> Result<()> {
+    let command = commands::pack_uninstall(name);
+    let output = ctx
+        .exec_with(&command, None, ctx.options.flash_timeout)
+        .await?;
+    for line in output
+        .stdout_lossy()
+        .lines()
+        .chain(output.stderr_lossy().lines())
+    {
+        let line = line.trim_end();
+        if !line.is_empty() {
+            ctx.reporter.info(format!("console: {line}"));
+        }
+    }
+    if !output.success() {
+        return Err(device_failure(&command, &output));
+    }
+    Ok(())
+}
 
 #[async_trait]
 impl Step<Context> for InstallMods {
     fn name(&self) -> &str {
-        "mods"
+        if self.update {
+            "update-emulators"
+        } else {
+            "mods"
+        }
     }
 
     fn description(&self) -> &str {
-        "Upload and install the emulator modules, then reboot"
+        if self.update {
+            "Replace the emulator modules with the new ones, then reboot"
+        } else {
+            "Upload and install the emulator modules, then reboot"
+        }
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
-        if ctx.mods.is_empty() {
+        if ctx.mods.is_empty() || self.update {
             return Ok(None);
         }
         let mut reasons = Vec::new();
@@ -327,6 +374,11 @@ impl Step<Context> for InstallMods {
                 m.bytes.len(),
                 m.title
             ));
+        }
+        if self.update {
+            for name in registered_removals(ctx).await? {
+                uninstall(ctx, &name).await?;
+            }
         }
         let output = ctx
             .exec_with(commands::PACKS_INSTALL, None, ctx.options.flash_timeout)
@@ -468,23 +520,7 @@ impl Step<Context> for RemoveMods {
         }
         let names = registered_removals(ctx).await?;
         for name in &names {
-            let command = commands::pack_uninstall(name);
-            let output = ctx
-                .exec_with(&command, None, ctx.options.flash_timeout)
-                .await?;
-            for line in output
-                .stdout_lossy()
-                .lines()
-                .chain(output.stderr_lossy().lines())
-            {
-                let line = line.trim_end();
-                if !line.is_empty() {
-                    ctx.reporter.info(format!("console: {line}"));
-                }
-            }
-            if !output.success() {
-                return Err(device_failure(&command, &output));
-            }
+            uninstall(ctx, name).await?;
         }
         let left = registered_removals(ctx).await?;
         if !left.is_empty() {

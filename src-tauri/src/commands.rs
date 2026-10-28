@@ -193,6 +193,10 @@ pub async fn flow_start(
     let package = package::load_for_flow().await;
     let mods = match &kind {
         FlowKind::InstallModules { ids } => crate::modules::load(ids)?,
+        FlowKind::UpdateModules { ids } => {
+            crate::modules::refresh(ids, |_| {}).await?;
+            crate::modules::load(ids)?
+        }
         _ => Vec::new(),
     };
     let removals = match &kind {
@@ -219,6 +223,18 @@ pub async fn flow_start(
             }
             names
         }
+        // An update replaces whatever package put the module on the console, so none of the
+        // old build's files stay behind. Games keep working: the module is back after it.
+        FlowKind::UpdateModules { ids } => {
+            let modules = crate::modules::resolve(ids)?;
+            let guard = state.session.lock().await;
+            let Some(session) = guard.as_ref() else {
+                return Err(CommandError::new(
+                    "Connect the console first: Cartload reads what it has before updating.",
+                ));
+            };
+            crate::modules::removal_records(session, &modules).await?
+        }
         _ => Vec::new(),
     };
     tracing::info!(
@@ -238,6 +254,29 @@ pub async fn modules_status(
 ) -> Result<crate::modules::ModulesStatus, CommandError> {
     let guard = state.session.lock().await;
     Ok(crate::modules::status(guard.as_ref()).await)
+}
+
+/// The modules' state with [`crate::modules::ModuleView::update`] filled in: the cache of
+/// the installed modules is brought up to date with the hub and compared with the console's
+/// files. Without a console running hakchi, or without the hub, it is the plain status.
+#[tauri::command]
+pub async fn modules_check_updates(
+    state: State<'_, Arc<AppState>>,
+) -> Result<crate::modules::ModulesStatus, CommandError> {
+    let status = {
+        let guard = state.session.lock().await;
+        crate::modules::status(guard.as_ref()).await
+    };
+    // The downloads run without the console's session, so status polling goes on.
+    if !status.console_checked || !crate::modules::refresh_installed(&status).await {
+        return Ok(status);
+    }
+    let guard = state.session.lock().await;
+    let mut status = crate::modules::status(guard.as_ref()).await;
+    if let Some(session) = guard.as_ref() {
+        crate::modules::compare_installed(session, &mut status).await;
+    }
+    Ok(status)
 }
 
 /// Downloads modules into the cache, with `module-download` progress events, and returns the

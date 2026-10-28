@@ -1022,6 +1022,22 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
 3. An emulator on the console that no record lists (`which <launcher>` finds it, `grep` in
    `/var/lib/hakchi/hmod` does not): the dialog "Cartload cannot remove this", no flow.
 
+### 10. Update an emulator
+
+1. On a console with hakchi2 CE's RetroArch and mGBA, open the Console page. Expected: after
+   "Checking for updates" next to the Emulators heading, RetroArch and Game Boy Advance show
+   "Update available" and an **Update** button; the log has `compared the module with the
+   console` with `update=true` for both.
+2. **Update** on Game Boy Advance, with a GBA game in the library. Expected: no dialog about the
+   game; the progress window "Update emulators" runs six steps with one reboot; the console log
+   shows `package mgba uninstalled` before `package _km_mgba installed`; afterwards the row
+   shows "Installed" and the GBA game still starts after a sync.
+3. **Update** on RetroArch. Expected: CE's `retroarch` is uninstalled and
+   `_km_retroarch_1910_ozone` installed; NES games through RetroArch still start (the hub's
+   package carries FCEUmm); afterwards no row shows an update.
+4. Without a network connection: no "Update available" anywhere and no error toast; the rows
+   show "Installed".
+
 ## Console page and progress window (desktop app)
 
 ### 1. Layout

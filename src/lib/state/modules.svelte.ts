@@ -1,4 +1,4 @@
-import { modulesFetch, modulesStatus } from "../api/commands";
+import { modulesCheckUpdates, modulesFetch, modulesStatus } from "../api/commands";
 import { AppError, inTauri, on } from "../api/tauri";
 import type { GameView, ModuleDownload, ModulesStatus } from "../api/types";
 import { previewModules } from "../dev/preview";
@@ -10,6 +10,20 @@ import { toasts } from "./toasts.svelte";
 /** The modules a core needs on the console: RetroArch plus the core. */
 export function withRetroarch(core: string): string[] {
   return core === "retroarch" ? ["retroarch"] : ["retroarch", core];
+}
+
+/** `next` with the update flags of `previous` for modules still installed, so a reload does
+ *  not hide an update until the next check answers. */
+function keepUpdates(next: ModulesStatus, previous: ModulesStatus | null): ModulesStatus {
+  if (!previous) {
+    return next;
+  }
+  return {
+    ...next,
+    modules: next.modules.map((m) =>
+      m.update === null && m.installed === true ? { ...m, update: previous.modules.find((p) => p.id === m.id)?.update ?? null } : m,
+    ),
+  };
 }
 
 /** An install waiting for the user to accept a module's warning. */
@@ -40,6 +54,8 @@ export interface PendingRemoval {
 class ModulesStore {
   status = $state<ModulesStatus | null>(null);
   loading = $state(false);
+  /** Comparing the installed modules with the Mod Hub. */
+  checking = $state(false);
   /** Ids being downloaded right now. */
   downloading = $state<string[]>([]);
   /** Download progress per module id. */
@@ -83,13 +99,43 @@ class ModulesStore {
     }
     this.loading = true;
     try {
-      this.status = await modulesStatus();
+      this.status = keepUpdates(await modulesStatus(), this.status);
     } catch (error: unknown) {
       const e = AppError.from(error);
       toasts.error(`Could not read the emulator modules: ${e.message}`, e.detail);
     } finally {
       this.loading = false;
     }
+    if (this.status?.console_checked) {
+      void this.checkUpdates();
+    }
+  }
+
+  /** Asks the Mod Hub whether the installed modules have newer builds than the console's
+   *  (downloading those into the cache). Quiet: without the hub the rows just show no
+   *  update. */
+  async checkUpdates(): Promise<void> {
+    if (!inTauri || this.checking) {
+      return;
+    }
+    this.checking = true;
+    try {
+      this.status = await modulesCheckUpdates();
+    } catch {
+      // The plain status stays; the check runs again on the next load.
+    } finally {
+      this.checking = false;
+    }
+  }
+
+  /** Replaces the console's copy of a module with the Mod Hub's current one. Games that use
+   *  it keep working: the module is back once the console restarts. */
+  async update(id: string): Promise<boolean> {
+    if (!inTauri) {
+      toasts.info("Updating modules works inside the desktop app only.");
+      return false;
+    }
+    return flowStore.begin({ kind: "update_modules", ids: [id] });
   }
 
   /** Installs `ids`, asking first when one of them carries a warning (`pending`, shown by

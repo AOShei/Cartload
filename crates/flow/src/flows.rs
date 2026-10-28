@@ -25,6 +25,8 @@ pub const DUMP_KERNEL: &str = "dump-kernel";
 pub const BASE_MODS: &str = "base-mods";
 /// Name of [`install_mods`].
 pub const MODS: &str = "mods";
+/// Name of [`update_mods`].
+pub const UPDATE_MODS: &str = "update-mods";
 /// Name of [`remove_mods`].
 pub const REMOVE_MODS: &str = "remove-mods";
 
@@ -80,7 +82,20 @@ pub fn install_mods() -> Flow<Context> {
     Flow::new(MODS)
         .step(WaitForConsole)
         .step(DetectState::expect_installed())
-        .step(InstallMods)
+        .step(InstallMods::new())
+        .step(WaitForConsole)
+        .step(DetectState::any())
+        .step(VerifyMods)
+}
+
+/// Update emulator modules on a console running its hakchi kernel: identify it, uninstall
+/// the packages being replaced ([`Context::with_removals`]), upload and install the new
+/// ones ([`Context::with_mods`]), reboot once, verify.
+pub fn update_mods() -> Flow<Context> {
+    Flow::new(UPDATE_MODS)
+        .step(WaitForConsole)
+        .step(DetectState::expect_installed())
+        .step(InstallMods::update())
         .step(WaitForConsole)
         .step(DetectState::any())
         .step(VerifyMods)

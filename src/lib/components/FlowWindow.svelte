@@ -32,7 +32,7 @@
 
   /** The modules a module task works on, by name. */
   const modules = $derived.by((): string => {
-    if (kind?.kind !== "install_modules" && kind?.kind !== "remove_modules") {
+    if (kind?.kind !== "install_modules" && kind?.kind !== "update_modules" && kind?.kind !== "remove_modules") {
       return "";
     }
     const catalog = modulesStore.status?.modules ?? [];

@@ -191,6 +191,13 @@ impl Module {
             .map(|m| m.len())
     }
 
+    /// Lowercase hex MD5 of the cached file, when it exists.
+    pub fn cached_md5(&self, cache_root: &Path) -> Option<String> {
+        std::fs::read(self.cached_path(cache_root))
+            .ok()
+            .map(|bytes| md5_hex(&bytes))
+    }
+
     /// Reads the cached module.
     pub fn load(&self, cache_root: &Path) -> Result<ModArchive> {
         let path = self.cached_path(cache_root);
@@ -218,6 +225,64 @@ impl Module {
     }
 }
 
+/// One file of a module as it lands on the console: its path from `/` and its MD5.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileSum {
+    /// The path on the console (`/etc/libretro/core/mgba_libretro.so`).
+    pub path: String,
+    /// Lowercase hex MD5.
+    pub md5: String,
+}
+
+impl ModArchive {
+    /// The `count` largest programs the module puts on the console (`bin/`, `usr/bin/`,
+    /// `*.so`), with their MD5s: what differs between builds, unlike fonts and artwork, and
+    /// never a settings file a user may have edited on the console. A module without
+    /// programs gives its largest files. `pack_install` copies every file but the package's
+    /// own `install`, `uninstall` and readme to the same path under the root.
+    pub fn fingerprint(&self, count: usize) -> Result<Vec<FileSum>> {
+        let archive_error = |source| Error::Archive {
+            path: PathBuf::from(format!("{}.hmod", self.name)),
+            source,
+        };
+        let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(self.bytes.as_slice()));
+        let mut files: Vec<(u64, FileSum)> = Vec::new();
+        for entry in archive.entries().map_err(archive_error)? {
+            let mut entry = entry.map_err(archive_error)?;
+            if entry.header().entry_type() != tar::EntryType::Regular {
+                continue;
+            }
+            let path = entry
+                .path()
+                .map_err(archive_error)?
+                .to_string_lossy()
+                .trim_start_matches("./")
+                .to_string();
+            if !path.contains('/') {
+                // `install`, `uninstall`, `readme.md`: the package's, not the console's.
+                continue;
+            }
+            let mut data = Vec::new();
+            std::io::Read::read_to_end(&mut entry, &mut data).map_err(archive_error)?;
+            files.push((
+                data.len() as u64,
+                FileSum {
+                    path: format!("/{path}"),
+                    md5: md5_hex(&data),
+                },
+            ));
+        }
+        let program = |path: &str| {
+            path.starts_with("/bin/") || path.starts_with("/usr/bin/") || path.ends_with(".so")
+        };
+        if files.iter().any(|(_, f)| program(&f.path)) {
+            files.retain(|(_, f)| program(&f.path));
+        }
+        files.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.path.cmp(&b.1.path)));
+        Ok(files.into_iter().take(count).map(|(_, f)| f).collect())
+    }
+}
+
 /// Lowercase hex MD5 of `data`.
 pub fn md5_hex(data: &[u8]) -> String {
     crate::basemods::md5_hex(data)
@@ -237,7 +302,7 @@ pub fn parse_link(text: &str) -> Option<String> {
 }
 
 #[cfg(feature = "fetch")]
-pub use download::{ModuleProgress, fetch};
+pub use download::{ModuleProgress, fetch, refresh};
 
 #[cfg(feature = "fetch")]
 mod download {
@@ -284,6 +349,36 @@ mod download {
             .await?;
         }
         Ok(())
+    }
+
+    /// Like [`fetch`], but also downloads again every cached module whose file differs from
+    /// the hub's current one (by the hub's MD5), so the cache holds the latest of each.
+    /// Returns the ids of the modules that were downloaded.
+    pub async fn refresh(
+        modules: &[&'static Module],
+        cache_root: &Path,
+        mut progress: impl FnMut(ModuleProgress),
+    ) -> Result<Vec<&'static str>> {
+        let client = crate::fetch::client()?;
+        let mut downloaded = Vec::new();
+        for (index, module) in modules.iter().enumerate() {
+            if let Some(cached) = module.cached_md5(cache_root) {
+                let hub = parse_md5(&text(&client, &module.md5_url()).await?);
+                if hub.is_none_or(|hub| hub == cached) {
+                    continue;
+                }
+                info!(
+                    module = module.id,
+                    "the hub has a newer file than the cache"
+                );
+            }
+            fetch_one(&client, module, cache_root, |done, total| {
+                progress(ModuleProgress { index, done, total });
+            })
+            .await?;
+            downloaded.push(module.id);
+        }
+        Ok(downloaded)
     }
 
     async fn text(client: &reqwest::Client, url: &str) -> Result<String> {
@@ -464,6 +559,43 @@ mod tests {
         );
         assert_eq!(parse_link("http://insecure/y.hmod"), None);
         assert_eq!(parse_link(""), None);
+    }
+
+    #[test]
+    fn fingerprint_takes_the_largest_programs() {
+        let mut tar = tar::Builder::new(Vec::new());
+        for (path, data) in [
+            ("install", vec![b'x'; 900]),
+            ("readme.md", vec![b'r'; 800]),
+            ("bin/gba", b"#!/bin/sh\n".to_vec()),
+            ("etc/libretro/core/mgba_libretro.so", vec![1; 500]),
+            ("etc/libretro/info/mgba_libretro.info", vec![2; 50]),
+            ("etc/libretro/assets/font.ttf", vec![3; 5000]),
+        ] {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(data.len() as u64);
+            header.set_mode(0o755);
+            header.set_cksum();
+            tar.append_data(&mut header, path, data.as_slice())
+                .expect("append");
+        }
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        std::io::Write::write_all(&mut gz, &tar.into_inner().expect("tar")).expect("gzip");
+        let archive = ModArchive {
+            id: "mgba".to_string(),
+            name: "_km_mgba".to_string(),
+            title: "mGBA".to_string(),
+            bytes: gz.finish().expect("gzip"),
+            binaries: vec!["gba".to_string()],
+        };
+        let sums = archive.fingerprint(2).expect("fingerprint");
+        assert_eq!(
+            sums.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
+            ["/etc/libretro/core/mgba_libretro.so", "/bin/gba"]
+        );
+        assert_eq!(sums[0].md5, md5_hex(&[1; 500]));
+        // Programs only: not the font, the info file or the package's own files.
+        assert_eq!(archive.fingerprint(10).expect("all").len(), 2);
     }
 
     #[test]

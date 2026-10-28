@@ -510,6 +510,7 @@ dependencies = [
  "cartload-fel",
  "cartload-hmod",
  "clap",
+ "flate2",
  "md5",
  "serde",
  "serde_json",

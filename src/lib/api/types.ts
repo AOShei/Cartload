@@ -166,6 +166,7 @@ export type FlowKind =
   | { kind: "uninstall"; stock_kernel?: string | null; force_stock_kernel?: boolean }
   | { kind: "dump_kernel"; path: string }
   | { kind: "install_modules"; ids: string[] }
+  | { kind: "update_modules"; ids: string[] }
   | { kind: "remove_modules"; ids: string[] };
 
 export type StepState = "pending" | "running" | "done" | "failed" | "skipped";
@@ -572,6 +573,8 @@ export interface ModuleView {
   /** The uninstall records that remove it: its own or another installer's (`snes9x2010`
    *  from hakchi2 CE). */
   records: string[];
+  /** The Mod Hub has a different build than the console's (null until checked). */
+  update: boolean | null;
 }
 
 export interface ModulesStatus {

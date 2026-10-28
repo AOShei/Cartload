@@ -273,6 +273,17 @@ package behind an emulator with `grep -lE '/bin/(snes9x|snes)"$' uninstall-*` in
 `/var/lib/hakchi/hmod`, leaving out RetroArch packages (records with `/bin/retroarch-clover`)
 when the emulator is a core.
 
+The records carry no version. To tell whether an installed emulator is the Mod Hub's current
+build, Cartload compares files: the hub's `<item>.hmod/md5` against the cached download
+(downloading again when it changed), then `md5sum` on the console of the three largest
+programs in the package (`bin/`, `usr/bin/`, `*.so`; never fonts, artwork or settings files a
+user may edit), at the same paths from `/`. A missing or different file means an update. On the
+console checked 2026-10-28, CE's `mgba` has none of `_km_mgba`'s files (CE's core is
+`mgba_libretro.so`, the hub's `km_mgba_libretro.so`) and CE's `/bin/retroarch` differs from
+`_km_retroarch_1910_ozone`'s, so both show an update. An update uninstalls every record that
+provides the emulator (CE's package or Cartload's own older copy), then uploads and installs the
+hub's package, and reboots once.
+
 ## Sync sequence (verified, see docs/reference/hakchi-ce-sync-trace.log)
 
 1. Build the menu tree locally (folders, resized art, desktop entries).

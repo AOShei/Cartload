@@ -25,6 +25,7 @@ use cartload_flow::{
 use cartload_hmod::{
     BootFiles, Version,
     basemods::{self, LoadedMod},
+    modhub::ModArchive,
 };
 
 const ADDRESS: &str = "169.254.13.37:22";
@@ -250,10 +251,33 @@ impl Sim {
             }
             return ok("");
         }
+        if command == commands::RM_MODS {
+            let prefix = format!("{}/", commands::MODS_DIR);
+            self.files.retain(|path, _| !path.starts_with(&prefix));
+            return ok("");
+        }
+        // Mod Hub modules: `tar -xzvC <dir>` with the gzip tar on stdin.
+        if let Some(name) = command
+            .strip_prefix(&format!("tar -xzvC '{}/", commands::MODS_DIR))
+            .and_then(|rest| rest.strip_suffix(".hmod'"))
+        {
+            let gz = flate2::read::GzDecoder::new(stdin.unwrap_or_default());
+            let mut archive = tar::Archive::new(gz);
+            for entry in archive.entries().unwrap() {
+                let mut entry = entry.unwrap();
+                let path = entry.path().unwrap().to_string_lossy().into_owned();
+                let mut data = Vec::new();
+                entry.read_to_end(&mut data).unwrap();
+                self.files
+                    .insert(format!("{}/{name}.hmod/{path}", commands::MODS_DIR), data);
+            }
+            return ok("");
+        }
         if command == commands::MKDIR_MODS
             || ["tiny7zx", "font_remount"]
                 .iter()
                 .any(|name| command == commands::mkdir_mod(name))
+            || command.starts_with(&format!("mkdir -p '{}/_km_", commands::MODS_DIR))
         {
             return ok("");
         }
@@ -263,11 +287,11 @@ impl Sim {
         {
             return exit(self.mods_registered.contains(name));
         }
-        // Mod Hub modules, by any name: their record, and `pack_uninstall`.
+        // Mod Hub modules and other installers' packages, by any name: their record, and
+        // `pack_uninstall`.
         if let Some(name) = command
             .strip_prefix("[ -f '/var/lib/hakchi/hmod/uninstall-")
             .and_then(|rest| rest.strip_suffix("' ]"))
-            .filter(|name| name.starts_with("_km_"))
         {
             return exit(self.mods_registered.contains(name));
         }
@@ -297,6 +321,16 @@ impl Sim {
             } else {
                 code(1, "", "")
             };
+        }
+        // Any other launcher: on the `PATH` once a reboot made the installed files live.
+        if let Some(binary) = command
+            .strip_prefix("which '")
+            .and_then(|rest| rest.strip_suffix('\''))
+        {
+            let present = self
+                .rootfs_files
+                .contains_key(&format!("{ROOTFS}/bin/{binary}"));
+            return exit(present && self.mods_live);
         }
         if command == commands::PACKS_INSTALL {
             assert!(
@@ -1539,6 +1573,105 @@ async fn remove_mods_uninstalls_the_registered_ones_reboots_and_verifies() {
         ("remove-emulators".to_string(), "already".to_string())
     );
     assert_eq!(count(&backend.log()[before..], commands::REBOOT), 0);
+}
+
+/// A Mod Hub module as downloaded: a gzip tar with a launcher and a core.
+fn hub_module(name: &str, launcher: &str, core: &[u8]) -> ModArchive {
+    let mut tar = tar::Builder::new(Vec::new());
+    for (path, data) in [
+        ("install".to_string(), b"#!/bin/sh\n".to_vec()),
+        (
+            format!("bin/{launcher}"),
+            b"#!/bin/sh\nexec retroarch-clover\n".to_vec(),
+        ),
+        (
+            format!("etc/libretro/core/{launcher}_libretro.so"),
+            core.to_vec(),
+        ),
+    ] {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(data.len() as u64);
+        header.set_mode(0o755);
+        header.set_cksum();
+        tar.append_data(&mut header, path, data.as_slice()).unwrap();
+    }
+    let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    std::io::Write::write_all(&mut gz, &tar.into_inner().unwrap()).unwrap();
+    ModArchive {
+        id: launcher.to_string(),
+        name: name.to_string(),
+        title: format!("{launcher} core"),
+        bytes: gz.finish().unwrap(),
+        binaries: vec![launcher.to_string()],
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn update_mods_replaces_the_old_packages_with_one_reboot() {
+    let mut sim = Sim::installed();
+    // The old core came from hakchi2 CE under its own name.
+    sim.mods_registered.insert("mgba".to_string());
+    sim.rootfs_files
+        .insert(format!("{ROOTFS}/bin/gba"), b"old".to_vec());
+    let backend = SimBackend::new(sim);
+    let (ctx, _events) = context(&backend, None);
+    let mut ctx = ctx
+        .with_mods(vec![hub_module("_km_mgba", "gba", &[7; 64])])
+        .with_removals(vec!["mgba".to_string(), "_km_mgba".to_string()]);
+    let mut flow = flows::update_mods();
+
+    flow.run(&mut ctx).await.expect("module updated");
+
+    assert_eq!(
+        outcomes(&flow),
+        expected(&[
+            ("wait-console", "already"),
+            ("detect", "done"),
+            ("update-emulators", "done"),
+            ("wait-console", "done"),
+            ("detect", "done"),
+            ("verify-emulators", "done"),
+        ])
+    );
+    let log = backend.log();
+    assert_in_order(
+        &log,
+        &[
+            &commands::extract_mod_gz("_km_mgba"),
+            &commands::pack_uninstall("mgba"),
+            commands::PACKS_INSTALL,
+            commands::REBOOT,
+        ],
+    );
+    // `_km_mgba` was not registered yet: nothing to uninstall for it.
+    assert_eq!(count(&log, &commands::pack_uninstall("_km_mgba")), 0);
+    assert_eq!(count(&log, commands::REBOOT), 1);
+    backend.with(|sim| {
+        assert!(!sim.mods_registered.contains("mgba"));
+        assert!(sim.mods_registered.contains("_km_mgba"));
+    });
+
+    // Updating again installs again, even though the module is registered: its own older
+    // copy is uninstalled first.
+    let before = backend.log().len();
+    let (ctx, _events) = context(&backend, None);
+    let mut ctx = ctx
+        .with_mods(vec![hub_module("_km_mgba", "gba", &[8; 64])])
+        .with_removals(vec!["_km_mgba".to_string()]);
+    let mut flow = flows::update_mods();
+    flow.run(&mut ctx).await.expect("second update");
+    assert_eq!(
+        outcomes(&flow)[2],
+        ("update-emulators".to_string(), "done".to_string())
+    );
+    assert_in_order(
+        &backend.log()[before..],
+        &[
+            &commands::pack_uninstall("_km_mgba"),
+            commands::PACKS_INSTALL,
+            commands::REBOOT,
+        ],
+    );
 }
 
 #[tokio::test(start_paused = true)]

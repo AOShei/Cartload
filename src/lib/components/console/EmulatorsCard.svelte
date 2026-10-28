@@ -4,8 +4,9 @@
   import Icon from "../Icon.svelte";
   import { canManage } from "./watch";
 
-  /* RetroArch and its cores on the console: install, remove (refused while games need
-     them), with the download progress in the row and the rest in the progress window. */
+  /* RetroArch and its cores on the console: install, update (when the Mod Hub has a build
+     the console does not), remove (refused while games need them), with the download
+     progress in the row and the rest in the progress window. */
   const ready = $derived(canManage(consoleStore.report));
 
   /** Reads the modules again once a task has ended and the console is back (an install or
@@ -28,9 +29,13 @@
 <section class="card emulators" aria-labelledby="emulators-heading">
   <div class="head">
     <h2 id="emulators-heading">Emulators</h2>
-    {#if modulesStore.loading}<span class="spinner" aria-hidden="true" title="Reading the console"></span>{/if}
+    {#if modulesStore.loading}
+      <span class="spinner" aria-hidden="true" title="Reading the console"></span>
+    {:else if modulesStore.checking}
+      <span class="muted small checking"><span class="spinner" aria-hidden="true"></span> Checking for updates</span>
+    {/if}
   </div>
-  <p class="muted small">RetroArch and its cores run the systems the console has no emulator for. Installing or removing one reboots the console once.</p>
+  <p class="muted small">RetroArch and its cores run the systems the console has no emulator for. Installing, updating or removing one restarts the console once.</p>
   {#if modulesStore.status}
     <ul class="modules">
       {#each modulesStore.status.modules as module (module.id)}
@@ -47,6 +52,8 @@
               ·
               {#if downloading && progress}
                 Downloading {formatBytes(progress.done)}{progress.total ? ` of ${formatBytes(progress.total)}` : ""}
+              {:else if module.installed === true && module.update === true}
+                <span class="update-text">Update available</span>
               {:else if module.installed === true}
                 <span class="ok-text">Installed</span>
               {:else}
@@ -54,6 +61,17 @@
               {/if}
             </span>
           </div>
+          {#if module.installed === true && module.update === true}
+            <button
+              type="button"
+              class="btn btn-sm btn-primary"
+              onclick={() => void modulesStore.update(module.id)}
+              disabled={flowStore.running || !ready}
+              title="Replaces it with the Mod Hub's current build and restarts the console once. Games keep working."
+            >
+              Update
+            </button>
+          {/if}
           {#if module.installed === true}
             <button
               type="button"
@@ -152,6 +170,17 @@
 
   .ok-text {
     color: var(--ok);
+  }
+
+  .update-text {
+    color: var(--accent-strong);
+    font-weight: var(--weight-semibold);
+  }
+
+  .checking {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
   }
 
   .foot {

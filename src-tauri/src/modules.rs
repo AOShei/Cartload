@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use cartload_console::Session;
-use cartload_hmod::modhub::{self, ModArchive, Module};
+use cartload_hmod::modhub::{self, FileSum, ModArchive, Module};
 use serde::Serialize;
 use tracing::{info, warn};
 
@@ -42,6 +42,9 @@ pub struct ModuleView {
     /// The uninstall records that remove it: its own (`_km_snes9x_xtreme`) or another
     /// installer's (`snes9x2010` from hakchi2 CE).
     pub records: Vec<String>,
+    /// The hub has a different build than the one on the console (`None` until an update
+    /// check ran, or when it could not tell).
+    pub update: Option<bool>,
 }
 
 /// The catalog with its state.
@@ -234,6 +237,7 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             installed,
             removable,
             records,
+            update: None,
         });
     }
     ModulesStatus {
@@ -242,6 +246,140 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
         modules,
         console_checked,
     }
+}
+
+/// How many of a module's files the update check compares: its largest, the binaries and
+/// cores that change between builds.
+const FINGERPRINT_FILES: usize = 3;
+
+/// `md5sum` of `paths` on the console; missing files are left out of the output.
+pub fn sums_check(paths: &[&str]) -> String {
+    let quoted: Vec<String> = paths
+        .iter()
+        .map(|p| cartload_console::parse::sh_quote(p))
+        .collect();
+    format!("md5sum {} 2>/dev/null; true", quoted.join(" "))
+}
+
+/// `md5sum` output as (path, md5) pairs.
+pub fn parse_sums(stdout: &str) -> Vec<(String, String)> {
+    stdout
+        .lines()
+        .filter_map(|line| {
+            let (md5, path) = line.trim().split_once(char::is_whitespace)?;
+            Some((path.trim().to_string(), md5.to_ascii_lowercase()))
+        })
+        .collect()
+}
+
+/// Whether the console's copies of `files` differ from them (or are missing).
+pub fn differs(files: &[FileSum], console: &[(String, String)]) -> bool {
+    files.iter().any(|file| {
+        !console
+            .iter()
+            .any(|(path, md5)| *path == file.path && *md5 == file.md5)
+    })
+}
+
+/// The modules `status` found on the console.
+fn installed(status: &ModulesStatus) -> Vec<&'static Module> {
+    status
+        .modules
+        .iter()
+        .filter(|view| view.installed == Some(true))
+        .filter_map(|view| modhub::find(&view.id))
+        .collect()
+}
+
+/// The first half of the update check, with no console involved: brings the cache of the
+/// installed modules up to date with the hub, downloading what changed. False when the hub
+/// could not be reached.
+pub async fn refresh_installed(status: &ModulesStatus) -> bool {
+    let modules = installed(status);
+    let Some(cache) = modhub::default_cache_dir() else {
+        return false;
+    };
+    if modules.is_empty() {
+        return true;
+    }
+    match modhub::refresh(&modules, &cache, |_| {}).await {
+        Ok(_) => true,
+        Err(error) => {
+            warn!(%error, "could not bring the modules up to date with the hub");
+            false
+        }
+    }
+}
+
+/// The second half: fills in [`ModuleView::update`] for the installed modules by comparing
+/// the largest files of each cached module with the console's copies. A module the check
+/// cannot judge (not cached, an unreadable archive) keeps `None`.
+pub async fn compare_installed(session: &Session, status: &mut ModulesStatus) {
+    let Some(cache) = modhub::default_cache_dir() else {
+        return;
+    };
+    for module in installed(status) {
+        let update = match module_differs(session, module, &cache).await {
+            Ok(update) => Some(update),
+            Err(error) => {
+                warn!(%error, module = module.id, "could not compare a module with the console");
+                None
+            }
+        };
+        if let Some(view) = status.modules.iter_mut().find(|v| v.id == module.id) {
+            view.update = update;
+            view.cached = true;
+            view.cached_bytes = module.cached_size(&cache);
+        }
+    }
+}
+
+async fn module_differs(
+    session: &Session,
+    module: &Module,
+    cache: &std::path::Path,
+) -> Result<bool, CommandError> {
+    let fail = |message: &str, detail: String| CommandError::new(message).with_detail(detail);
+    let archive = module
+        .load(cache)
+        .map_err(|e| fail("The module is not in the cache.", e.to_string()))?;
+    let files = archive
+        .fingerprint(FINGERPRINT_FILES)
+        .map_err(|e| fail("The module's archive cannot be read.", e.to_string()))?;
+    let paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+    let output = session
+        .exec(&sums_check(&paths))
+        .await
+        .map_err(|e| fail("Could not read the console's files.", e.to_string()))?;
+    let update = differs(&files, &parse_sums(&output.stdout_lossy()));
+    info!(
+        module = module.id,
+        update, "compared the module with the console"
+    );
+    Ok(update)
+}
+
+/// Downloads the hub's current file of every module in `ids` whose cache is missing or
+/// older, reporting progress.
+pub async fn refresh(
+    ids: &[String],
+    mut progress: impl FnMut(ModuleDownload) + Send,
+) -> Result<(), CommandError> {
+    let modules = resolve(ids)?;
+    let cache = cache_dir()?;
+    modhub::refresh(&modules, &cache, |p| {
+        progress(ModuleDownload {
+            id: modules[p.index].id.to_string(),
+            done: p.done,
+            total: p.total,
+        });
+    })
+    .await
+    .map(|_| ())
+    .map_err(|error| {
+        CommandError::new(format!("Could not download the modules: {error}"))
+            .with_detail(error.to_string())
+    })
 }
 
 /// Resolves ids to catalog modules.
@@ -347,6 +485,36 @@ mod tests {
         let many = removal_blocked(&[&modhub::SNES9X], &games).expect("blocked");
         assert!(many.message.contains("7 games in the library still need"));
         assert!(many.message.contains("Game 5 and 2 more"));
+    }
+
+    #[test]
+    fn update_check_compares_the_console_sums() {
+        assert_eq!(
+            sums_check(&["/bin/gba", "/etc/libretro/core/mgba_libretro.so"]),
+            "md5sum '/bin/gba' '/etc/libretro/core/mgba_libretro.so' 2>/dev/null; true"
+        );
+        let console =
+            parse_sums("0CC175B9C0F1B6A831C399E269772661  /etc/libretro/core/mgba_libretro.so\n\n");
+        assert_eq!(
+            console,
+            [(
+                "/etc/libretro/core/mgba_libretro.so".to_string(),
+                "0cc175b9c0f1b6a831c399e269772661".to_string()
+            )]
+        );
+        let file = |path: &str, md5: &str| FileSum {
+            path: path.to_string(),
+            md5: md5.to_string(),
+        };
+        let same = [file(
+            "/etc/libretro/core/mgba_libretro.so",
+            "0cc175b9c0f1b6a831c399e269772661",
+        )];
+        assert!(!differs(&same, &console));
+        let changed = [file("/etc/libretro/core/mgba_libretro.so", "ffff")];
+        assert!(differs(&changed, &console));
+        let missing = [same[0].clone(), file("/bin/gba", "aaaa")];
+        assert!(differs(&missing, &console));
     }
 
     #[test]
