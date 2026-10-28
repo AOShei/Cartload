@@ -24,14 +24,26 @@ Next, in order:
 
 Later, larger projects (not scheduled):
 
-- **Our own hakchi kernel build.** The shipped hakchi v1.0.4-126 has no published source (see
-  `data/README.md`). Pick up from the public tree where it stops (`AOShei/hakchi` at `fd525ac`,
-  `AOShei/sun-nontendocm-kernel` at `f8c6e0b`), rebuild the kernel and ramdisk with a pinned
-  toolchain in CI, bring it level with v1.0.4-126's behaviour on the NES, SNES and Famicom Minis,
-  and ship that with its full source. Under way: the public kernel rebuilt to the shipped
-  kernel's configuration and drivers, reproducibly (`scripts/kernel/build.sh`,
-  `docs/kernel.md`); it boots on a SNES from RAM into hakchi's shell with NAND, USB, Mali and
-  the controller driver working. Next: boot to the menu through FEL.
+- **Independence from unverifiable builds.** Everything Cartload puts on a console should come
+  from public source, built reproducibly, with the source published next to it, so no one can
+  be locked out by a vanished binary or has to trust one they cannot check. Nintendo's own
+  system on the console (the menu, its emulators, Mali's userspace) stays as it is. In order:
+  1. **Kernel.** Done: the public kernel brought level with v1.0.4-126's, reproducible
+     (`scripts/kernel/build.sh`, `docs/kernel.md`), installed on a SNES (EUR) and play-tested
+     (games, sound, controllers, saves, RetroArch). Untested: USB storage, Wi-Fi and Bluetooth
+     dongles.
+  2. **Userland.** Rebuild every binary of the ramdisk and the package from source (busybox,
+     dropbear, e2fsprogs, cryptsetup, kexec, rsync, sunxi-tools, glibc 2.22 and the rest) with
+     Buildroot 2015.11.1, the toolchain v1.0.4-126 was built with, plus `sntool` and
+     `clovershell` from the hakchi fork; keep the shipped scripts in that fork as their source
+     of truth, with their difference from public master documented.
+  3. **u-boot from source** (Allwinner's published u-boot plus hakchi's changes).
+  4. **Own identity.** The package gets its own version instead of "hakchi v1.0.4-126", is
+     published as a release with its source and checksums, built in CI, and becomes what the
+     app installs; the app shows that version and the kernel's.
+  5. **NES and Famicom Minis**: the same chip and kernel; needs testers with the hardware.
+  Firmware blobs stay blobs (ARISC, the rtl8188fu Wi-Fi firmware, `fes1.bin`), listed with
+  their origin.
 - **Emulators built from official libretro source.** Today the emulator modules are
   KMFDManic's builds, mirrored and pinned. libretro publishes no RetroArch binary for 32-bit ARM
   Linux and its armhf cores stopped in 2020, so this means building RetroArch (with the
