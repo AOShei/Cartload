@@ -203,7 +203,21 @@ pub async fn flow_start(
             if let Some(refusal) = crate::modules::removal_blocked(&modules, &games) {
                 return Err(refusal);
             }
-            modules.iter().map(|m| m.item.to_string()).collect()
+            let guard = state.session.lock().await;
+            let Some(session) = guard.as_ref() else {
+                return Err(CommandError::new(
+                    "Connect the console first: Cartload reads its uninstall records before \
+                     removing anything.",
+                ));
+            };
+            let names = crate::modules::removal_records(session, &modules).await?;
+            if names.is_empty() {
+                return Err(CommandError::new(
+                    "The console has no uninstall record for this emulator, so there is \
+                     nothing Cartload can remove.",
+                ));
+            }
+            names
         }
         _ => Vec::new(),
     };

@@ -23,7 +23,7 @@
 >
   {#if removal}
     {#if removal.unmanaged}
-      <p>{removal.title} is on the console, but not under the name Cartload installs it with, so there is no uninstall record for Cartload to run. Remove it with the tool that installed it (hakchi2 CE's Uninstall mods).</p>
+      <p>{removal.title} is on the console, but no package on it has an uninstall record for it, so there is nothing Cartload can run to remove it. It may be part of another package (hakchi2 CE's RetroArch carries its NES cores, for example): removing that package removes it too.</p>
     {:else if blocked}
       {@const count = removal.games.length}
       <div class="warning">
@@ -43,7 +43,9 @@
       </ul>
     {:else}
       <p>
-        Cartload runs the module's uninstall script on the console and reboots it once.
+        Cartload runs the uninstall script of {removal.records.length === 1 ? "the package" : "the packages"}
+        {#each removal.records as record, i (record)}{i > 0 ? ", " : ""}<span class="mono">{record}</span>{/each}
+        on the console and reboots it once. Packages installed by hakchi2 CE are removed the same way.
         {#if removal.alsoRemoved.length > 0}
           Every core needs RetroArch, so the installed cores go too: {removal.alsoRemoved.join(", ")}.
         {/if}

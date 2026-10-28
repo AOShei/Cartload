@@ -30,6 +30,8 @@ export interface PendingRemoval {
   games: GameView[];
   /** Installed without an uninstall record Cartload can run. */
   unmanaged: boolean;
+  /** The console's packages the removal uninstalls (`snes9x2010`, `_km_snes9x_xtreme`). */
+  records: string[];
 }
 
 /* Emulator modules from the Mod Hub: the catalog with its cache and console state, downloads
@@ -129,6 +131,7 @@ class ModulesStore {
       alsoRemoved: id === "retroarch" ? modules.filter((m) => m.id !== id && m.installed === true).map((m) => m.short) : [],
       games,
       unmanaged: module.installed === true && module.removable === false,
+      records: [...new Set(modules.filter((m) => affected.includes(m.id)).flatMap((m) => m.records))],
     };
   }
 

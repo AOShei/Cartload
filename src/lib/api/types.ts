@@ -567,8 +567,11 @@ export interface ModuleView {
   cached: boolean;
   cached_bytes: number | null;
   installed: boolean | null;
-  /** Installed with an uninstall record Cartload can run. */
+  /** Has an uninstall record on the console Cartload can run. */
   removable: boolean | null;
+  /** The uninstall records that remove it: its own or another installer's (`snes9x2010`
+   *  from hakchi2 CE). */
+  records: string[];
 }
 
 export interface ModulesStatus {

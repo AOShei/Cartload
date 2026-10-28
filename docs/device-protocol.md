@@ -264,6 +264,15 @@ prints nothing when the mod has no record. A mod whose `uninstall` file says `no
 gets no record and cannot be removed this way. Cartload reboots afterwards, as for an install
 (source: `b0030_package` in the `hakchi.hmod` ramdisk).
 
+The records are named after the package, not the emulator: a SNES Classic set up with hakchi2
+CE (checked 2026-10-28) has `retroarch` (RetroArch with the FCEUmm and Nestopia cores, `/bin/nes`),
+`snes9x2010` (`/bin/snes`), `genesis_plus_gx` (`/bin/md`) and `mgba` (`/bin/gba`), where
+Cartload's own modules are `_km_retroarch_1910_ozone`, `_km_snes9x_xtreme` and so on. Each
+record lists the package's files as `rm -f "$rootfs/./bin/<launcher>"`, so Cartload finds the
+package behind an emulator with `grep -lE '/bin/(snes9x|snes)"$' uninstall-*` in
+`/var/lib/hakchi/hmod`, leaving out RetroArch packages (records with `/bin/retroarch-clover`)
+when the emulator is a core.
+
 ## Sync sequence (verified, see docs/reference/hakchi-ce-sync-trace.log)
 
 1. Build the menu tree locally (folders, resized art, desktop entries).

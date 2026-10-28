@@ -36,9 +36,12 @@ pub struct ModuleView {
     pub cached_bytes: Option<u64>,
     /// Installed on the connected console (`None` when no console answered).
     pub installed: Option<bool>,
-    /// Installed with an uninstall record under its hub name, so Cartload can remove it
-    /// (`None` when no console answered).
+    /// Has an uninstall record on the console, so Cartload can remove it (`None` when no
+    /// console answered).
     pub removable: Option<bool>,
+    /// The uninstall records that remove it: its own (`_km_snes9x_xtreme`) or another
+    /// installer's (`snes9x2010` from hakchi2 CE).
+    pub records: Vec<String>,
 }
 
 /// The catalog with its state.
@@ -81,10 +84,67 @@ pub fn installed_check(module: &Module) -> String {
         .join(" && ")
 }
 
-/// Exit code 0 when the console has the module's uninstall record (what `pack_install`
-/// writes and `hakchi pack_uninstall` runs).
-pub fn registered_check(module: &Module) -> String {
-    format!("[ -f '/var/lib/hakchi/hmod/uninstall-{}' ]", module.item)
+/// Where `pack_install` writes the uninstall records.
+const RECORDS_DIR: &str = "/var/lib/hakchi/hmod";
+
+/// Prints the uninstall records (`uninstall-<name>`, one per line) that delete one of
+/// `binaries` from `bin/`. `pack_install` generates each record from the package's files
+/// (`rm -f "$rootfs/./bin/snes"`), so this finds the package that put a launcher on the
+/// console whatever it was called: Cartload's `_km_snes9x_xtreme` or hakchi2 CE's
+/// `snes9x2010`.
+pub fn records_check(binaries: &[&str]) -> String {
+    format!(
+        r#"cd {RECORDS_DIR} 2>/dev/null && grep -lE '/bin/({})"$' uninstall-* 2>/dev/null; true"#,
+        binaries.join("|")
+    )
+}
+
+/// The record names in the output of [`records_check`].
+pub fn parse_records(stdout: &str) -> Vec<String> {
+    stdout
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("uninstall-"))
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// The records that remove `module`. A core's never include a RetroArch package (one that
+/// ships `retroarch-clover`): removing a core must not take RetroArch with it.
+pub async fn records(session: &Session, module: &Module) -> Result<Vec<String>, CommandError> {
+    let mut found = list_records(session, module.binaries).await?;
+    if module.id != modhub::RETROARCH.id {
+        let frontends = list_records(session, &["retroarch-clover"]).await?;
+        found.retain(|name| !frontends.contains(name));
+    }
+    Ok(found)
+}
+
+async fn list_records(session: &Session, binaries: &[&str]) -> Result<Vec<String>, CommandError> {
+    let output = session
+        .exec(&records_check(binaries))
+        .await
+        .map_err(|error| {
+            CommandError::new("Could not read the console's uninstall records.")
+                .with_detail(error.to_string())
+        })?;
+    Ok(parse_records(&output.stdout_lossy()))
+}
+
+/// The record names removing `modules` takes off the console, each once.
+pub async fn removal_records(
+    session: &Session,
+    modules: &[&Module],
+) -> Result<Vec<String>, CommandError> {
+    let mut names: Vec<String> = Vec::new();
+    for module in modules {
+        for name in records(session, module).await? {
+            if !names.contains(&name) {
+                names.push(name);
+            }
+        }
+    }
+    Ok(names)
 }
 
 /// The modules removing `ids` takes off the console: RetroArch takes every core with it,
@@ -116,7 +176,8 @@ pub fn removal_blocked(modules: &[&Module], games: &[String]) -> Option<CommandE
     };
     Some(
         CommandError::new(format!(
-            "{} game{} in the library still need{} {titles}: {shown}{more}. Remove them from              the library (or switch them to the built-in emulator) and sync first.",
+            "{} game{} in the library still need{} {titles}: {shown}{more}. Remove them from \
+             the library (or switch them to the built-in emulator) and sync first.",
             games.len(),
             if games.len() == 1 { "" } else { "s" },
             if games.len() == 1 { "s" } else { "" },
@@ -144,15 +205,21 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             },
             None => None,
         };
-        let removable = match (session, installed) {
-            (Some(session), Some(true)) => session
-                .exec(&registered_check(module))
-                .await
-                .ok()
-                .map(|output| output.success()),
-            (_, Some(false)) => Some(false),
+        let records = match session {
+            Some(session) if installed.is_some() => match records(session, module).await {
+                Ok(records) => Some(records),
+                Err(error) => {
+                    warn!(%error, module = module.id, "could not read the uninstall records");
+                    None
+                }
+            },
             _ => None,
         };
+        // Another installer's package counts: hakchi2 CE's `snes9x2010` puts `/bin/snes` on
+        // the console but not the `snes9x` binary KMFD's module adds.
+        let installed = installed.map(|all| all || records.as_ref().is_some_and(|r| !r.is_empty()));
+        let removable = records.as_ref().map(|r| !r.is_empty());
+        let records = records.unwrap_or_default();
         let cached_bytes = cache.as_deref().and_then(|c| module.cached_size(c));
         modules.push(ModuleView {
             id: module.id.to_string(),
@@ -166,6 +233,7 @@ pub async fn status(session: Option<&Session>) -> ModulesStatus {
             cached_bytes,
             installed,
             removable,
+            records,
         });
     }
     ModulesStatus {
@@ -250,9 +318,15 @@ mod tests {
         let all = removal(&ids(&["retroarch"])).expect("known id");
         assert_eq!(all.len(), modhub::CATALOG.len());
         assert_eq!(
-            registered_check(&modhub::SNES9X),
-            "[ -f '/var/lib/hakchi/hmod/uninstall-_km_snes9x_xtreme' ]"
+            records_check(modhub::SNES9X.binaries),
+            r#"cd /var/lib/hakchi/hmod 2>/dev/null && grep -lE '/bin/(snes9x|snes)"$' uninstall-* 2>/dev/null; true"#
         );
+        // What a SNES Classic with hakchi2 CE's RetroArch answered (2026-10-28).
+        assert_eq!(
+            parse_records("uninstall-snes9x2010\nuninstall-_km_snes9x_xtreme\n\n"),
+            ["snes9x2010", "_km_snes9x_xtreme"]
+        );
+        assert!(parse_records("").is_empty());
     }
 
     #[test]
@@ -263,6 +337,11 @@ mod tests {
         assert!(
             one.message
                 .starts_with("1 game in the library still needs SNES core")
+        );
+        assert!(
+            one.message.contains("Remove them from the library"),
+            "{}",
+            one.message
         );
         let games: Vec<String> = (1..=7).map(|i| format!("Game {i}")).collect();
         let many = removal_blocked(&[&modhub::SNES9X], &games).expect("blocked");

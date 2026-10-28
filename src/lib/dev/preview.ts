@@ -697,6 +697,7 @@ export function previewModules(): ModulesStatus {
     cached_bytes: name === "cached" || name === "installed" ? cachedBytes : null,
     installed: connected ? name === "installed" && installed : null,
     removable: connected ? name === "installed" && installed : null,
+    records: [] as string[],
   });
   return {
     cache_dir: "/home/user/.cache/cartload/mods",

@@ -1011,5 +1011,9 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
    RetroArch. Expected: the confirmation names the installed cores that go with it; after the
    flow Settings shows **Install** for RetroArch and every core, and the built-in emulators
    still run their games.
-2. A module installed by hakchi2 CE under another name (no `uninstall-_km_…` record): the
-   dialog "Cartload cannot remove this" and no flow starts.
+2. Emulators installed by hakchi2 CE (records `retroarch`, `snes9x2010`, `genesis_plus_gx`,
+   `mgba`): Settings shows them as installed with **Remove**; the confirmation names CE's
+   package (`snes9x2010` for SNES) and the flow removes it (`package snes9x2010 uninstalled`).
+   Removing RetroArch there also removes CE's built-in NES cores (FCEUmm, Nestopia).
+3. An emulator on the console that no record lists (`which <launcher>` finds it, `grep` in
+   `/var/lib/hakchi/hmod` does not): the dialog "Cartload cannot remove this", no flow.
