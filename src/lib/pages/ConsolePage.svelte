@@ -64,6 +64,39 @@
     return null;
   });
 
+  type Tab = "detected" | "technical" | "command";
+  let tab = $state<Tab>("detected");
+  const tabs = $derived.by((): { id: Tab; label: string }[] => {
+    const list: { id: Tab; label: string }[] = [
+      { id: "detected", label: "Detected" },
+      { id: "technical", label: "Technical details" },
+    ];
+    if (app.devExec && status?.state === "connected") {
+      list.push({ id: "command", label: "Command" });
+    }
+    return list;
+  });
+  /** The chosen tab, or Detected when the chosen one is gone (the command tab offline). */
+  const shown = $derived(tabs.some((t) => t.id === tab) ? tab : "detected");
+
+  /** Left / Right / Home / End move between the tabs and select them. */
+  function onTabKey(event: KeyboardEvent): void {
+    const index = tabs.findIndex((t) => t.id === shown);
+    const last = tabs.length - 1;
+    const next =
+      event.key === "ArrowRight" ? (index + 1) % tabs.length
+      : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length
+      : event.key === "Home" ? 0
+      : event.key === "End" ? last
+      : null;
+    if (next === null) {
+      return;
+    }
+    event.preventDefault();
+    tab = tabs[next]!.id;
+    document.getElementById(`tab-${tab}`)?.focus();
+  }
+
   let command = $state("");
   let running = $state(false);
   let result = $state<ExecResult | null>(null);
@@ -103,54 +136,72 @@
   </div>
 
   <div class="side">
-    {#if mode === "setup"}
-      <MaintenanceCard installed={false} />
-    {/if}
+    <div class="side-fill">
+      {#if mode === "setup"}
+        <MaintenanceCard installed={false} />
+      {/if}
 
-    {#if report && report.details.length > 0}
-      <section class="card details" aria-labelledby="details-heading">
-        <h2 id="details-heading">Detected</h2>
-        <DetailsList details={report.details} />
-      </section>
-    {/if}
+      <section class="card info">
+        <div class="tabs" role="tablist" aria-label="Console information">
+          {#each tabs as t (t.id)}
+            <button
+              type="button"
+              role="tab"
+              id="tab-{t.id}"
+              aria-selected={shown === t.id}
+              aria-controls="panel-{t.id}"
+              tabindex={shown === t.id ? 0 : -1}
+              class:active={shown === t.id}
+              onclick={() => (tab = t.id)}
+              onkeydown={onTabKey}
+            >
+              {t.label}
+            </button>
+          {/each}
+        </div>
 
-    {#if app.devExec && status?.state === "connected"}
-      <section class="card dev" aria-label="Run a command on the console">
-        <h2>Run a command <span class="muted">(development build)</span></h2>
-        <form onsubmit={runCommand}>
-          <input type="text" class="mono" placeholder="hakchi get rootfs" bind:value={command} aria-label="Shell line to run on the console" spellcheck="false" />
-          <button type="submit" class="btn" disabled={running || !command.trim()}>
-            {#if running}
-              <span class="spinner" aria-hidden="true"></span>
-              Running…
+        <div class="panel" role="tabpanel" id="panel-{shown}" aria-labelledby="tab-{shown}" tabindex="0">
+          {#if shown === "detected"}
+            {#if report && report.details.length > 0}
+              <DetailsList details={report.details} />
             {:else}
-              <Icon name="play" size={16} />
-              Run
+              <p class="muted">Nothing detected yet.</p>
             {/if}
-          </button>
-        </form>
-        {#if result}
-          <p class="muted num">exit code {result.exit_code ?? "none"}</p>
-          {#if result.stdout}<pre>{result.stdout}</pre>{/if}
-          {#if result.stderr}<pre class="stderr">{result.stderr}</pre>{/if}
-        {/if}
+          {:else if shown === "technical"}
+            <p class="muted lede">Raw data from the console, useful in bug reports.</p>
+            <pre class="raw">{status ? JSON.stringify(status, null, 2) : "No data yet."}</pre>
+          {:else}
+            <p class="muted lede">Runs a shell line on the console (development build).</p>
+            <form onsubmit={runCommand}>
+              <input type="text" class="mono" placeholder="hakchi get rootfs" bind:value={command} aria-label="Shell line to run on the console" spellcheck="false" />
+              <button type="submit" class="btn" disabled={running || !command.trim()}>
+                {#if running}
+                  <span class="spinner" aria-hidden="true"></span>
+                  Running…
+                {:else}
+                  <Icon name="play" size={16} />
+                  Run
+                {/if}
+              </button>
+            </form>
+            {#if result}
+              <p class="muted num">exit code {result.exit_code ?? "none"}</p>
+              {#if result.stdout}<pre class="out">{result.stdout}</pre>{/if}
+              {#if result.stderr}<pre class="out stderr">{result.stderr}</pre>{/if}
+            {/if}
+          {/if}
+        </div>
       </section>
-    {/if}
-
-    {#if status}
-      <details class="card raw">
-        <summary>Technical details</summary>
-        <p class="muted raw-lede">Raw data from the console, useful in bug reports.</p>
-        <pre>{JSON.stringify(status, null, 2)}</pre>
-      </details>
-    {/if}
+    </div>
   </div>
 </div>
 
 <style>
-  /* Narrow: one scrolling column. Wide (1100 px and up): the status card, hakchi and the
-     emulators (or the setup) on the left, the details on the right from the top, each
-     column scrolling on its own. */
+  /* Narrow: one scrolling column, the information panel at a fixed height. Wide (1100 px and
+     up): the status card, hakchi and the emulators (or the setup) on the left; on the right
+     the information panel, exactly as tall as the left column: it fills its column without
+     adding to the row's height, so the left column alone sets it, and its content scrolls
+     inside. The page scrolls when the left column is taller than the window. */
   .page {
     flex: 1;
     min-height: 0;
@@ -161,58 +212,99 @@
   }
 
   .main,
-  .side {
+  .side-fill {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
     min-width: 0;
   }
 
-  .details,
-  .unsupported,
-  .dev {
+  .unsupported {
     padding: var(--space-4) var(--space-5);
   }
 
-  .details h2,
   .unsupported h2 {
     margin-bottom: var(--space-3);
   }
 
-  .raw {
-    padding: var(--space-3) var(--space-5);
+  .info {
+    display: flex;
+    flex-direction: column;
+    height: 420px;
+    min-height: 0;
+    overflow: hidden;
   }
 
-  .raw summary {
-    cursor: pointer;
+  .tabs {
+    flex: none;
+    display: flex;
+    gap: var(--space-1);
+    padding: 0 var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tabs button {
+    position: relative;
+    padding: var(--space-3) var(--space-2);
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
     font-weight: var(--weight-semibold);
+    cursor: pointer;
   }
 
-  .raw-lede {
-    margin: var(--space-2) 0;
+  .tabs button:hover {
+    color: var(--text);
+  }
+
+  .tabs button.active {
+    color: var(--accent-strong);
+  }
+
+  .tabs button.active::after {
+    content: "";
+    position: absolute;
+    left: var(--space-1);
+    right: var(--space-1);
+    bottom: -1px;
+    height: 3px;
+    border-radius: 2px 2px 0 0;
+    background: var(--accent);
+  }
+
+  .panel {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: var(--space-4) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .lede {
     font-size: var(--text-sm);
   }
 
-  .raw pre {
+  .raw {
+    flex: 1;
     margin: 0;
-    max-height: 320px;
-    overflow: auto;
     font-size: var(--text-sm);
     user-select: text;
   }
 
-  .dev form {
+  form {
     display: flex;
     gap: var(--space-2);
-    margin-top: var(--space-3);
   }
 
-  .dev input {
+  form input {
     flex: 1;
   }
 
-  .dev pre {
-    margin: var(--space-2) 0 0;
+  .out {
+    margin: 0;
     padding: var(--space-3);
     background: var(--surface-raised);
     border-radius: var(--radius-s);
@@ -220,26 +312,33 @@
     user-select: text;
   }
 
-  .dev .stderr {
+  .stderr {
     color: var(--danger);
   }
 
   @media (min-width: 1100px) {
     .page {
-      overflow: hidden;
-    }
-
-    .page {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(320px, 32%);
-      grid-template-rows: minmax(0, 1fr);
+      grid-template-rows: auto;
+      align-items: start;
       gap: var(--space-5);
     }
 
-    .main,
     .side {
-      min-height: 0;
-      overflow: auto;
+      position: relative;
+      align-self: stretch;
+      min-height: 320px;
+    }
+
+    .side-fill {
+      position: absolute;
+      inset: 0;
+    }
+
+    .info {
+      flex: 1;
+      height: auto;
     }
   }
 </style>
