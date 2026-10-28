@@ -58,6 +58,16 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 
 | Program | State |
 |---|---|
-| Toolchain | built: `toolchain_defconfig`, madmonkey's configuration with every package off |
+| Toolchain | built: `buildroot_defconfig`, madmonkey's configuration with every package off except the ones below |
+| glibc 2.22 | built by the toolchain. **Byte-identical** to the ramdisk's: `libc`, `ld`, `libm`, `libdl`, `librt`, `libcrypt`, `libutil`, `libgcc_s`. Differ: `libpthread` (Buildroot leaves it unstripped for debuggers; stripped with `--strip-unneeded` it still differs), `libnss_dns`, `libnss_files`, `libresolv` (same size, other link layout) |
+| libuuid (util-linux 2.27.1) | built by Buildroot: **byte-identical** |
+| aplay (alsa-utils 1.0.29) | built by Buildroot: **byte-identical** |
 | BusyBox | built: `busybox.config` gives the shipped 375 applets exactly; Thumb-2 like the shipped one; 646,488 bytes against 650,604 (the other options cannot be read from a stripped binary and are that commit's defaults) |
-| everything else | to do |
+| libblkid (util-linux 2.27.1) | built by Buildroot; 197,832 bytes against 222,368 (the shipped one was built in another tree, see above) |
+| fbgrab 1.2 (libpng 1.6.20) | built by Buildroot; 10,004 bytes against 9,208 |
+| cryptsetup 1.6.8 | built by Buildroot with the kernel crypto API (the shipped one links no crypto library); still links libcryptsetup and popt as shared libraries where the shipped one has them, and device-mapper, built in |
+| e2fsprogs 1.44.1, dropbear 2018.76, kexec-tools 2.0.15, rsync 3.1.3 | to do: newer than this Buildroot's |
+| llmnrd, tinysvcmdns, sntool, clovershell, sunxi-tools, xdelta3 | to do |
+
+The byte-identical files show that this toolchain and Buildroot are the ones the shipped binaries
+were built with.

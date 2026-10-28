@@ -15,3 +15,19 @@ BR2_GCC_ENABLE_GRAPHITE=y
 BR2_ENABLE_LOCALE_PURGE=y
 BR2_ENABLE_LOCALE_WHITELIST="C en_US.UTF-8"
 BR2_BACKUP_SITE="http://sources.buildroot.net"
+
+# Packages whose shipped version is the one this Buildroot carries, built with its recipes and
+# madmonkey's options for them. No OpenSSL or libgcrypt: the shipped cryptsetup links neither
+# (Buildroot then uses the kernel crypto API).
+BR2_PACKAGE_UTIL_LINUX=y
+BR2_PACKAGE_UTIL_LINUX_LIBBLKID=y
+BR2_PACKAGE_UTIL_LINUX_LIBUUID=y
+BR2_PACKAGE_POPT=y
+BR2_PACKAGE_LVM2=y
+BR2_PACKAGE_CRYPTSETUP=y
+BR2_PACKAGE_ZLIB=y
+BR2_PACKAGE_LIBPNG=y
+BR2_PACKAGE_FBGRAB=y
+BR2_PACKAGE_ALSA_LIB=y
+BR2_PACKAGE_ALSA_UTILS=y
+BR2_PACKAGE_ALSA_UTILS_APLAY=y

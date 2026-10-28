@@ -6,8 +6,8 @@
 #   scripts/userland/build.sh --clean    remove target/userland first (the toolchain too)
 #
 # Needs podman or docker and network access for the sources. Everything runs in the container
-# (Containerfile). The toolchain (Buildroot 2015.11.1, toolchain_defconfig) is built once into
-# target/userland and reused.
+# (Containerfile). Buildroot 2015.11.1 (buildroot_defconfig) builds the toolchain and the packages
+# whose shipped version it carries, once, into target/userland; later runs reuse them.
 #
 # Sources are pinned: tarballs by SHA-256, git repositories by commit (sources.txt).
 set -euo pipefail
@@ -24,15 +24,15 @@ if [ "${1:-}" = "--inside" ]; then
   export PATH="$br/output/host/usr/bin:$PATH"
   cross=arm-buildroot-linux-gnueabihf-
 
-  if [ ! -x "$br/output/host/usr/bin/${cross}gcc" ]; then
-    echo "== toolchain (Buildroot 2015.11.1, GCC 4.9.3, glibc 2.22)"
-    rm -rf "$br"
+  echo "== Buildroot 2015.11.1: toolchain (GCC 4.9.3, glibc 2.22) and its packages"
+  if [ ! -d "$br" ]; then
     tar -xjf "/work/dl/$BUILDROOT.tar.bz2" -C /work
-    cp "$here/toolchain_defconfig" "$br/configs/cartload_toolchain_defconfig"
-    make -s -C "$br" cartload_toolchain_defconfig >/dev/null
-    make -C "$br" BR2_DL_DIR=/work/br-dl BR2_JLEVEL="$jobs" toolchain >/work/toolchain.log 2>&1 \
-      || { tail -30 /work/toolchain.log >&2; exit 1; }
   fi
+  cp "$here/buildroot_defconfig" "$br/configs/cartload_defconfig"
+  make -s -C "$br" cartload_defconfig >/dev/null
+  # Already built packages are skipped; the first run takes a few minutes.
+  make -C "$br" BR2_DL_DIR=/work/br-dl BR2_JLEVEL="$jobs" >/work/buildroot.log 2>&1 \
+    || { tail -30 /work/buildroot.log >&2; exit 1; }
   "${cross}gcc" --version | head -1
 
   rm -rf "$out"
