@@ -1,8 +1,9 @@
 # data
 
 Binary blobs that the Rust crates embed at build time with `include_bytes!`. `hakchi.hmod` is
-the kernel package itself; the other three are not part of it. All four come from the hakchi2
-CE tree or its releases and are redistributed unchanged.
+the kernel package itself and `tiny7zx.hmod/` one of hakchi2 CE's base mods; the rest are not
+part of either. All come from the hakchi2 CE tree or its releases and are redistributed
+unchanged.
 
 ## hakchi.hmod
 
@@ -40,6 +41,21 @@ the source of the exact v1.0.4-126 build (April 2020) has not been found publish
 Cartload release carries this file, the corresponding source has to be obtainable from the
 release (GPL-2 section 3 and GPL-3 section 6): at least an archived copy of that tree with its
 submodules, and ideally the exact v1.0.4-126 tree from hakchi's maintainers.
+
+## tiny7zx.hmod/
+
+| | |
+| --- | --- |
+| Origin | hakchi2 CE source tree, `hakchi_gui/mods/hmods/tiny7zx.hmod/` (<https://github.com/TeamShinkansen/Hakchi2-CE>, commit `74707cd6`, the same files as at the pinned `4fb3092c` of `crates/hmod/src/basemods.rs`) |
+| Files | `bin/tiny7zx` (26 578 bytes, md5 `eb8fa3b5a0d8a832e81eec9b5fccb60b`), `install` (37 bytes, md5 `9fc874cd8fe53b3662fdd9446b7f38cc`), `readme.md` (3 501 bytes, md5 `b19c71bef9cbc6f8e42ba5743aad0ec6`), checked against the catalog by `cargo test -p cartload-hmod` |
+| Embedded by | `crates/hmod` with its `bundled` feature, as `basemods::TINY7ZX.load_bundled()`; the app installs it after every hakchi install |
+
+The 7z extractor the console's emulator wrappers run when a game's ROM is a `.7z` archive:
+pts-tiny-7z-sfx by Péter Szabó, packaged as an hmod by cluster, madmonkey and KMFDManic.
+
+License: pts-tiny-7z-sfx is GNU General Public License v2.0 (its source is
+<https://github.com/pts/pts-tiny-7z-sfx>); the packaging is part of hakchi2 CE (GPL-3.0).
+Redistributed unchanged.
 
 ## fes1.bin
 

@@ -68,9 +68,9 @@ pub enum Error {
 
     /// Compressed games are in the plan but the console has no extractor.
     #[error(
-        "{games} compressed game(s) need the tiny7zx mod on the console and `which tiny7zx` \
-         found none; install hakchi2 CE's base mods (cartload-flow base-mods) or turn \
-         compression off (cartload-library compress --off)"
+        "{games} compressed game(s) need 7z support (the tiny7zx mod) on the console and \
+         `which tiny7zx` found none; reinstall hakchi from Cartload's Console page (or run \
+         cartload-flow base-mods), or turn compression off for those games"
     )]
     MissingExtractor {
         /// Compressed games in the plan.

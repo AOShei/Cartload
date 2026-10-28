@@ -15,7 +15,7 @@ use cartload_flow::{
     Backend, ConsoleState, Context, Event, EventReceiver, Flow, FlowOptions, HmodPackage, Level,
     Outcome, Reporter, StepInfo, UsbBackend, channel, flows,
 };
-use cartload_hmod::modhub::ModArchive;
+use cartload_hmod::{basemods, modhub::ModArchive};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 use tracing::{info, warn};
@@ -32,7 +32,8 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FlowKind {
-    /// Install or repair the hakchi kernel.
+    /// Install or repair the hakchi kernel, then the built-in base mods (`tiny7zx`, which
+    /// compressed games need).
     Install,
     /// Boot the hakchi kernel from RAM and stop there.
     Memboot,
@@ -107,7 +108,7 @@ impl FlowKind {
     /// Builds the flow.
     pub fn build(&self) -> Flow<Context> {
         match self {
-            Self::Install => flows::install_kernel(),
+            Self::Install => flows::install_kernel_with_base_mods(),
             Self::Memboot => flows::memboot(),
             Self::Uninstall { .. } => flows::uninstall_kernel(),
             Self::DumpKernel { path } => flows::dump_stock_kernel(path.clone()),
@@ -148,6 +149,8 @@ pub fn step_label(name: &str) -> &str {
         "upload" => "Upload the package",
         "install" => "Run the installer",
         "verify" => "Verify the install",
+        "base-mods" => "Add 7z support",
+        "verify-mods" => "Verify 7z support",
         "read-stock-kernel" => "Read the stock kernel backup",
         "flash-stock-kernel" => "Flash the stock kernel",
         "remove" => "Remove hakchi",
@@ -639,8 +642,15 @@ impl FlowRunner {
         kind.apply_options(&mut ctx.options);
         if kind.needs_package() && ctx.hmod.is_none() {
             return Err(CommandError::new(
-                "The kernel package (hakchi.hmod) is missing. Download it in step 2 first.",
+                "The kernel package (hakchi.hmod) is missing.",
             ));
+        }
+        if matches!(kind, FlowKind::Install) && ctx.base_mods.is_empty() {
+            ctx.base_mods = basemods::BUNDLED
+                .iter()
+                .map(|m| m.load_bundled())
+                .collect::<Result<_, _>>()
+                .map_err(|error| CommandError::from_error(&error))?;
         }
         let flow = kind.build().with_events(sender);
         let steps = flow.steps();
@@ -1100,7 +1110,7 @@ mod tests {
     #[test]
     fn kinds_describe_and_build_themselves() {
         assert_eq!(FlowKind::Install.name(), "install");
-        assert_eq!(FlowKind::Install.steps().len(), 13);
+        assert_eq!(FlowKind::Install.steps().len(), 17);
         assert_eq!(FlowKind::Memboot.steps().len(), 3);
         let uninstall = FlowKind::Uninstall {
             stock_kernel: Some("k.img".into()),

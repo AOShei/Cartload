@@ -473,6 +473,16 @@ impl SyncRunner {
                 ));
             }
         }
+        if plan.needs_extractor() && !session.exec(commands::WHICH_EXTRACTOR).await?.success() {
+            let n = plan.collection.compressed;
+            view.warnings.push(format!(
+                "{n} compressed game{} need{} 7z support (tiny7zx), which is not on this console. \
+                 Reinstall hakchi on the Console page to add it, or turn compression off for {}.",
+                if n == 1 { "" } else { "s" },
+                if n == 1 { "s" } else { "" },
+                if n == 1 { "that game" } else { "those games" },
+            ));
+        }
         info!(
             uploads = view.uploads.len(),
             deletions = view.deletions.len(),

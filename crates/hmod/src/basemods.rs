@@ -4,10 +4,11 @@
 //! emulator wrappers run at launch. `font_remount` (CE's extended title font) is listed too
 //! because CE always installs it; it is optional here.
 //!
-//! The files are GPL-3 artifacts of the CE repository and are never bundled: they are
-//! downloaded on demand from the CE repository at a pinned commit ([`SOURCE_COMMIT`]), checked
-//! against the sizes and MD5s recorded here, and cached under a directory of the caller's
-//! choice (see [`default_cache_dir`]). [`BaseMod::load`] turns the cached files into the tar
+//! With the `bundled` feature `tiny7zx` is embedded from `data/tiny7zx.hmod/` at the repository
+//! root ([`BaseMod::load_bundled`]), so the app installs it without a network. Otherwise the
+//! files are downloaded on demand from the CE repository at a pinned commit ([`SOURCE_COMMIT`]),
+//! checked against the sizes and MD5s recorded here, and cached under a directory of the
+//! caller's choice (see [`default_cache_dir`]). [`BaseMod::load`] turns the cached files into the tar
 //! stream the console's `pack_install` takes, exactly as CE's `ModTasks.TransferHmod` sends a
 //! directory-form hmod (`tar -xvC <dir>` on the console, then `hakchi packs_install`).
 
@@ -270,12 +271,57 @@ impl BaseMod {
             })?;
             files.push((file.path.to_string(), data));
         }
+        self.assemble(files)
+    }
+
+    /// Builds the mod from the copy embedded in the binary, verifying every file. Only the
+    /// mods in [`BUNDLED`] are embedded; for the others this is [`Error::NotBundled`].
+    #[cfg(feature = "bundled")]
+    pub fn load_bundled(&self) -> Result<LoadedMod> {
+        let mut files = Vec::with_capacity(self.files.len());
+        for file in self.files {
+            let path = PathBuf::from(format!("data/{}.hmod/{}", self.name, file.path));
+            let data = bundled_file(self.name, file.path).ok_or_else(|| Error::NotBundled {
+                name: self.name.to_string(),
+            })?;
+            verify(file, data).map_err(|(expected, actual)| Error::ModChecksum {
+                name: self.name.to_string(),
+                path,
+                expected,
+                actual,
+            })?;
+            files.push((file.path.to_string(), data.to_vec()));
+        }
+        self.assemble(files)
+    }
+
+    fn assemble(&self, files: Vec<(String, Vec<u8>)>) -> Result<LoadedMod> {
         let tar = build_tar(self, &files)?;
         Ok(LoadedMod {
             spec: find(self.name).unwrap_or(&TINY7ZX),
             files,
             tar,
         })
+    }
+}
+
+/// The mods embedded in the binary (feature `bundled`).
+#[cfg(feature = "bundled")]
+pub const BUNDLED: &[&BaseMod] = &[&TINY7ZX];
+
+/// A file of a bundled mod, from `data/<name>.hmod/` at the repository root.
+#[cfg(feature = "bundled")]
+fn bundled_file(name: &str, path: &str) -> Option<&'static [u8]> {
+    macro_rules! data {
+        ($file:literal) => {
+            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/", $file))
+        };
+    }
+    match (name, path) {
+        ("tiny7zx", "bin/tiny7zx") => Some(data!("tiny7zx.hmod/bin/tiny7zx")),
+        ("tiny7zx", "install") => Some(data!("tiny7zx.hmod/install")),
+        ("tiny7zx", "readme.md") => Some(data!("tiny7zx.hmod/readme.md")),
+        _ => None,
     }
 }
 
@@ -527,6 +573,29 @@ mod tests {
     use std::io::Read;
 
     use super::*;
+
+    #[cfg(feature = "bundled")]
+    #[test]
+    fn tiny7zx_is_built_in_and_matches_the_catalog() {
+        let loaded = TINY7ZX.load_bundled().unwrap();
+        assert_eq!(loaded.name(), "tiny7zx");
+        assert_eq!(loaded.files.len(), TINY7ZX.files.len());
+        assert_eq!(
+            loaded.len(),
+            TINY7ZX.files.iter().map(|f| f.size).sum::<u64>()
+        );
+        let mut archive = tar::Archive::new(loaded.tar.as_slice());
+        let names: Vec<String> = archive
+            .entries()
+            .unwrap()
+            .map(|e| e.unwrap().path().unwrap().display().to_string())
+            .collect();
+        assert_eq!(names, ["bin/tiny7zx", "install", "readme.md"]);
+        assert!(matches!(
+            FONT_REMOUNT.load_bundled().unwrap_err(),
+            Error::NotBundled { .. }
+        ));
+    }
 
     /// Writes a mod's files to a cache with the catalog's sizes and MD5s faked by content: the
     /// real files are not in the repository, so the tests make content whose MD5 the catalog

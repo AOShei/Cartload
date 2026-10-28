@@ -87,6 +87,13 @@ pub enum Error {
         path: PathBuf,
     },
 
+    /// The base mod is not one of those embedded in the binary.
+    #[error("base mod {name} is not built in")]
+    NotBundled {
+        /// The mod.
+        name: String,
+    },
+
     /// A base mod's file does not have the catalogued size and MD5.
     #[error("base mod {name}: {} should be {expected} but is {actual}", path.display())]
     ModChecksum {

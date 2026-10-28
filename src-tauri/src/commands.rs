@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn flow_steps_lists_pending_steps_with_labels() {
         let steps = flow_steps(FlowKind::Install);
-        assert_eq!(steps.len(), 13);
+        assert_eq!(steps.len(), 17);
         assert_eq!(steps[0].label, "Boot from memory");
         assert!(
             steps

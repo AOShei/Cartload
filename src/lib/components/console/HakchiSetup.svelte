@@ -25,7 +25,7 @@
     if (!watch.ready) {
       return "Waiting for the console in FEL mode.";
     }
-    return "About five minutes; the console reboots twice.";
+    return "About six minutes; the console restarts a few times.";
   });
 </script>
 

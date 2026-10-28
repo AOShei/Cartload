@@ -152,6 +152,10 @@ const INSTALL_STEPS: [string, string, string][] = [
   ["install", "Run the installer", "Run the installer: back up, flash, install, reboot"],
   ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
   ["verify", "Verify the install", "Check the installed kernel reports the package's versions"],
+  ["base-mods", "Add 7z support", "Install the base mods (tiny7zx, for compressed games), then reboot"],
+  ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
+  ["detect", "Identify the console", "Identify the console"],
+  ["verify-mods", "Verify 7z support", "Check the base mods are installed and on the PATH"],
 ];
 
 function pendingSteps(): StepSnapshot[] {
