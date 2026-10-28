@@ -6,7 +6,7 @@
   import { inTauri } from "../../api/tauri";
   import { previewDialog } from "../../dev/preview";
   import { NORMAL, ms } from "../../motion";
-  import { consoleStore, formatBytes, formatDuration, libraryStore, preferences, syncStore, modulesStore, withRetroarch } from "../../state";
+  import { consoleStore, flowStore, formatBytes, formatDuration, libraryStore, preferences, syncStore, modulesStore, withRetroarch } from "../../state";
 
   const report = $derived(consoleStore.report);
   const status = $derived(report?.status ?? null);
@@ -84,15 +84,23 @@
   const elapsed = $derived(
     snapshot.started_at === null ? "" : formatDuration((snapshot.finished_at ?? syncStore.now) - snapshot.started_at),
   );
+  /** The flow adding 7z support before the sync, while the bar shows it. */
+  const prep = $derived(syncStore.preparing && flowStore.snapshot.kind?.kind === "base_mods" ? flowStore.snapshot : null);
+  const prepStep = $derived(prep && prep.current !== null ? (prep.steps[prep.current] ?? null) : null);
+  const prepPercent = $derived(
+    prep && prep.steps.length > 0
+      ? (prep.steps.filter((s) => s.state === "done" || s.state === "skipped").length / prep.steps.length) * 100
+      : 0,
+  );
   const consolePercent = $derived(storage && storage.total > 0 ? Math.min(100, (storage.used / storage.total) * 100) : 0);
   const plannedPercent = $derived(
     storage && storage.total > 0 && plan ? Math.min(100, ((storage.used + plan.upload_size) / storage.total) * 100) : consolePercent,
   );
 </script>
 
-{#snippet changeLists(p: NonNullable<typeof plan>, expanded: boolean)}
+{#snippet changeLists(p: NonNullable<typeof plan>)}
   <div class="columns">
-    <details open={expanded || (p.uploads.length > 0 && p.uploads.length <= 12)}>
+    <details open>
       <summary><Icon name="upload" size={14} /> Upload {p.uploads.length} file{p.uploads.length === 1 ? "" : "s"} ({formatBytes(p.upload_size)})</summary>
       <ul class="files mono">
         {#each p.uploads as file (file.path)}
@@ -102,7 +110,7 @@
         {/each}
       </ul>
     </details>
-    <details open={expanded || (p.deletions.length + p.link_deletions.length + p.empty_dirs.length > 0 && p.deletions.length <= 12)}>
+    <details open>
       <summary><Icon name="trash" size={14} /> Remove {p.deletions.length} file{p.deletions.length === 1 ? "" : "s"}, reset {p.link_deletions.length} link{p.link_deletions.length === 1 ? "" : "s"}, remove {p.empty_dirs.length} empty folder{p.empty_dirs.length === 1 ? "" : "s"}</summary>
       <ul class="files mono">
         {#each p.deletions as path (path)}
@@ -120,9 +128,6 @@
       </ul>
     </details>
   </div>
-  {#if p.deletions.length + p.link_deletions.length > 0}
-    <p class="muted">If hakchi2 CE synced this console, the first Cartload sync replaces its files with this library.</p>
-  {/if}
 {/snippet}
 
 <section class="sync card" aria-label="Sync">
@@ -135,17 +140,50 @@
       {#if plan.noop}
         <p>Nothing to transfer: the console already holds every file. Syncing anyway re-links the games and restarts the menu.</p>
       {/if}
-      {@render changeLists(plan, false)}
-      <p class="muted">{plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} already on the console stay as they are. The console's menu restarts when the sync ends.</p>
-      {#if plan.needs_7z}
-        <p class="muted">Compressed games need 7z support, which this console does not have yet. It is added first; the console restarts once.</p>
-      {/if}
+      <ul class="counts">
+        <li><Icon name="upload" size={14} /> Upload {plan.uploads.length} file{plan.uploads.length === 1 ? "" : "s"} ({formatBytes(plan.upload_size)})</li>
+        <li><Icon name="trash" size={14} /> Remove {plan.deletions.length} file{plan.deletions.length === 1 ? "" : "s"}, reset {plan.link_deletions.length} link{plan.link_deletions.length === 1 ? "" : "s"}, remove {plan.empty_dirs.length} empty folder{plan.empty_dirs.length === 1 ? "" : "s"}</li>
+      </ul>
+      <ul class="notes muted">
+        <li>{plan.unchanged} file{plan.unchanged === 1 ? "" : "s"} already on the console stay as they are. The console's menu restarts when the sync ends.</li>
+        {#if plan.deletions.length + plan.link_deletions.length > 0}
+          <li>If hakchi2 CE synced this console, the first Cartload sync replaces its files with this library.</li>
+        {/if}
+        {#if plan.needs_7z}
+          <li>Compressed games need 7z support, which this console does not have yet. It is added first; the console restarts once.</li>
+        {/if}
+      </ul>
       <div class="panel-actions">
         <button type="button" class="btn btn-primary" onclick={() => syncStore.run()} disabled={!canSync}>
           {#if syncStore.starting}<span class="spinner on-accent" aria-hidden="true"></span>{:else}<Icon name="sync" size={16} />{/if}
           <span>{syncStore.starting ? "Starting…" : "Sync now"}</span>
         </button>
+        {#if !plan.noop}
+          <button type="button" class="btn" onclick={() => (changesOpen = true)}><Icon name="list" size={14} /> Show changes</button>
+        {/if}
         <button type="button" class="btn btn-quiet" onclick={() => syncStore.cancelReview()}>Cancel</button>
+      </div>
+    </section>
+  {:else if syncStore.preparing}
+    <section class="panel progress" aria-live="polite" aria-label="Sync progress" aria-busy="true" transition:slide={{ duration: ms(NORMAL) }}>
+      <div class="panel-head">
+        <h3>
+          {#if prepStep}
+            Adding 7z support: step {(prep?.current ?? 0) + 1} of {prep?.steps.length}, {prepStep.label.toLowerCase()}
+          {:else if prep?.state === "done"}
+            Adding 7z support: waiting for the console…
+          {:else}
+            Adding 7z support…
+          {/if}
+        </h3>
+      </div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(prepPercent)}>
+        <span style:width="{prepPercent}%"></span>
+      </div>
+      <p class="muted">The console restarts once, then the sync starts by itself. Leave the console and the cable alone until it finishes.</p>
+      <div class="panel-actions">
+        <button type="button" class="btn btn-quiet" onclick={() => flowStore.showWindow()}>Show steps</button>
+        <button type="button" class="btn btn-quiet" onclick={() => preferences.setLogOpen(true)}>Full log</button>
       </div>
     </section>
   {:else if running || snapshot.state === "done" || snapshot.state === "failed"}
@@ -206,7 +244,7 @@
         </div>
         <span class="num muted">{formatBytes(storage.used)} of {formatBytes(storage.total)} used{plan && plan.upload_size > 0 ? `, +${formatBytes(plan.upload_size)}` : ""}</span>
       {:else}
-        <span class="muted">{connected ? "Reading…" : "Not connected"}</span>
+        <span class="muted">{connected ? "Reading…" : status?.state === "working" || running || syncStore.preparing ? "Busy" : "Not connected"}</span>
       {/if}
     </div>
     <div class="block">
@@ -265,7 +303,10 @@
     {#each plan.retroarch.filter((r) => r.redirected > 0 && r.installed !== false) as use (use.system)}
       <p class="muted">{use.redirected} {use.name} game{use.redirected === 1 ? "" : "s"} will run through RetroArch: this console has no {use.name} emulator of its own.</p>
     {/each}
-    {@render changeLists(plan, true)}
+    {#if plan.deletions.length + plan.link_deletions.length > 0}
+      <p class="muted">If hakchi2 CE synced this console, the first Cartload sync replaces its files with this library.</p>
+    {/if}
+    {@render changeLists(plan)}
     {#snippet actions()}
       <button type="button" class="btn btn-primary" onclick={() => { changesOpen = false; syncStore.review(); }} disabled={!canSync || syncStore.reviewing}>
         <Icon name="sync" size={16} />
@@ -362,6 +403,11 @@
     overflow: auto;
   }
 
+  /* Nothing in the panel shrinks to fit: when it is taller than its limit, it scrolls. */
+  .panel > :global(*) {
+    flex-shrink: 0;
+  }
+
   .panel-head {
     display: flex;
     align-items: baseline;
@@ -402,12 +448,6 @@
     font-size: var(--text-sm);
   }
 
-  /* In the bar's review panel the lists stay short; the dialog lets its content scroll. */
-  .panel .files {
-    max-height: 144px;
-    overflow: auto;
-  }
-
   .files li {
     display: flex;
     justify-content: space-between;
@@ -415,9 +455,35 @@
     padding: 1px 0;
   }
 
+  .counts {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-5);
+  }
+
+  .counts li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .notes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--text-sm);
+  }
+
   .panel-actions {
     display: flex;
     gap: var(--space-2);
+    padding-top: var(--space-1);
   }
 
   .bar {

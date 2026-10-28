@@ -623,7 +623,8 @@ export function previewSync(): { plan: SyncPlanView | null; snapshot: SyncSnapsh
     case "plan":
       return { plan: previewPlan(3), snapshot: null, reviewing: false };
     case "review":
-      return { plan: previewPlan(3), snapshot: null, reviewing: true };
+      // A first sync over a hakchi2 CE library on a console without 7z support: every line.
+      return { plan: { ...previewPlan(82), needs_7z: true }, snapshot: null, reviewing: true };
     case "warning":
       return {
         plan: {

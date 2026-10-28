@@ -133,6 +133,9 @@ class FlowStore {
   /** Sequence number of the finished run the user put away, so the status bar stops
    *  pointing at it. */
   dismissedSeq = $state(-1);
+  /** The run was started by another view that shows its progress (the sync bar), so it
+   *  opens no window and its success is not announced. */
+  private quiet = false;
   private started = false;
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -199,8 +202,9 @@ class FlowStore {
     }
   }
 
-  /** Starts a flow. Returns whether it started. */
-  async begin(kind: FlowKind): Promise<boolean> {
+  /** Starts a flow and opens its window, unless `window` is false because the caller shows
+   *  the progress itself. Returns whether it started. */
+  async begin(kind: FlowKind, { window = true }: { window?: boolean } = {}): Promise<boolean> {
     if (this.starting || this.running) {
       return false;
     }
@@ -210,8 +214,9 @@ class FlowStore {
     }
     this.starting = true;
     try {
+      this.quiet = !window;
       this.set(await flowStart(kind));
-      this.windowOpen = true;
+      this.windowOpen = window;
       return true;
     } catch (error: unknown) {
       const e = AppError.from(error);
@@ -252,6 +257,9 @@ class FlowStore {
     const show = { label: "Show", run: () => this.showWindow() };
     if (snapshot.state === "done") {
       this.dismissedSeq = snapshot.seq;
+      if (this.quiet) {
+        return;
+      }
       toasts.withAction("success", flowOutcome(snapshot.kind).heading, {
         label: "Open Console",
         run: () => navigation.go("console"),

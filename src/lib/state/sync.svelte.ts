@@ -33,6 +33,8 @@ class SyncStore {
   /** The plan is open for review before the sync starts. */
   reviewing = $state(false);
   starting = $state(false);
+  /** 7z support is being added before the sync: the flow runs, then the console restarts. */
+  preparing = $state(false);
   now = $state(Date.now());
   private started = false;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -176,25 +178,31 @@ class SyncStore {
   }
 
   /** Adds 7z support to the console (the `base_mods` flow, one restart), then waits until
-      the console answers again. False when the flow did not finish. */
+      the console answers again. The sync bar shows the progress; a failed flow is announced
+      by the flow store with a way to its details. False when the flow did not finish. */
   private async add7z(): Promise<boolean> {
-    if (!(await flowStore.begin({ kind: "base_mods" }))) {
-      return false;
-    }
-    const done = await flowStore.settled();
-    if (done.state !== "done") {
-      return false;
-    }
-    // The watcher reconnects after the flow; the sync needs its session.
-    for (let attempt = 0; attempt < 45; attempt++) {
-      this.plan = null;
-      if (await this.makePlan()) {
-        return true;
+    this.preparing = true;
+    try {
+      if (!(await flowStore.begin({ kind: "base_mods" }, { window: false }))) {
+        return false;
       }
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const done = await flowStore.settled();
+      if (done.state !== "done") {
+        return false;
+      }
+      // The watcher reconnects after the flow; the sync needs its session.
+      for (let attempt = 0; attempt < 45; attempt++) {
+        this.plan = null;
+        if (await this.makePlan()) {
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      toasts.error("7z support was added, but the console did not answer again. Try the sync once more.");
+      return false;
+    } finally {
+      this.preparing = false;
     }
-    toasts.error("7z support was added, but the console did not answer again. Try the sync once more.");
-    return false;
   }
 
   /** Puts the result away; the bar shows the plan again. */

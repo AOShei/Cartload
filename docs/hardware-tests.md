@@ -942,7 +942,7 @@ RetroArch modules under other names, so the install path with KMFD's modules is 
    step reports both modules registered and `retroarch-clover`, `nes`, `fceumm` on the PATH.
 2. On the Console page, both rows say "Installed on the console". `ls /var/lib/hakchi/hmod` on
    the console lists `uninstall-_km_retroarch_1910_ozone` and `uninstall-_km_fceumm_xtreme`.
-3. Rerun **Install**: the flow's install step is skipped as already done.
+3. Rerun **Install**: the flow's install step is marked done with "already done" as its message.
 
 ### 2. NES game through RetroArch
 
@@ -1041,16 +1041,18 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
 On a console without tiny7zx (`which tiny7zx` fails; a console set up by hakchi2 CE already
 has it), add a game (compression is on by default for NES and SNES ROMs) and open the sync.
 Expected: "Show changes" and the sync panel say "Compressed games need 7z support, which this
-console does not have yet. … the console restarts once." Click "Sync now". Expected: the progress
-window opens on "Add 7z support" with six steps: "Wait for the console", "Identify the console",
-"Add 7z support" (the log shows `uploaded tiny7zx.hmod (3 files, 30116 bytes)`), "Wait for the
-console", "Identify the console", "Verify 7z support" (`tiny7zx is on the console's PATH at
-/bin/tiny7zx`), then "7z support is added.". The sync starts by itself once the console answers
-and the compressed game starts on the console. A second sync does not add it again.
+console does not have yet. … the console restarts once." Click "Sync now". Expected: no window
+opens; the sync panel shows "Adding 7z support: step 1 of 6, …" with a progress bar through
+"Wait for the console", "Identify the console", "Add 7z support" (the log shows
+`uploaded tiny7zx.hmod (3 files, 30116 bytes)`), "Wait for the console", "Identify the console",
+"Verify 7z support" (`tiny7zx is on the console's PATH at /bin/tiny7zx`), then "waiting for the
+console…". "Show steps" opens the progress window with the six steps. The sync starts by itself
+once the console answers and the compressed game starts on the console. A second sync does not
+add it again.
 
 Install and Reinstall also add it: after "Verify the install" the steps "Add 7z support",
 "Wait for the console", "Identify the console" and "Verify 7z support" run; on a console that
-already has tiny7zx "Add 7z support" is skipped as already done.
+already has tiny7zx "Add 7z support" is marked done with "already done" as its message.
 
 ### 12. Emulator downloads come from the mirror
 
@@ -1059,6 +1061,13 @@ shows `downloaded module` with a `github.com/AOShei/Cartload/releases/download/e
 URL and the pinned `sha256`. With github.com blocked (for example `127.0.0.1 github.com` in
 `/etc/hosts`), the download falls back to hakchi.net and the log shows a `module download failed`
 warning for the mirror first.
+
+Results, 2026-10-28, SNES Classic Mini EUR, hakchi v1.0.4-126, Linux, v0.2.0 dev build:
+- 1 and the first half of 12 (Gambatte core from the mirror): ok. sha256 c1b6167d…, `mods` flow 6
+  steps in 21 s, update check afterwards says up to date.
+- 11 (7z, tiny7zx removed by `hakchi pack_uninstall tiny7zx`): ok. 7z added in 21 s with one
+  restart, then the sync ran by itself (82 files uploaded, 12 removed). Run with the progress
+  window of that build; the sync panel showing the step instead is not yet run on hardware.
 
 ## Console page and progress window (desktop app)
 

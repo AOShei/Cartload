@@ -193,7 +193,10 @@ pub enum StepState {
     Done,
     /// Failed; the flow stopped here.
     Failed,
-    /// Nothing to do: already done, or not needed on this console.
+    /// Not needed on this console. A step whose goal was already reached is [`Done`] instead,
+    /// with the reason as its message.
+    ///
+    /// [`Done`]: StepState::Done
     Skipped,
 }
 
@@ -381,7 +384,11 @@ impl FlowSnapshot {
                     entry.transfer = None;
                     match outcome {
                         Outcome::Done => entry.state = StepState::Done,
-                        Outcome::AlreadyDone(reason) | Outcome::NotNeeded(reason) => {
+                        Outcome::AlreadyDone(reason) => {
+                            entry.state = StepState::Done;
+                            entry.message = Some(reason.clone());
+                        }
+                        Outcome::NotNeeded(reason) => {
                             entry.state = StepState::Skipped;
                             entry.message = Some(reason.clone());
                         }
@@ -1032,7 +1039,7 @@ mod tests {
             },
             2_720,
         );
-        assert_eq!(snapshot.steps[1].state, StepState::Skipped);
+        assert_eq!(snapshot.steps[1].state, StepState::Done);
         assert_eq!(
             snapshot.steps[1].message.as_deref(),
             Some("the console is already reachable")
