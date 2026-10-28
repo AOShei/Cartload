@@ -56,11 +56,11 @@
     <div class="package">
       <span class="muted small">
         {#if pkg}
-          Package <span class="num">{pkg.version}</span>, {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ", built in"}
+          Package <span class="num">{pkg.version}</span>, {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}
         {:else if packageStore.updating}
           Downloading the package…
         {:else}
-          The built-in kernel package could not be prepared.
+          The kernel package is missing.
         {/if}
       </span>
       {#if !pkg}

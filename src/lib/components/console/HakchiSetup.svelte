@@ -51,10 +51,10 @@
         </span>
       {:else if pkg}
         <span class="ok"><Icon name="check" size={16} /></span>
-        <span>Kernel package <strong class="num">{pkg.version}</strong> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ", built in"}</span></span>
+        <span>Kernel package <strong class="num">{pkg.version}</strong> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}</span></span>
       {:else}
         <div class="missing">
-          <span>The built-in kernel package could not be prepared. It can be downloaded instead (9 MB).</span>
+          <span>The kernel package is missing. Download it (9 MB).</span>
           {#if packageStore.status?.problem}
             <span class="problem">The copy on disk cannot be used: {packageStore.status.problem}</span>
           {/if}

@@ -662,13 +662,13 @@ what is written to NAND applies. The headless equivalent of each section is the
 ### 1. Built-in package (no console needed)
 
 With the network off and no `~/.cache/cartload/hakchi.hmod`, open the Console page. Expected:
-the "Install hakchi" card shows "Kernel package v1.0.4-126 · 8.9 MB, built in" with no
+the "Install hakchi" card shows "Kernel package v1.0.4-126 · 8.9 MB" with no
 Download or Update button, and the log (Ctrl+L) shows `built-in kernel package written to the
 cache`. `~/.cache/cartload/hakchi.hmod` exists with SHA-256 `003994b4…fdbff592` (md5
 `2e163a25c98b4c05bed274817abb38da`). Overwrite it with any other file (`echo x >
 ~/.cache/cartload/hakchi.hmod`) and reopen the Console page: the log shows the same line again
 and the file is the pinned one again. With hakchi installed, the "hakchi" card shows "Package
-v1.0.4-126, 8.9 MB, built in", also without a button.
+v1.0.4-126, 8.9 MB", also without a button.
 
 ### 2. Install from stock firmware
 
