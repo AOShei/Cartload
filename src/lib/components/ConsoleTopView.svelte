@@ -130,6 +130,10 @@
          between them with its label on it,
          and the controller-port blocks running from the bars past the front edge. -->
     <rect class="usa-body" x="40" y="28" width="220" height="252" rx="8" />
+    <!-- eject: level with the bars' top edges, filling the gap between the port blocks; the
+         blocks and the bars, drawn after it, overlap its sides a little -->
+    <rect x="130" y="176" width="40" height="60" rx="3" fill="#acacb0" stroke="#8e8e94" />
+    <text class="lbl on-bar" x="150" y="229" text-anchor="middle">EJECT</text>
     <!-- the controller-port blocks run from the cartridge block, under the bars, to a little past the front edge -->
     <rect class="usa-body" x="62" y="158" width="70" height="138" rx="4" />
     <rect class="usa-body" x="168" y="158" width="70" height="138" rx="4" />
@@ -139,10 +143,6 @@
     <line class="usa-line" x1="72" y1="131" x2="228" y2="131" />
     <line class="usa-line" x1="84" y1="111" x2="84" y2="131" />
     <line class="usa-line" x1="216" y1="111" x2="216" y2="131" />
-    <!-- eject: level with the bars' top edges, filling the gap between the port blocks; the
-         bars, drawn after it, overlap its sides a little -->
-    <rect x="130" y="176" width="40" height="60" rx="3" fill="#acacb0" stroke="#8e8e94" />
-    <text class="lbl on-bar" x="150" y="229" text-anchor="middle">EJECT</text>
     <!-- power bar and its lights -->
     <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
     <circle cx="52" cy="191" r="1.8" fill="#8a8a8e" />
