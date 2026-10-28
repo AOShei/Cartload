@@ -1108,3 +1108,40 @@ Results, 2026-10-28, SNES Classic Mini EUR, hakchi v1.0.4-126, Linux, v0.2.0 dev
    is clicked.
 5. Escape or a click beside the window hides it and never stops the task; **Stop** does, and
    during flash writes says "Stopping after this step…".
+
+## Cartload kernel (experimental)
+
+The kernel built by `scripts/kernel/build.sh` (`docs/kernel.md`), tested from RAM only. Nothing
+here writes the kernel or the installed hakchi. Have the console's power plug within reach: a
+boot that does not come back needs a power-cycle, which returns to the installed kernel.
+
+### 1. Memboot into the shell
+
+`cargo run -p cartload-flow -- memboot --hmod target/kernel/out/hakchi-3.4.113.30-cartload-test.hmod`
+on a console running hakchi. Expected: the three steps pass (kexec, about 16 s), and over SSH
+`cat /proc/version` shows `3.4.113.30-cartload`; `lsmod` lists `nand`, `mali`, `sd_mod`,
+`usb_storage`, `overlayfs`, `evdev`, `gpio_keys`; `ls /dev/nand*` shows `nand nanda nandb nandc`;
+`dmesg | grep -i mali` ends with `Mali: Mali device driver loaded`; `/etc/init.d/S78clvcon start`
+loads `clovercon` and `input_polldev`. The kernel log's warnings (`[DISP] ... fail`,
+`audio_pa_ctrl failed`, `_check_scan_data, read error, block 4..7`) are the same as on the
+installed kernel. Return with `sync; umount -ar; reboot -f`.
+
+### 2. Boot to the menu through FEL
+
+Not run yet. Put the console in FEL mode (hold reset while switching on) and memboot the test
+package through FEL without the shell, so the console starts its normal system with this
+kernel. Expected over SSH: `ReedPlayer-Clover` running, `mali` and `clovercon` loaded, a
+framebuffer capture (`fbgrab`) showing the menu; with a controller plugged in, an input device
+for it in `/proc/bus/input/devices`. Then a game, sound and a USB stick.
+
+Note: a full boot through kexec from the running kernel
+(`detached-fallback reboot_kexec <boot.img>` without a shell token) does not work: the console
+comes up with its USB network device but never answers on it. It fails the same way with the
+pinned package's own `boot.img`, so it is the method, not the kernel. Use FEL.
+
+Results, 2026-10-28, SNES Classic Mini EUR, kernel branch `cartload` at `1ed43a0f`, Linux:
+- 1: ok (kexec 4.8 s, console back in 10.2 s; NAND, USB network, SSH, Mali and clovercon as
+  expected; warnings identical to the installed kernel's).
+- Full boot through kexec: no network, with this kernel and with the pinned package's kernel
+  alike; power-cycled back to the installed kernel both times.
+- 2: not run.

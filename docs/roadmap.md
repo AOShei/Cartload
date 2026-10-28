@@ -28,7 +28,10 @@ Later, larger projects (not scheduled):
   `data/README.md`). Pick up from the public tree where it stops (`AOShei/hakchi` at `fd525ac`,
   `AOShei/sun-nontendocm-kernel` at `f8c6e0b`), rebuild the kernel and ramdisk with a pinned
   toolchain in CI, bring it level with v1.0.4-126's behaviour on the NES, SNES and Famicom Minis,
-  and ship that with its full source.
+  and ship that with its full source. Under way: the public kernel rebuilt to the shipped
+  kernel's configuration and drivers, reproducibly (`scripts/kernel/build.sh`,
+  `docs/kernel.md`); it boots on a SNES from RAM into hakchi's shell with NAND, USB, Mali and
+  the controller driver working. Next: boot to the menu through FEL.
 - **Emulators built from official libretro source.** Today the emulator modules are
   KMFDManic's builds, mirrored and pinned. libretro publishes no RetroArch binary for 32-bit ARM
   Linux and its armhf cores stopped in 2020, so this means building RetroArch (with the

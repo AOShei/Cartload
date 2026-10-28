@@ -47,7 +47,8 @@ v1.0.4-121 to -130 in 2018 and 2019, the shipped kernel is `3.4.113.29` where th
 tree is at `.24`, and the build supports the Mega Drive Mini (September 2019), which no public
 commit does. About a fifth of the shipped ramdisk scripts differ from public master. Decision
 (2026-10-28): ship with the closest public source linked (the forks above) and revisit if
-anyone asks; building our own kernel from the public tree is on the roadmap.
+anyone asks. A rebuild of the kernel from the public tree, level with the shipped one's
+configuration and drivers, is under way: `docs/kernel.md`.
 
 ## tiny7zx.hmod/
 

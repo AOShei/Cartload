@@ -1,0 +1,10 @@
+# Build environment for the experimental hakchi kernel (see build.sh).
+#
+# Ubuntu 16.04 ships GCC 4.9.3 for ARM, the compiler version hakchi v1.0.4-126's kernel was
+# built with (it used Buildroot 2015.11.1's). Kernel 3.4's host tools also build cleanly here.
+FROM docker.io/library/ubuntu:16.04
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      gcc-4.9-arm-linux-gnueabihf binutils-arm-linux-gnueabihf make gcc libc6-dev bc perl \
+      xz-utils bzip2 gzip cpio kmod git ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && for t in gcc cpp; do ln -s /usr/bin/arm-linux-gnueabihf-$t-4.9 /usr/local/bin/arm-linux-gnueabihf-$t; done
