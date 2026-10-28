@@ -153,7 +153,7 @@
   }
 
   /* Side by side: the heading and the package on one line, then one column per tool with
-     its button at the bottom, so the buttons line up whatever the description's length. */
+     its button to the right of its text. */
   .row .head {
     flex-direction: row;
     align-items: center;
@@ -174,21 +174,29 @@
   }
 
   .row .tools li {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--space-3);
     padding: 0;
     border-top: 0;
   }
 
-  .row .tools .btn {
-    align-self: flex-start;
+  /* Too narrow for three text-and-button columns: one tool per line, as in the list form. */
+  .maintenance.row {
+    container-type: inline-size;
   }
 
-  @media (max-width: 799px) {
+  @container (max-width: 820px) {
     .row .tools {
       grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    .row .tools li {
+      padding: var(--space-2) 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .row .tools li:first-child {
+      border-top: 0;
     }
   }
 
