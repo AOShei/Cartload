@@ -66,8 +66,14 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 | libblkid (util-linux 2.27.1) | built by Buildroot; 197,832 bytes against 222,368 (the shipped one was built in another tree, see above) |
 | fbgrab 1.2 (libpng 1.6.20) | built by Buildroot; 10,004 bytes against 9,208 |
 | cryptsetup 1.6.8 | built by Buildroot with the kernel crypto API (the shipped one links no crypto library); still links libcryptsetup and popt as shared libraries where the shipped one has them, and device-mapper, built in |
-| e2fsprogs 1.44.1, dropbear 2018.76, kexec-tools 2.0.15, rsync 3.1.3 | to do: newer than this Buildroot's |
+| e2fsprogs 1.44.1 | built with Buildroot's recipe from the newer source (`local.mk`); same libraries; e2fsck 235,952 bytes against 220,872, mke2fs 100,968 / 96,928, resize2fs 51,844 / 45,436 |
+| dropbear 2018.76 | same; `--disable-static` (Buildroot's `--enable-static` makes dropbear 2018 link itself statically); same libraries; 260,172 bytes against 219,944 |
+| kexec-tools 2.0.15 | same, without zlib like the shipped one; 92,276 bytes against 47,160 |
+| rsync 3.1.3 | same, with its bundled zlib and popt like the shipped one (`buildroot-patches/`); 375,568 bytes against 278,144 |
 | llmnrd, tinysvcmdns, sntool, clovershell, sunxi-tools, xdelta3 | to do |
 
 The byte-identical files show that this toolchain and Buildroot are the ones the shipped binaries
-were built with.
+were built with. The newer tools link the same libraries as the shipped ones, except that the
+shipped ones also need `libgcc_s` and are 10 to 50% smaller: they were built outside Buildroot,
+probably with flags like those in hakchi's `sntool/Makefile` (`-Os -mthumb -flto`,
+`--gc-sections`). The difference is size, not behaviour.

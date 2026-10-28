@@ -6,3 +6,11 @@ file buildroot-2015.11.1.tar.bz2 https://buildroot.org/downloads/buildroot-2015.
 
 # The last commit before the shipped busybox's build time, 2018-04-10 20:38:05 GMT.
 git busybox https://git.busybox.net/busybox 3632cb15f16a7596a68dccfd66a2ad9496bf9fd9
+
+# Newer than Buildroot 2015.11.1's own versions; built with its recipes from these sources
+# (local.mk). Checked against kernel.org's sha256sums.asc (e2fsprogs, kexec-tools) and Buildroot
+# 2018.08's hash files (dropbear, rsync).
+file e2fsprogs-1.44.1.tar.gz https://mirrors.edge.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.44.1/e2fsprogs-1.44.1.tar.gz de345fed50a03367a66d8b8a40501e346c26c8e6cbe3890123094ab994fc70b6
+file dropbear-2018.76.tar.bz2 https://matt.ucc.asn.au/dropbear/releases/dropbear-2018.76.tar.bz2 f2fb9167eca8cf93456a5fc1d4faf709902a3ab70dd44e352f3acbc3ffdaea65
+file kexec-tools-2.0.15.tar.xz https://mirrors.edge.kernel.org/pub/linux/utils/kernel/kexec/kexec-tools-2.0.15.tar.xz 899b7b861431eb51886d0c12866e91b036228244d35a5fb04762dd1a3c0194e7
+file rsync-3.1.3.tar.gz https://download.samba.org/pub/rsync/src/rsync-3.1.3.tar.gz 55cc554efec5fdaad70de921cd5a5eeb6c29a95524c715f3bbf849235b0800c0

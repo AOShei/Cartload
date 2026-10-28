@@ -24,12 +24,27 @@ if [ "${1:-}" = "--inside" ]; then
   export PATH="$br/output/host/usr/bin:$PATH"
   cross=arm-buildroot-linux-gnueabihf-
 
+  # Sources Buildroot builds with its own recipes (local.mk): unpacked fresh each run.
+  for t in e2fsprogs-1.44.1.tar.gz dropbear-2018.76.tar.bz2 kexec-tools-2.0.15.tar.xz rsync-3.1.3.tar.gz; do
+    rm -rf "/work/src/${t%.tar.*}"
+    tar -xf "/work/dl/$t" -C /work/src
+  done
+
   echo "== Buildroot 2015.11.1: toolchain (GCC 4.9.3, glibc 2.22) and its packages"
   if [ ! -d "$br" ]; then
     tar -xjf "/work/dl/$BUILDROOT.tar.bz2" -C /work
   fi
+  # Recipe changes (buildroot-patches), each applied once.
+  for p in "$here"/buildroot-patches/*.patch; do
+    patch -d "$br" -p1 -R --dry-run -s -f <"$p" >/dev/null 2>&1 || patch -d "$br" -p1 -s <"$p"
+  done
   cp "$here/buildroot_defconfig" "$br/configs/cartload_defconfig"
   make -s -C "$br" cartload_defconfig >/dev/null
+  # Buildroot does not notice changed options of packages built from outside sources: those are
+  # rebuilt from clean each run (they are small).
+  for p in e2fsprogs dropbear kexec rsync; do
+    make -s -C "$br" "$p-dirclean" >/dev/null
+  done
   # Already built packages are skipped; the first run takes a few minutes.
   make -C "$br" BR2_DL_DIR=/work/br-dl BR2_JLEVEL="$jobs" >/work/buildroot.log 2>&1 \
     || { tail -30 /work/buildroot.log >&2; exit 1; }
