@@ -91,7 +91,7 @@ mode forced. Checklists and results: `docs/hardware-tests.md`, section "Cartload
 On a SNES Classic Mini (EUR) it boots to the menu with Mali, the controller driver and the
 other modules working (2026-10-28).
 
-## Installing (not done yet)
+## Installing
 
 A console cannot be bricked by a kernel: FEL is in the chip's boot ROM, and from FEL a working
 kernel boots from RAM and the installer flashes it back. What a faulty kernel can damage is the
@@ -109,5 +109,7 @@ data partition (games, saves, settings). So, in order:
    same command (the memboot goes through FEL), then restore the data partition from the backup
    if needed.
 
-Still to do: games, sound, controllers, USB storage and Wi-Fi; steps 2 to 4 on hardware; the NES
-and Famicom Minis.
+Steps 1 to 3 were done on a SNES Classic Mini (EUR) on 2026-10-28: it starts from NAND on this
+kernel to the menu in 13 s. Step 4 was rehearsed before the install, not yet after it. Still to
+do: games, sound, controllers, USB storage and Wi-Fi; the return from this kernel; the NES and
+Famicom Minis.

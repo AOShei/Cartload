@@ -1163,10 +1163,22 @@ Results, 2026-10-28, SNES Classic Mini EUR, kernel branch `cartload` at `1ed43a0
   `clovercon`, `uinput`, `zram`, `usb_storage`, `sd_mod` loaded from the data partition; the
   `fbgrab` capture shows the SNES menu. Kernel log as the installed kernel's except two RTC
   lines (`Rtc time will be wrong`, `unable to read the hardware clock`), probably from the FEL
-  start (compared against a NAND boot), not checked. Not tested: games, sound, controllers
-  (none plugged in), USB storage, Wi-Fi.
+  start (compared against a NAND boot); later traced to cold starts (see the install result).
+  Not tested: games, sound, controllers (none plugged in), USB storage, Wi-Fi.
 - Backup (`scripts/console-backup.sh`): ok, 14 min (debug build of `cartload-console`, about
   0.5 MB/s through SSH). Every piece matched the MD5 taken on the console; no stock kernel
   backup at block 0x68. `e2fsck -fn` on `nandc.img` reports only free-count mismatches and an
   unreplayed journal (the memboot does not unmount); on a copy, the journal replay plus that
   fix leaves a clean filesystem.
+- Way back rehearsed: `cartload-flow install --hmod data/hakchi.hmod` on the console as it was,
+  13 steps in 43 s; games, the 8 packs and tiny7zx kept.
+- Install: `cartload-flow install --hmod target/kernel/out/hakchi-3.4.113.30-cartload.hmod`,
+  13 steps in 44.5 s (`nand sectors written: 36`); madmonkey's modules folder replaced by ours.
+  Cold start from NAND (power unplugged): SSH and the menu after 13 s, u-boot's boot parameters
+  on the command line, the 13 modules loaded, packs and tiny7zx in place, `fbgrab` shows the
+  menu, `cartload-console info` reads it normally. Kernel log as the installed kernel's except
+  the RTC lines (`Rtc time will be wrong`, `unable to read the hardware clock`): they come with
+  a cold start (the 32 kHz crystal is not running yet when the driver switches to it; the RTC
+  has no battery). After a warm `reboot` they are gone and the clock is set from the RTC, as on
+  the stock kernel. The stock kernel's cold start was not logged for comparison; same driver.
+  Not tested yet: games, sound, controllers, USB storage, Wi-Fi.
