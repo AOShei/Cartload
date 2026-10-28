@@ -60,9 +60,13 @@ fi
 # ---- on the host ----
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 work=$repo/target/userland
-[ "${1:-}" = "--clean" ] && rm -rf "$work"
 engine=$(command -v podman || command -v docker || true)
 [ -n "$engine" ] || { echo "needs podman or docker" >&2; exit 1; }
+if [ "${1:-}" = "--clean" ]; then
+  # Buildroot leaves read-only directories; with rootless podman the files belong to the
+  # user namespace.
+  if [ "$(basename "$engine")" = podman ]; then podman unshare rm -rf "$work"; else rm -rf "$work"; fi
+fi
 mkdir -p "$work/dl" "$work/br-dl" "$work/src"
 
 echo "== sources"
