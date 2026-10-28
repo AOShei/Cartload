@@ -104,7 +104,6 @@
          one centred row; the LED on the light front. No marks or lettering: the drawing is
          a guide to the controls, not a reproduction. -->
     <rect class="sfc-body" x="40" y="28" width="220" height="268" rx="20" />
-    <line class="vents" x1="72" y1="37" x2="228" y2="37" />
     <!-- the seams on the light back, in line with the front ones, from the top edge to the plate -->
     <line class="sfc-seam" x1="60" y1="28" x2="60" y2="48" />
     <line class="sfc-seam" x1="240" y1="28" x2="240" y2="48" />
@@ -297,11 +296,6 @@
 
 
 
-  .vents {
-    stroke: #b9b7b3;
-    stroke-width: 3;
-    stroke-dasharray: 2 4;
-  }
 
   /* labels */
   .lbl {
