@@ -141,7 +141,7 @@
     <line class="usa-line" x1="216" y1="111" x2="216" y2="131" />
     <!-- eject: level with the bars' top edges, filling the gap between the port blocks; the
          bars, drawn after it, overlap its sides a little -->
-    <rect x="130" y="176" width="40" height="60" rx="3" fill="#c4c4c7" stroke="#a0a0a6" />
+    <rect x="130" y="176" width="40" height="60" rx="3" fill="#acacb0" stroke="#8e8e94" />
     <text class="lbl on-bar" x="150" y="229" text-anchor="middle">EJECT</text>
     <!-- power bar and its lights -->
     <circle cx="52" cy="183" r="1.8" fill="#8a8a8e" />
