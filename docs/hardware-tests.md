@@ -639,8 +639,8 @@ a toast.
 
 ## hakchi setup on the Console page (desktop app)
 
-Since the Console and Kernel pages were merged, the stages below are the Console page's setup
-view (a console without hakchi) and each flow's steps, log and result appear in the progress
+Since the Console and Kernel pages were merged, the stages below are the Console page's
+"Install hakchi" card (stage 1 its FEL instructions, stages 2 and 3 its last line) and each flow's steps, log and result appear in the progress
 window instead of the page's right column. Read "the Kernel page" in this section that way.
 
 Crate: `src-tauri`, binary `cartload` (package `cartload-app`). The Kernel page runs the flows of "Install kernel"
@@ -1036,8 +1036,11 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
    (Emulators, or the setup's last step) stretches so both columns end on the same line at any
    window size. Technical details shows the console's JSON in a dark read-only box with
    coloured keys, strings, numbers and literals; its Copy button (top right) copies the text
-   and turns into "Copied" for a moment. With a stock console or FEL mode: the three setup steps on
-   the left and Boot from memory, Save, Factory reset on the right.
+   and turns into "Copied" for a moment. With nothing connected, a stock console or FEL mode: one
+   "Install hakchi" card on the left (the FEL instructions with the drawing and the live
+   status line, then the kernel package and the Install hakchi button on its last line, with
+   what the install waits for under the button) and Boot from memory, Save, Factory reset above
+   the information panel on the right; nothing scrolls at the default window.
 3. Settings has no Emulators section; the Linux setup row is there, and on the Console page
    only while it needs attention.
 

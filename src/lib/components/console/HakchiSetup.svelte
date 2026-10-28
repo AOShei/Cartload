@@ -4,193 +4,103 @@
   import FelInstructions from "./FelInstructions.svelte";
   import { consoleWatch } from "./watch";
 
-  /* Installing hakchi on a console that does not have it: FEL mode, the kernel package,
-     then the install, whose progress opens in the progress window. */
+  /* Installing hakchi on a console that does not have it, in one card: how to put the
+     console in FEL mode with what the app sees right now, then the kernel package and the
+     install button side by side. The install's progress opens in the progress window. */
   const watch = $derived(consoleWatch(consoleStore.report));
   const pkg = $derived(packageStore.status?.package ?? null);
   const busy = $derived(flowStore.running || flowStore.starting);
   const canStart = $derived(watch.ready && pkg !== null && !busy);
 
-  /** Why the install cannot start, in one short line. */
-  const blocker = $derived.by((): string | null => {
-    if (busy) {
-      return flowStore.running ? "Another task is running on the console." : null;
-    }
-    if (!watch.ready) {
-      return "Waiting for the console in FEL mode (step 1).";
+  /** What the install waits for, in one short line. */
+  const blocker = $derived.by((): string => {
+    if (flowStore.running) {
+      return "Another task is running on the console.";
     }
     if (!pkg) {
-      return "Download the kernel package (step 2) first.";
+      return "Download the kernel package first.";
     }
-    return null;
+    if (!watch.ready) {
+      return "Waiting for the console in FEL mode.";
+    }
+    return "About five minutes; the console reboots twice.";
   });
 </script>
 
-<ol class="stages">
-  <li class="stage" class:complete={watch.ready}>
-    <span class="number" aria-hidden="true">{#if watch.ready}<Icon name="check" size={16} />{:else}1{/if}</span>
-    <div class="body card">
-      <h2>Put the console in FEL mode</h2>
-      <FelInstructions />
-      <p class="watch" role="status">
-        <span class="dot tone-{watch.tone}" aria-hidden="true"></span>
-        {watch.text}
-      </p>
-    </div>
-  </li>
+<section class="card setup" aria-labelledby="setup-heading">
+  <h2 id="setup-heading">Install hakchi</h2>
 
-  <li class="stage" class:complete={pkg !== null}>
-    <span class="number" aria-hidden="true">{#if pkg}<Icon name="check" size={16} />{:else}2{/if}</span>
-    <div class="body card">
-      <div class="row">
-        <h2>Kernel package</h2>
-        <span class="spacer"></span>
-        {#if packageStore.loading && !packageStore.status}
-          <span class="muted"><span class="spinner" aria-hidden="true"></span> Checking the cache…</span>
-        {:else if packageStore.updating}
-          <span class="muted num">
-            {#if packageStore.progress?.total}
-              {formatBytes(packageStore.progress.done)} of {formatBytes(packageStore.progress.total)}
-            {:else}
-              Downloading…
-            {/if}
-          </span>
-        {:else if pkg}
-          <button type="button" class="btn btn-quiet" onclick={() => void packageStore.update()} disabled={busy}>
-            <Icon name="download" size={16} />
-            Update package
-          </button>
-        {/if}
-      </div>
-      {#if pkg}
-        <p>
-          hakchi <strong class="num">{pkg.version}</strong>
-          <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (from CARTLOAD_HMOD)" : ""}</span>
-        </p>
-        {#if packageStore.error}
-          <p class="problem">The update failed: {packageStore.error} The copy on disk is still usable.</p>
-        {/if}
+  <div class="fel">
+    <FelInstructions width={190} />
+    <p class="watch" role="status">
+      <span class="dot tone-{watch.tone}" aria-hidden="true"></span>
+      {watch.text}
+    </p>
+  </div>
+
+  <div class="footer">
+    <div class="package">
+      {#if packageStore.loading && !packageStore.status}
+        <span class="muted"><span class="spinner" aria-hidden="true"></span> Checking for the kernel package…</span>
       {:else if packageStore.updating}
-        <progress max={packageStore.progress?.total ?? 1} value={packageStore.progress?.total ? packageStore.progress.done : undefined}></progress>
+        <span class="muted num">
+          <span class="spinner" aria-hidden="true"></span>
+          Downloading the kernel package{#if packageStore.progress?.total}: {formatBytes(packageStore.progress.done)} of {formatBytes(packageStore.progress.total)}{/if}
+        </span>
+      {:else if pkg}
+        <span class="ok"><Icon name="check" size={16} /></span>
+        <span>Kernel package <strong class="num">{pkg.version}</strong> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}</span></span>
+        <button type="button" class="btn btn-quiet btn-sm" onclick={() => void packageStore.update()} disabled={busy}>
+          <Icon name="download" size={14} />
+          Update
+        </button>
       {:else}
-        <p>No kernel package yet. It is a 9 MB download from the hakchi project's servers.</p>
-        {#if packageStore.status?.problem}
-          <p class="problem">The copy on disk cannot be used: {packageStore.status.problem}</p>
-        {/if}
-        {#if packageStore.error}
-          <p class="problem">The download failed: {packageStore.error}</p>
-        {/if}
-        <div>
-          <button type="button" class="btn btn-primary" onclick={() => void packageStore.update()} disabled={busy}>
-            <Icon name="download" size={16} />
-            {packageStore.error ? "Try the download again" : "Download package"}
-          </button>
+        <div class="missing">
+          <span>No kernel package yet: a 9 MB download from the hakchi project's servers.</span>
+          {#if packageStore.status?.problem}
+            <span class="problem">The copy on disk cannot be used: {packageStore.status.problem}</span>
+          {/if}
+          {#if packageStore.error}
+            <span class="problem">The download failed: {packageStore.error}</span>
+          {/if}
         </div>
+        <button type="button" class="btn" onclick={() => void packageStore.update()} disabled={busy}>
+          <Icon name="download" size={16} />
+          {packageStore.error ? "Try again" : "Download"}
+        </button>
+      {/if}
+      {#if pkg && packageStore.error}
+        <span class="problem">Update failed; the copy on disk is still usable.</span>
       {/if}
     </div>
-  </li>
 
-  <li class="stage" class:active={canStart}>
-    <span class="number" aria-hidden="true">3</span>
-    <div class="body card">
-      <div class="row">
-        <h2>Install hakchi</h2>
-        <span class="spacer"></span>
-        <button type="button" class="btn btn-primary" onclick={() => void flowStore.begin({ kind: "install" })} disabled={!canStart}>
-          {#if flowStore.starting}
-            <span class="spinner on-accent" aria-hidden="true"></span>
-            Starting…
-          {:else}
-            Install hakchi
-            <Icon name="arrow" size={16} />
-          {/if}
-        </button>
-      </div>
-      <p class="muted small">
-        {blocker ?? "Takes about five minutes. The console reboots twice; the progress opens in a window."}
-      </p>
+    <div class="install">
+      <button type="button" class="btn btn-primary" onclick={() => void flowStore.begin({ kind: "install" })} disabled={!canStart}>
+        {#if flowStore.starting}
+          <span class="spinner on-accent" aria-hidden="true"></span>
+          Starting…
+        {:else}
+          Install hakchi
+          <Icon name="arrow" size={16} />
+        {/if}
+      </button>
+      <span class="muted small">{blocker}</span>
     </div>
-  </li>
-</ol>
+  </div>
+</section>
 
 <style>
-  .stages {
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  .setup {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
-  }
-
-  .stage {
-    position: relative;
-    display: grid;
-    grid-template-columns: 36px 1fr;
-    gap: var(--space-4);
-  }
-
-  .stage::before {
-    content: "";
-    position: absolute;
-    left: 17px;
-    top: 40px;
-    bottom: calc(-1 * var(--space-4));
-    width: 2px;
-    background: var(--border);
-  }
-
-  .stage:last-child::before {
-    display: none;
-  }
-
-  .number {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-weight: var(--weight-bold);
-    font-variant-numeric: tabular-nums;
-    transition:
-      background-color var(--motion) var(--ease-out),
-      border-color var(--motion) var(--ease-out),
-      color var(--motion) var(--ease-out);
-  }
-
-  .stage.complete .number {
-    background: var(--ok-soft);
-    border-color: var(--ok);
-    color: var(--ok);
-  }
-
-  .stage.active .number {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--accent-strong);
-  }
-
-  .body {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
     padding: var(--space-4) var(--space-5);
   }
 
-  .row {
+  .fel {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: var(--space-3);
-    min-height: var(--control);
-  }
-
-  .spacer {
-    flex: 1;
   }
 
   .watch {
@@ -198,22 +108,75 @@
     align-items: center;
     gap: var(--space-2);
     min-height: var(--control);
+    margin: 0;
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-s);
     background: var(--surface-raised);
   }
 
+  /* The package and the install button share the card's last line, pushed to the bottom
+     when the card stretches to the column's height. */
+  .footer {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+
+  .package {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .missing {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ok {
+    display: inline-flex;
+    color: var(--ok);
+  }
+
+  .install {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
   .small {
-    font-size: var(--text-md);
+    font-size: var(--text-sm);
   }
 
   .problem {
     color: var(--danger);
-    font-size: var(--text-md);
+    font-size: var(--text-sm);
   }
 
   .spinner.on-accent {
     border-color: color-mix(in srgb, var(--on-accent) 35%, transparent);
     border-top-color: var(--on-accent);
+  }
+
+  @media (max-width: 799px) {
+    .footer {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .install {
+      align-items: flex-start;
+    }
   }
 </style>
