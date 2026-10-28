@@ -70,7 +70,12 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 | dropbear 2018.76 | same; `--disable-static` (Buildroot's `--enable-static` makes dropbear 2018 link itself statically); same libraries; 260,172 bytes against 219,944 |
 | kexec-tools 2.0.15 | same, without zlib like the shipped one; 92,276 bytes against 47,160 |
 | rsync 3.1.3 | same, with its bundled zlib and popt like the shipped one (`buildroot-patches/`); 375,568 bytes against 278,144 |
-| llmnrd, tinysvcmdns, sntool, clovershell, sunxi-tools, xdelta3 | to do |
+| llmnrd | built from `4dc24d0`, the commit the shipped binary names (`git id v0.5-4-g4dc24d0`) |
+| tinysvcmdns | geekman's library; the shipped main program was never published, so `main-tinysvcmdns.c` replaces it with the same command line (`S93mdnsd`: instance, type, port, TXT records) |
+| clovershell | Cluster's daemon at `5edb874`, the last commit before the shipped build; same strings |
+| sunxi-fexc, sunxi-pio, sunxi-nand-part | sunxi-tools at the commits they report (`1e219c0`, `5c19710`), with our toolchain instead of Linaro GCC 4.8 |
+| xdelta3 3.1.1 | jmacd's xdelta at `7508fd2` (the shipped binary, unpacked from UPX 3.94, reports 3.1.1; main had no commits from 2017-08 to 2026), without lzma like the shipped one, not UPX-packed |
+| sntool | **not equivalent**: the public source (2018) builds a 12.5 KB tool with the boot-area commands; the shipped one (793 KB, `5833d00` 2020, unpublished) also has `sunxi-part` (`grow`, `shrink`, `tune`), `decodepng`, `ismd`, `isRecovery`, `mdui` and Mega Drive helpers. Those need a replacement of our own. |
 
 The byte-identical files show that this toolchain and Buildroot are the ones the shipped binaries
 were built with. The newer tools link the same libraries as the shipped ones, except that the

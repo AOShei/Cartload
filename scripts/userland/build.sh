@@ -67,6 +67,55 @@ if [ "${1:-}" = "--inside" ]; then
     || { tail -30 /work/busybox.log >&2; exit 1; }
   cp busybox "$out/bin/busybox"
 
+  # Pinned build times for the rest: a date that reports the commit time (for build stamps
+  # made with `date`) and a header pinning __DATE__ and __TIME__.
+  stamp() { # stamp <git dir>: sets epoch, the PATH shim and the header for that commit
+    epoch=$(git -C "$1" log -1 --format=%ct)
+    mkdir -p /work/shim
+    printf '#!/bin/sh\nexec /bin/date -d @%s "$@"\n' "$epoch" >/work/shim/date
+    chmod +x /work/shim/date
+    printf '#define __DATE__ "%s"\n#define __TIME__ "%s"\n' \
+      "$(LC_ALL=C TZ=UTC /bin/date -d "@$epoch" '+%b %e %Y')" \
+      "$(TZ=UTC /bin/date -d "@$epoch" +%H:%M:%S)" >/work/shim/reproducible.h
+  }
+  pinned="-Wno-builtin-macro-redefined -include /work/shim/reproducible.h"
+  cc="${cross}gcc"
+
+  echo "== llmnrd ($(git -C /work/src/llmnrd describe --tags))"
+  cd /work/src/llmnrd && git clean -qfdx
+  make -s CC="$cc" >/work/llmnrd.log 2>&1 || { tail -20 /work/llmnrd.log >&2; exit 1; }
+  cp llmnrd "$out/bin/"
+
+  echo "== tinysvcmdns (geekman's library, Cartload's main)"
+  cd /work/src/tinysvcmdns && git clean -qfdx
+  "$cc" -std=gnu99 -O2 -DNDEBUG -Wall -o "$out/bin/tinysvcmdns" mdns.c mdnsd.c "$here/main-tinysvcmdns.c" -I. -lpthread
+
+  echo "== clovershell"
+  cd /work/src/clovershell-daemon && git clean -qfdx && stamp .
+  "$cc" -O2 -Wall $pinned -o "$out/bin/clovershell" clovershell.c
+
+  echo "== sunxi-tools"
+  for t in 1e219c0:sunxi-fexc 1e219c0:sunxi-pio 5c19710:sunxi-nand-part; do
+    cd "/work/src/sunxi-tools-${t%%:*}" && git clean -qfdx
+    make -s CC="$cc" "${t#*:}" >/work/sunxi-tools.log 2>&1 || { tail -20 /work/sunxi-tools.log >&2; exit 1; }
+    cp "${t#*:}" "$out/bin/"
+  done
+
+  echo "== sntool (public hakchi)"
+  cd /work/src/hakchi/sntool && git -C /work/src/hakchi clean -qfdx -- sntool && stamp /work/src/hakchi
+  PATH="/work/shim:$PATH" make -s GCC="$cc" >/work/sntool.log 2>&1 || { tail -20 /work/sntool.log >&2; exit 1; }
+  cp sntool "$out/bin/"
+
+  echo "== xdelta3 3.1.1"
+  cd /work/src/xdelta/xdelta3 && git -C /work/src/xdelta clean -qfdx
+  autoreconf -fi >/work/xdelta.log 2>&1
+  # Its Makefile compiles as C99, where glibc 2.22 does not define static_assert; GCC 4.9
+  # has _Static_assert there too.
+  CPPFLAGS="-Dstatic_assert=_Static_assert" ./configure --host=arm-buildroot-linux-gnueabihf --without-liblzma \
+    >>/work/xdelta.log 2>&1 \
+    && make -s xdelta3 >>/work/xdelta.log 2>&1 || { tail -20 /work/xdelta.log >&2; exit 1; }
+  cp xdelta3 "$out/bin/"
+
   echo "== done"
   ls -l "$out/bin" "$out/lib"
   exit 0
@@ -101,6 +150,10 @@ while read -r kind name url pin; do
       [ -d "$d/.git" ] || git clone -q "$url" "$d"
       git -C "$d" cat-file -e "$pin^{commit}" 2>/dev/null || git -C "$d" fetch -q origin
       git -C "$d" checkout -q --force "$pin"
+      # sntool needs headers from hakchi's mkbootimg submodule.
+      if [ "$name" = hakchi ]; then
+        git -C "$d" submodule update -q --init 3rdparty/mkbootimg 3rdparty/sunxi-tools
+      fi
       ;;
     ''|'#'*) ;;
     *) echo "sources.txt: unknown kind $kind" >&2; exit 1 ;;

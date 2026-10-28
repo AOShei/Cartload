@@ -14,3 +14,23 @@ file e2fsprogs-1.44.1.tar.gz https://mirrors.edge.kernel.org/pub/linux/kernel/pe
 file dropbear-2018.76.tar.bz2 https://matt.ucc.asn.au/dropbear/releases/dropbear-2018.76.tar.bz2 f2fb9167eca8cf93456a5fc1d4faf709902a3ab70dd44e352f3acbc3ffdaea65
 file kexec-tools-2.0.15.tar.xz https://mirrors.edge.kernel.org/pub/linux/utils/kernel/kexec/kexec-tools-2.0.15.tar.xz 899b7b861431eb51886d0c12866e91b036228244d35a5fb04762dd1a3c0194e7
 file rsync-3.1.3.tar.gz https://download.samba.org/pub/rsync/src/rsync-3.1.3.tar.gz 55cc554efec5fdaad70de921cd5a5eeb6c29a95524c715f3bbf849235b0800c0
+
+# Programs outside Buildroot, at the commit each shipped binary names or, when it names none,
+# the last commit before it was built.
+# llmnrd: the shipped one reports "git id v0.5-4-g4dc24d0".
+git llmnrd https://github.com/tklauser/llmnrd 4dc24d0ecf7333ce139a8b8fb2e8477e14bfe092
+# tinysvcmdns: the mDNS library (mdns.c, mdnsd.c; its messages match the shipped binary). The
+# shipped main program was never published; main-tinysvcmdns.c replaces it.
+git tinysvcmdns https://github.com/geekman/tinysvcmdns 84b40311d00bf86ad2b79ee9df7121aacf5a6e61
+# clovershell: the last commit before the shipped build (2018-03-19); its strings match.
+git clovershell-daemon https://github.com/ClusterM/clovershell-daemon 5edb8745f54556482a178e60542fd1901a201683
+# xdelta3 3.1.1 (the shipped one, unpacked from UPX, reports it): main had no commits between
+# 2017-08-21 and 2026.
+git xdelta https://github.com/jmacd/xdelta 7508fd2a823443b1f0173ca361620f21d62a7d37
+# sunxi-tools: sunxi-fexc and sunxi-pio report v1.4.2-30-g1e219c0, sunxi-nand-part
+# v1.4.2-54-g5c19710 ("dirty": hakchi's patch to fel_lib.c, which they do not use).
+git sunxi-tools-1e219c0 https://github.com/linux-sunxi/sunxi-tools 1e219c0bb9051cb6252e7fb9e52c552e4aa21a21
+git sunxi-tools-5c19710 https://github.com/linux-sunxi/sunxi-tools 5c1971040c6c44caefb98e371bfca9e18d511da9
+# sntool and its headers (the mkbootimg submodule): public hakchi. The shipped sntool
+# (5833d00, 2020) was built from unpublished changes.
+git hakchi https://github.com/AOShei/hakchi fd525ac710988d12fb9e37213b5fc75651ba47c0
