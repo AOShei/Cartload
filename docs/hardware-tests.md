@@ -1181,4 +1181,14 @@ Results, 2026-10-28, SNES Classic Mini EUR, kernel branch `cartload` at `1ed43a0
   a cold start (the 32 kHz crystal is not running yet when the driver switches to it; the RTC
   has no battery). After a warm `reboot` they are gone and the clock is set from the RTC, as on
   the stock kernel. The stock kernel's cold start was not logged for comparison; same driver.
-  Not tested yet: games, sound, controllers, USB storage, Wi-Fi.
+- Play test on the installed kernel (TV, two controllers; the user, 2026-10-28/29): both
+  controllers detected (`Nintendo Clovercon - controller1/2`), HDMI 720p, sound, built-in games,
+  added SNES (compressed) and NES games, Game Boy (Pokémon Red, Blue) through RetroArch, suspend
+  points, Down + Select to the menu, several syncs including new NES games: all fine.
+  Two hangs, not reproduced: Pokémon Blue on a black screen at start while the console had
+  hakchi2 CE's RetroArch with KMFD's Gambatte core (it starts fine after **Update** put KMFD's
+  RetroArch on); controllers dead once after a RetroArch update followed straight by a sync,
+  fixed by a power-cycle, not seen on later syncs. Kernel log of that boot not kept. The kernel
+  log has `udevd: failed to execute '/usr/bin/hdmi_trans'` (not yet compared with the stock
+  kernel). Not tested: USB storage, Wi-Fi and Bluetooth dongles (no OTG hub), the return from
+  this kernel.
