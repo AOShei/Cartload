@@ -42,6 +42,11 @@ class Toasts {
     this.push("success", message, null, { label: "Undo", run: undo }, UNDO_TTL);
   }
 
+  /** A message with one action button (Show details, Open). */
+  withAction(kind: ToastKind, message: string, action: ToastAction): void {
+    this.push(kind, message, null, action, kind === "error" ? ERROR_TTL : UNDO_TTL);
+  }
+
   dismiss(id: number): void {
     const timer = this.timers.get(id);
     if (timer) {

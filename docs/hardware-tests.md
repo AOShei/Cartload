@@ -637,7 +637,11 @@ a toast.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | SNES Classic Mini (EUR), hakchi v1.0.4-126 | Linux 6.18.57, Wayland, hakchi0 169.254.68.74 | not run (console attached all day) | OK: connected card and details in 2.4 s, both in the app and the `watch` example | not run | not run | native Wayland needed `WEBKIT_DISABLE_DMABUF_RENDERER=1`; GDK_BACKEND=x11 also works |
 
-## Kernel page (desktop app)
+## hakchi setup on the Console page (desktop app)
+
+Since the Console and Kernel pages were merged, the stages below are the Console page's setup
+view (a console without hakchi) and each flow's steps, log and result appear in the progress
+window instead of the page's right column. Read "the Kernel page" in this section that way.
 
 Crate: `src-tauri`, binary `cartload` (package `cartload-app`). The Kernel page runs the flows of "Install kernel"
 above through the app's `FlowRunner`: the same `cartload-flow` steps, the same time limits,
@@ -928,17 +932,17 @@ RetroArch modules under other names, so the install path with KMFD's modules is 
 
 ### Prerequisites
 
-- A console running its hakchi kernel without RetroArch (Settings → Emulators shows "Not on
+- A console running its hakchi kernel without RetroArch (Console → Emulators shows "Not on
   the console" for all three), or one where the KMFD modules are not installed.
 - Internet access to hakchi.net.
 
-### 1. Install from Settings
+### 1. Install from the Console page
 
-1. Settings → Emulators → **Install** on "NES core (FCEUmm)". Expected: "Downloading …" on
-   RetroArch then the core (about 11 MB), then the app switches to the Kernel page and the
-   flow "Installing emulator modules" runs its six steps; the console reboots once; the last
+1. Console → Emulators → **Install** on "NES core (FCEUmm)". Expected: "Downloading …" on
+   RetroArch then the core (about 11 MB), then the progress window "Install emulators" opens
+   over the page and runs its six steps; the console reboots once; the last
    step reports both modules registered and `retroarch-clover`, `nes`, `fceumm` on the PATH.
-2. Back in Settings, both rows say "Installed on the console". `ls /var/lib/hakchi/hmod` on
+2. On the Console page, both rows say "Installed on the console". `ls /var/lib/hakchi/hmod` on
    the console lists `uninstall-_km_retroarch_1910_ozone` and `uninstall-_km_fceumm_xtreme`.
 3. Rerun **Install**: the flow's install step is skipped as already done.
 
@@ -984,7 +988,7 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
 
 ### 7. N64
 
-1. Settings → Emulators → **Install** on N64. Expected: the "Install at your own risk?"
+1. Console → Emulators → **Install** on N64. Expected: the "Install at your own risk?"
    dialog with the performance warning first; Cancel installs nothing, **Install anyway**
    runs the flow.
 2. Import a `.z64` ROM, sync, start it. Record which game and how it runs; slow or broken
@@ -998,8 +1002,8 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
    "SNES core (Snes9x)" across all folders, with that game listed.
 2. Remove the game from the library (or set it to the built-in emulator), sync, then
    **Remove** again. Expected: the confirmation dialog; **Remove** runs "Removing emulator
-   modules" on the Kernel page (six steps, one reboot); the console log shows
-   `package _km_snes9x_xtreme uninstalled`; afterwards Settings shows **Install** for SNES and
+   modules" in the progress window (six steps, one reboot); the console log shows
+   `package _km_snes9x_xtreme uninstalled`; afterwards the Console page shows **Install** for SNES and
    `hakchi pack_list` no longer lists `_km_snes9x_xtreme`, while RetroArch and the other cores
    still start their games.
 3. On a SNES Classic with NES games in the library, **Remove** on NES (FCEUmm). Expected: the
@@ -1017,3 +1021,32 @@ hakchi's SNES wrapper (which would pass `-rom` to `/bin/snes` as the file name).
    Removing RetroArch there also removes CE's built-in NES cores (FCEUmm, Nestopia).
 3. An emulator on the console that no record lists (`which <launcher>` finds it, `grep` in
    `/var/lib/hakchi/hmod` does not): the dialog "Cartload cannot remove this", no flow.
+
+## Console page and progress window (desktop app)
+
+### 1. Layout
+
+1. The top bar shows the Cartload mark and three tabs: Console, Library, Settings (Ctrl+1 to
+   Ctrl+3; Left/Right move between the tabs). Clicking the mark opens About in Settings.
+2. Console page with a console running hakchi: the status card, then Emulators on the left and
+   hakchi (package, Reinstall, Save the stock kernel, Factory reset), Detected and a collapsed
+   Technical details on the right. With a stock console or FEL mode: the three setup steps on
+   the left and Boot from memory, Save, Factory reset on the right.
+3. Settings has no Emulators section; the Linux setup row is there, and on the Console page
+   only while it needs attention.
+
+### 2. Progress window
+
+1. Remove a core: the window "Remove emulators" opens over the Console page, names the core,
+   lists six steps with the log folded. The page underneath stays the Console page and does
+   not switch to the setup view while the console reboots.
+2. **Hide** while it runs: the status bar shows "Remove emulators, step n of 6"; clicking it
+   brings the window back. Let it finish hidden: a toast says the emulators are removed.
+3. Reinstall hakchi on an installed console: the window shows the kernel steps with the log
+   open, no FEL panel (it kexecs). On a powered-off console, Install hakchi: the window shows
+   "Your turn: put the console in FEL mode" with the drawing until the console is found.
+4. A failing run (unplug the console during "Wait for the console"): the window shows the
+   failure card with Try again. Close it: the status bar keeps "… failed: details" until its ×
+   is clicked.
+5. Escape or a click beside the window hides it and never stops the task; **Stop** does, and
+   during flash writes says "Stopping after this step…".

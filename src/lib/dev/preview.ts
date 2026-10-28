@@ -32,7 +32,7 @@ const fixtures: Record<string, () => StatusReport> = {
     },
     tone: "ready",
     title: "Console in FEL mode: ready to install the kernel.",
-    next: "Open the Kernel page to install hakchi, or to boot it from memory without installing anything.",
+    next: "Install hakchi below, or boot it from memory without installing anything.",
     details: [
       { label: "USB", value: "bus 1, device 9" },
       { label: "USB id", value: "1f3a:efe8" },
@@ -275,6 +275,61 @@ const flowFixtures: Record<string, () => FlowSnapshot> = {
       cancel_pending: false,
       started_at: now - 300_000,
       finished_at: now - 20_000,
+    };
+  },
+  "waiting-fel": () => {
+    const now = Date.now();
+    const steps = pendingSteps();
+    const first = steps[0]!;
+    first.state = "running";
+    first.started_at = now - 8_000;
+    first.message =
+      "waiting up to 120 s for a console in FEL mode: hold Reset, switch Power on, release Reset after two seconds";
+    return {
+      seq: 5,
+      kind: { kind: "install" },
+      state: "running",
+      steps,
+      current: 0,
+      message: first.message,
+      failure: null,
+      cancel_pending: false,
+      started_at: now - 8_000,
+      finished_at: null,
+    };
+  },
+  removing: () => {
+    const now = Date.now();
+    const labels: [string, string][] = [
+      ["wait-console", "Wait for the console"],
+      ["detect", "Identify the console"],
+      ["remove-emulators", "Remove the emulator modules"],
+      ["wait-console", "Wait for the console"],
+      ["detect", "Identify the console"],
+      ["verify-removed", "Verify the modules are gone"],
+    ];
+    const steps: StepSnapshot[] = labels.map(([name, label], index) => ({
+      index,
+      name,
+      label,
+      description: "",
+      state: index < 2 ? "done" : index === 2 ? "running" : "pending",
+      started_at: index <= 2 ? now - 6_000 : null,
+      elapsed_ms: index < 2 ? 400 : null,
+      message: index === 0 ? "already connected" : index === 2 ? "console: uninstalling snes9x2010..." : null,
+      transfer: null,
+    }));
+    return {
+      seq: 12,
+      kind: { kind: "remove_modules", ids: ["snes9x"] },
+      state: "running",
+      steps,
+      current: 2,
+      message: "console: uninstalling snes9x2010...",
+      failure: null,
+      cancel_pending: false,
+      started_at: now - 6_000,
+      finished_at: null,
     };
   },
   cancelled: () => {

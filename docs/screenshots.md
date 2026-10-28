@@ -80,8 +80,10 @@ google-chrome --headless=new --window-size=1280,800 --hide-scrollbars \
   "http://localhost:1420/?page=library&library=many&sync=plan&theme=light"
 ```
 
-Fixtures: `?preview=disconnected|fel|booting|connected|stock` (Console), `?page=kernel&flow=
-idle|running|failed|done|cancelled&package=cached|none|problem`, `?page=library&library=some|
+Fixtures: `?preview=disconnected|fel|booting|connected|stock` (Console), `&flow=
+idle|running|waiting-fel|removing|failed|done|cancelled&package=cached|none|problem` with
+`&window=open` for the progress window, `&modules=cached|installed` (Emulators),
+`&remove=<module>` (the removal dialog), `&emulator=<module>` (Library filter), `?page=library&library=some|
 empty|many&sync=none|plan|review|warning|running|done|failed&import=running|done`, `?page=settings`. `&theme=light|dark`
 forces a theme, `&log=open|closed` the activity log panel; on the Library page `&folder=4/1`
 opens a folder of the fixture (index path), `&select=N` selects its first N games (the detail
@@ -96,8 +98,8 @@ before capturing.
 | --- | --- |
 | `console-connected-<theme>.png` | Console page with a hakchi console identified |
 | `console-nothing-<theme>.png` | Console page with nothing attached |
-| `kernel-running-<theme>.png` | Kernel page during the upload step |
-| `kernel-done-<theme>.png` | Kernel page after a successful install |
+| `kernel-running-<theme>.png` | Progress window during the upload step (`?flow=running&window=open`) |
+| `kernel-done-<theme>.png` | Progress window after a successful install (`?flow=done&window=open`) |
 | `library-<theme>.png` | Library page with folders, covers, a selected game and the sync bar |
 | `library-plan-<theme>.png` | Library page with the sync plan open |
 | `settings-<theme>.png` | Settings page, scrolled to the About panel |

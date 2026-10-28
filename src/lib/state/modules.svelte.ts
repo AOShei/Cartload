@@ -35,7 +35,7 @@ export interface PendingRemoval {
 }
 
 /* Emulator modules from the Mod Hub: the catalog with its cache and console state, downloads
-   with progress, and the hand-off to the install flow (which runs on the Kernel page like
+   with progress, and the hand-off to the install flow (followed in the progress window like
    every flow). */
 class ModulesStore {
   status = $state<ModulesStatus | null>(null);
@@ -145,7 +145,7 @@ class ModulesStore {
     }
   }
 
-  /** Starts the confirmed removal and shows the Kernel page, where its steps are followed. */
+  /** Starts the confirmed removal; its progress window opens over the current page. */
   async confirmRemove(): Promise<boolean> {
     const removal = this.removal;
     this.removal = null;
@@ -156,16 +156,11 @@ class ModulesStore {
       toasts.info("Removing modules works inside the desktop app only.");
       return false;
     }
-    const started = await flowStore.begin({ kind: "remove_modules", ids: [removal.id] });
-    if (started) {
-      navigation.go("kernel");
-      toasts.info("Removing the emulator. The console reboots once at the end.");
-    }
-    return started;
+    return flowStore.begin({ kind: "remove_modules", ids: [removal.id] });
   }
 
-  /** Downloads what is missing from the cache, then starts the install flow for `ids` and
-   *  shows the Kernel page, where the flow's steps are followed. */
+  /** Downloads what is missing from the cache, then starts the install flow for `ids`;
+   *  its progress window opens over the current page. */
   private async installNow(ids: string[]): Promise<boolean> {
     if (!inTauri) {
       toasts.info("Installing modules works inside the desktop app only.");
@@ -186,12 +181,7 @@ class ModulesStore {
     } finally {
       this.downloading = [];
     }
-    const started = await flowStore.begin({ kind: "install_modules", ids });
-    if (started) {
-      navigation.go("kernel");
-      toasts.info("Installing the emulator modules. The console reboots once at the end.");
-    }
-    return started;
+    return flowStore.begin({ kind: "install_modules", ids });
   }
 }
 

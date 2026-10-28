@@ -1,4 +1,4 @@
-//! The kernel package (`hakchi.hmod`) the Kernel page installs: where it is, which version it
+//! The kernel package (`hakchi.hmod`) the Console page installs: where it is, which version it
 //! is, and downloading a fresh copy into the cache.
 //!
 //! Resolution order: the `CARTLOAD_HMOD` environment variable (a development override pointing
@@ -52,7 +52,7 @@ pub struct PackageInfo {
     pub modified: Option<u64>,
 }
 
-/// What the Kernel page shows in step 2.
+/// What the Console page shows about the package.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageStatus {
     /// The package that would be installed, when one is usable.

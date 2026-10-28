@@ -1,23 +1,22 @@
 <script lang="ts">
-  import { onMount, tick, untrack } from "svelte";
+  import { onMount, tick } from "svelte";
   import { save } from "@tauri-apps/plugin-dialog";
   import {
     diagnosticsReport,
     diagnosticsSave,
     logFile,
     logReveal,
-    setupInstall,
-    setupStatus,
     tgdbKeyGet,
     tgdbKeySet,
   } from "../api/commands";
   import { AppError, inTauri } from "../api/tauri";
-  import type { KeyStatus, LogFileInfo, SetupStatus } from "../api/types";
+  import type { KeyStatus, LogFileInfo } from "../api/types";
   import AppMark from "../components/AppMark.svelte";
   import Dialog from "../components/Dialog.svelte";
   import Icon from "../components/Icon.svelte";
+  import LinuxSetup from "../components/LinuxSetup.svelte";
   import Wordmark from "../components/Wordmark.svelte";
-  import { app, consoleStore, flowStore, formatBytes, libraryStore, modulesStore, navigation, preferences, toasts, withRetroarch, type Theme } from "../state";
+  import { app, libraryStore, navigation, preferences, toasts, type Theme } from "../state";
 
   let keyStatus = $state<KeyStatus | null>(null);
   let keyLoading = $state(false);
@@ -25,33 +24,13 @@
   let keyBusy = $state(false);
   let confirmKeyRemoval = $state(false);
   let about: HTMLElement | undefined = $state();
-  let setup = $state<SetupStatus | null>(null);
-  let setupBusy = $state(false);
-  let setupOpen = $state(false);
-  let setupChecking = $state(false);
   let log = $state<LogFileInfo | null>(null);
-  /** A console running a hakchi kernel the app can talk to: modules install there. */
-  const consoleReady = $derived.by((): boolean => {
-    const status = consoleStore.report?.status;
-    return status?.state === "connected" && status.info.can_interact && (consoleStore.report?.supported ?? true);
-  });
   let diagnosticsBusy = $state(false);
 
-  /** Reads the modules again once a flow has ended and the console is back (an install or
-   *  a removal reboots it). */
-  $effect(() => {
-    if (consoleReady && !flowStore.running) {
-      untrack(() => void modulesStore.load());
-    }
-  });
 
   onMount(() => {
     void libraryStore.start();
-    void modulesStore.start();
     if (inTauri) {
-      void setupStatus()
-        .then((status) => (setup = status))
-        .catch((error: unknown) => toasts.error(`Could not read the system setup: ${AppError.from(error).message}`));
       void logFile()
         .then((info) => (log = info))
         .catch(() => (log = null));
@@ -63,7 +42,7 @@
     }
   });
 
-  /** The sidebar brand opens the About panel. */
+  /** The top bar's brand opens the About panel. */
   $effect(() => {
     if (navigation.section === "about" && about) {
       navigation.tookSection();
@@ -73,33 +52,6 @@
       });
     }
   });
-
-  /** Runs the checks again and shows the result in the dialog. */
-  async function checkSetup(): Promise<void> {
-    setupOpen = true;
-    setupChecking = true;
-    try {
-      setup = await setupStatus();
-    } catch (error: unknown) {
-      const e = AppError.from(error);
-      toasts.error(`Could not read the system setup: ${e.message}`, e.detail);
-    } finally {
-      setupChecking = false;
-    }
-  }
-
-  async function installSetup(): Promise<void> {
-    setupBusy = true;
-    try {
-      setup = await setupInstall();
-      toasts.success(setup.complete ? "Linux setup installed. Reconnect the console." : "Installed what could be installed.");
-    } catch (error: unknown) {
-      const e = AppError.from(error);
-      toasts.error(e.message, e.detail);
-    } finally {
-      setupBusy = false;
-    }
-  }
 
   async function copyDiagnostics(): Promise<void> {
     diagnosticsBusy = true;
@@ -205,6 +157,29 @@
     </div>
   </section>
 
+  <section class="card" aria-labelledby="library-heading">
+    <div class="head">
+      <h2 id="library-heading">Library</h2>
+      <span class="mono path muted small" title={libraryStore.view?.root ?? ""}>{libraryStore.view?.root ?? "the user data directory"}</span>
+    </div>
+    <p class="muted small">
+      TheGamesDB key for cover art (free at thegamesdb.net):
+      {#if keyLoading}checking…{:else if keyStatus?.environment}set by CARTLOAD_TGDB_KEY{:else if keyStatus?.stored}stored{:else}none yet{/if}{#if keyStatus?.remaining !== null && keyStatus?.remaining !== undefined}, <span class="num">{keyStatus.remaining}</span> requests left this month{/if}.
+    </p>
+    <form class="key" onsubmit={(e) => { e.preventDefault(); void saveKey(false); }}>
+      <input type="password" bind:value={keyValue} placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"} aria-label="TheGamesDB API key" autocomplete="off" disabled={keyBusy} />
+      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>
+        {#if keyBusy}<span class="spinner" aria-hidden="true"></span>{/if}
+        Store
+      </button>
+      {#if keyStatus?.stored}
+        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => (confirmKeyRemoval = true)}>Remove…</button>
+      {/if}
+    </form>
+  </section>
+
+  <LinuxSetup />
+
   <section class="card" aria-labelledby="log-heading">
     <div class="head">
       <h2 id="log-heading">Activity log</h2>
@@ -224,75 +199,6 @@
         <button type="button" class="btn btn-quiet" onclick={() => void revealLog()} title={log.path}>Open log folder</button>
       {/if}
     </div>
-  </section>
-
-  {#if setup?.applies}
-    <section class="card row-card" aria-labelledby="setup-heading">
-      <h2 id="setup-heading">Linux setup</h2>
-      {#if setup.complete}
-        <span class="status ok"><Icon name="check" size={16} /> Ready</span>
-        <button type="button" class="btn btn-quiet btn-sm" onclick={() => void checkSetup()}>Check again</button>
-      {:else}
-        <span class="status warn"><Icon name="warning" size={16} /> Needs attention</span>
-        <button type="button" class="btn btn-sm" onclick={() => void checkSetup()}>Check setup…</button>
-      {/if}
-    </section>
-  {/if}
-
-  <section class="card grow" aria-labelledby="modules-heading">
-    <h2 id="modules-heading">Emulators</h2>
-    <p class="muted small">RetroArch and its cores install into hakchi's storage on the console; each core adds RetroArch when it is missing. The built-in emulators and the menu stay untouched.</p>
-    {#if modulesStore.status}
-      <ul class="modules">
-        {#each modulesStore.status.modules as module (module.id)}
-          {@const progress = modulesStore.progress[module.id]}
-          {@const downloading = modulesStore.downloading.includes(module.id)}
-          <li class:wide={module.id === "retroarch"}>
-            <div class="module-text">
-              <strong>{module.short}</strong>
-              <span class="muted small">
-                {module.purpose}
-                {#if module.warning}
-                  <span class="risk" title={module.warning}><Icon name="warning" size={12} /> At your own risk</span>
-                {/if}
-                {#if downloading && progress}
-                  · Downloading {formatBytes(progress.done)}{progress.total ? ` of ${formatBytes(progress.total)}` : ""}
-                {:else if module.installed === true}
-                  · <span class="ok-text">Installed</span>
-                {:else if !module.cached}
-                  · {formatBytes(module.approx_bytes)}
-                {/if}
-              </span>
-            </div>
-            {#if module.installed === true}
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => modulesStore.requestRemove(module.id)}
-                disabled={flowStore.running || !consoleReady}
-                title={module.id === "retroarch" ? "Uninstalls RetroArch and its cores, then reboots the console once" : "Uninstalls the core and reboots the console once"}
-              >
-                Remove
-              </button>
-            {:else}
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => void modulesStore.install(modulesStore.missing(withRetroarch(module.id)))}
-                disabled={downloading || flowStore.running || !consoleReady}
-                title={consoleReady ? "Downloads the module and reboots the console once" : "Connect a console running hakchi"}
-              >
-                {#if downloading}<span class="spinner" aria-hidden="true"></span>{/if}
-                Install
-              </button>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="muted"><span class="spinner" aria-hidden="true"></span> Reading the modules…</p>
-    {/if}
-    <p class="muted small foot">Modules come from KMFDManic's Mod Hub. Installing or removing needs a connected console running hakchi and reboots it once.</p>
   </section>
   </div>
 
@@ -326,26 +232,6 @@
     <p class="muted small foot">Made with Tauri, Rust and Svelte. A from-scratch implementation; shares no code with hakchi2 CE.</p>
   </section>
 
-  <section class="card" aria-labelledby="library-heading">
-    <div class="head">
-      <h2 id="library-heading">Library</h2>
-      <span class="mono path muted small" title={libraryStore.view?.root ?? ""}>{libraryStore.view?.root ?? "the user data directory"}</span>
-    </div>
-    <p class="muted small">
-      TheGamesDB key for cover art (free at thegamesdb.net):
-      {#if keyLoading}checking…{:else if keyStatus?.environment}set by CARTLOAD_TGDB_KEY{:else if keyStatus?.stored}stored{:else}none yet{/if}{#if keyStatus?.remaining !== null && keyStatus?.remaining !== undefined}, <span class="num">{keyStatus.remaining}</span> requests left this month{/if}.
-    </p>
-    <form class="key" onsubmit={(e) => { e.preventDefault(); void saveKey(false); }}>
-      <input type="password" bind:value={keyValue} placeholder={keyStatus?.stored ? "Replace the stored key" : "Paste the key"} aria-label="TheGamesDB API key" autocomplete="off" disabled={keyBusy} />
-      <button type="submit" class="btn" disabled={keyBusy || !keyValue.trim()}>
-        {#if keyBusy}<span class="spinner" aria-hidden="true"></span>{/if}
-        Store
-      </button>
-      {#if keyStatus?.stored}
-        <button type="button" class="btn btn-quiet" disabled={keyBusy} onclick={() => (confirmKeyRemoval = true)}>Remove…</button>
-      {/if}
-    </form>
-  </section>
   </div>
 </div>
 
@@ -356,45 +242,6 @@
     <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (confirmKeyRemoval = false)}>Keep it</button>
   {/snippet}
 </Dialog>
-
-{#if setup}
-  <Dialog open={setupOpen} title="Linux setup" width="560px" onclose={() => (setupOpen = false)}>
-    {#if setupChecking}
-      <p class="muted"><span class="spinner" aria-hidden="true"></span> Checking…</p>
-    {:else}
-      <ul class="checks">
-        <li class:ok={setup.usb_rule}><Icon name={setup.usb_rule ? "check" : "warning"} size={16} /><span>USB access rule</span></li>
-        <li class:ok={setup.name_rule}><Icon name={setup.name_rule ? "check" : "warning"} size={16} /><span>hakchi0 interface name</span></li>
-        {#if setup.network_manager}
-          <li class:ok={setup.network_profile}><Icon name={setup.network_profile ? "check" : "warning"} size={16} /><span>Link-local network profile</span></li>
-        {:else}
-          <li><Icon name="warning" size={16} /><span>NetworkManager not found: give hakchi0 a link-local address yourself.</span></li>
-        {/if}
-        {#if setup.firewalld}
-          {#if setup.firewall_zone === "trusted"}
-            <li class="ok"><Icon name="check" size={16} /><span>Firewall: hakchi0 trusted</span></li>
-          {:else if setup.firewall_zone}
-            <li><Icon name="warning" size={16} /><span>Firewall: hakchi0 is in the {setup.firewall_zone} zone</span></li>
-          {:else}
-            <li class="ok"><Icon name="dash" size={16} /><span>Firewall: checked once the console is connected</span></li>
-          {/if}
-        {/if}
-      </ul>
-      {#if !setup.complete}
-        <p class="muted small">Install writes the missing files and asks for your password.{#if !setup.can_install} pkexec was not found, so install them by hand (docs/hardware-tests.md).{/if}</p>
-      {/if}
-    {/if}
-    {#snippet actions()}
-      {#if !setup?.complete}
-        <button type="button" class="btn btn-primary" onclick={() => void installSetup()} disabled={setupBusy || setupChecking || !setup?.can_install}>
-          {#if setupBusy}<span class="spinner on-accent" aria-hidden="true"></span>{/if}
-          {setupBusy ? "Installing…" : "Install"}
-        </button>
-      {/if}
-      <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (setupOpen = false)}>Close</button>
-    {/snippet}
-  </Dialog>
-{/if}
 
 <style>
   /* Narrow: one scrolling column. Wide (1100 px and up): the settings on the left and the
@@ -500,45 +347,12 @@
     color: var(--accent-strong);
   }
 
-  .status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
-  }
 
-  .status.ok,
-  .ok-text {
-    color: var(--ok);
-  }
 
-  .status.warn {
-    color: var(--warn);
-  }
 
-  .checks {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
 
-  .checks li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--text-muted);
-  }
 
-  .checks li.ok {
-    color: var(--text);
-  }
 
-  .checks li.ok :global(svg) {
-    color: var(--ok);
-  }
 
   .option {
     display: flex;
@@ -560,48 +374,11 @@
     font-size: var(--text-sm);
   }
 
-  /* RetroArch across the top, then the cores two to a row. */
-  .modules {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2) var(--space-5);
-  }
 
-  .modules li.wide {
-    grid-column: 1 / -1;
-  }
 
-  .modules li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--border);
-  }
 
-  .risk {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: var(--space-1);
-    color: var(--warn);
-  }
 
-  .module-text {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
 
-  .modules .btn {
-    flex: none;
-    min-width: 76px;
-  }
 
   .key,
   .actions {

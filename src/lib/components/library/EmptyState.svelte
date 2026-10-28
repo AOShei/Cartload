@@ -36,11 +36,11 @@
           {#if installed}
             hakchi is running on the console.
           {:else}
-            The Kernel page walks through it once; the console keeps hakchi afterwards.
+            The Console page walks through it once; the console keeps hakchi afterwards.
           {/if}
         </p>
         {#if !installed}
-          <button type="button" class="btn" onclick={() => navigation.go("kernel")}>Open the Kernel page</button>
+          <button type="button" class="btn" onclick={() => navigation.go("console")}>Open the Console page</button>
         {/if}
       </div>
     </li>

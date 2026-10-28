@@ -380,9 +380,7 @@ fn describe_disconnected(hint: &Hint) -> Description {
         } => (
             Tone::Warning,
             format!("Something answers at {address}, but it is not a hakchi kernel."),
-            "It refused the hakchi login. If this is the console, install the kernel from the \
-             Kernel page."
-                .into(),
+            "It refused the hakchi login. If this is the console, install hakchi below.".into(),
             vec![
                 Detail::new("Address", address.clone()),
                 Detail::new("Error", reason.clone()),
@@ -439,9 +437,7 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
             (
                 Tone::Ready,
                 "Console in FEL mode: ready to install the kernel.".into(),
-                "Open the Kernel page to install hakchi, or to boot it from memory without \
-                 installing anything."
-                    .into(),
+                "Install hakchi below, or boot it from memory without installing anything.".into(),
                 details,
             )
         }
@@ -591,8 +587,8 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
         return (
             Tone::Ready,
             "Console running the hakchi recovery kernel from memory.".into(),
-            "Nothing has been installed yet. Open the Kernel page to install hakchi, or switch \
-             the console off and on to return to its own system."
+            "Nothing has been installed yet. Install hakchi below, or switch the console off \
+             and on to return to its own system."
                 .into(),
             details,
         );
@@ -611,21 +607,21 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
         let (title, next) = match &info.versions {
             None => (
                 "Console with a very old hakchi kernel.".to_string(),
-                "Reinstall the kernel from the Kernel page.".to_string(),
+                "Reinstall hakchi below.".to_string(),
             ),
             Some(versions) if versions.requires_reflash() => (
                 format!(
                     "Console with hakchi {}: the kernel is too old to use.",
                     versions.script
                 ),
-                "Reinstall the kernel from the Kernel page.".to_string(),
+                "Reinstall hakchi below.".to_string(),
             ),
             Some(versions) => (
                 format!(
                     "Console with hakchi {}: its system files are too old.",
                     versions.script
                 ),
-                "Update hakchi from the Kernel page.".to_string(),
+                "Update hakchi below (Reinstall).".to_string(),
             ),
         };
         return (Tone::Warning, title, next, details);
@@ -888,7 +884,7 @@ mod tests {
         })
         .describe(0);
         assert!(shell.title.contains("recovery kernel from memory"));
-        assert!(shell.next.contains("Kernel page"));
+        assert!(shell.next.contains("Install hakchi below"));
         assert_eq!(shell.details[0].value, "abcd");
 
         let outdated = connected(ConsoleInfo {
@@ -907,7 +903,7 @@ mod tests {
             outdated.title,
             "Console with hakchi v1.0.2-000: the kernel is too old to use."
         );
-        assert_eq!(outdated.next, "Reinstall the kernel from the Kernel page.");
+        assert_eq!(outdated.next, "Reinstall hakchi below.");
 
         let ancient = connected(ConsoleInfo {
             hwid: "abcd".into(),

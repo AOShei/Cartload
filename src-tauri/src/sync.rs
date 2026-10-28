@@ -355,7 +355,7 @@ fn connected_info(state: &AppState) -> Result<ConsoleInfo, CommandError> {
     match state.report().status {
         ConsoleStatus::Connected { info, .. } if info.can_interact => Ok(*info),
         ConsoleStatus::Connected { .. } => Err(CommandError::new(
-            "The console's hakchi is too old to sync with, or it runs a recovery shell. Install hakchi again from the Kernel page.",
+            "The console's hakchi is too old to sync with, or it runs a recovery shell. Install hakchi again from the Console page.",
         )),
         ConsoleStatus::Working { title, .. } => Err(CommandError::new(format!(
             "{title} is in progress. Wait for it to finish."

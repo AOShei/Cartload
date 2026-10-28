@@ -2,7 +2,7 @@
 //! emitted on every change, and stoppable except while the console writes to its flash.
 //!
 //! The flows themselves live in `cartload-flow`. This module adapts their event stream to what
-//! the Kernel page shows (one entry per step with its state, timing and last message), pauses
+//! the progress window shows (one entry per step with its state, timing and last message), pauses
 //! the console watcher while a flow owns the USB link, and turns a failure into a
 //! [`FlowFailure`] naming the likely cause and the next action.
 
@@ -190,7 +190,7 @@ pub struct Transfer {
     pub total: u64,
 }
 
-/// One step as the Kernel page shows it.
+/// One step as the progress window shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepSnapshot {
     /// Zero-based position in the flow.
@@ -245,7 +245,7 @@ pub enum FlowState {
     Cancelled,
 }
 
-/// Everything the Kernel page shows about the current or last flow. Emitted as the
+/// Everything the progress window shows about the current or last flow. Emitted as the
 /// `flow-progress` event on every change and returned by `flow_status`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlowSnapshot {

@@ -1,6 +1,6 @@
 import type { IconName } from "../components/icons";
 
-export type PageId = "console" | "kernel" | "library" | "settings";
+export type PageId = "console" | "library" | "settings";
 
 export interface PageDef {
   id: PageId;
@@ -12,8 +12,7 @@ export interface PageDef {
 
 /** The pages, in sidebar order. */
 export const PAGES: readonly PageDef[] = [
-  { id: "console", label: "Console", icon: "console", hint: "What is connected and what it can do." },
-  { id: "kernel", label: "Kernel", icon: "kernel", hint: "Install or repair hakchi on the console." },
+  { id: "console", label: "Console", icon: "console", hint: "The console: hakchi, emulators and maintenance." },
   { id: "library", label: "Library", icon: "library", hint: "Your games, folders and art." },
   { id: "settings", label: "Settings", icon: "settings", hint: "Theme and advanced options." },
 ];
@@ -28,7 +27,8 @@ function initialPage(): PageId {
     return "console";
   }
   const wanted = new URLSearchParams(location.search).get("page");
-  return isPageId(wanted) ? wanted : "console";
+  // The Kernel page became part of the Console page.
+  return wanted === "kernel" ? "console" : isPageId(wanted) ? wanted : "console";
 }
 
 class Navigation {

@@ -2,24 +2,25 @@
   import { onMount, untrack } from "svelte";
   import { cubicOut } from "svelte/easing";
   import { fly } from "svelte/transition";
+  import FlowWindow from "./lib/components/FlowWindow.svelte";
   import LogPanel from "./lib/components/LogPanel.svelte";
   import ModuleRemoveDialog from "./lib/components/ModuleRemoveDialog.svelte";
   import ModuleWarningDialog from "./lib/components/ModuleWarningDialog.svelte";
-  import Sidebar from "./lib/components/Sidebar.svelte";
   import StatusBar from "./lib/components/StatusBar.svelte";
   import Toaster from "./lib/components/Toaster.svelte";
+  import TopBar from "./lib/components/TopBar.svelte";
   import { NORMAL, ms } from "./lib/motion";
   import ConsolePage from "./lib/pages/ConsolePage.svelte";
-  import KernelPage from "./lib/pages/KernelPage.svelte";
   import LibraryPage from "./lib/pages/LibraryPage.svelte";
   import SettingsPage from "./lib/pages/SettingsPage.svelte";
-  import { PAGES, app, consoleStore, libraryStore, logStore, navigation, preferences } from "./lib/state";
+  import { PAGES, app, consoleStore, flowStore, libraryStore, logStore, navigation, preferences } from "./lib/state";
 
   onMount(() => {
     preferences.load();
     void app.load();
     void consoleStore.start();
     void logStore.start();
+    void flowStore.start();
   });
 
   /** The library is read for one console (which games need RetroArch depends on it, and
@@ -37,7 +38,7 @@
     });
   });
 
-  /** Ctrl+1..4 switch pages, Ctrl+L toggles the log, F5 looks again. */
+  /** Ctrl+1..3 switch pages, Ctrl+L toggles the log, F5 looks again. */
   function onkeydown(event: KeyboardEvent): void {
     if (event.key === "F5") {
       event.preventDefault();
@@ -64,15 +65,13 @@
 <svelte:window onkeydown={onkeydown} />
 
 <div class="shell">
-  <Sidebar />
+  <TopBar />
   <div class="column">
     <main>
       {#key navigation.page}
         <div class="page" in:fly={{ y: 6, duration: ms(NORMAL), easing: cubicOut }}>
           {#if navigation.page === "console"}
             <ConsolePage />
-          {:else if navigation.page === "kernel"}
-            <KernelPage />
           {:else if navigation.page === "library"}
             <LibraryPage />
           {:else}
@@ -90,20 +89,21 @@
 <Toaster />
 <ModuleWarningDialog />
 <ModuleRemoveDialog />
+<FlowWindow />
 
 <style>
   .shell {
     display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: auto 1fr auto;
     grid-template-areas:
-      "sidebar main"
-      "footer footer";
+      "header"
+      "main"
+      "footer";
     height: 100vh;
   }
 
-  .shell > :global(nav) {
-    grid-area: sidebar;
+  .shell > :global(header) {
+    grid-area: header;
   }
 
   .column {
@@ -114,7 +114,7 @@
     min-width: 0;
   }
 
-  /* The window is a fixed viewport: the sidebar, this header, the log panel and the status
+  /* The window is a fixed viewport: the top bar, the log panel and the status
      bar never move, and the page content area is the only flexible region. It never scrolls
      itself; each page declares which of its regions scroll. */
   main {

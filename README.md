@@ -70,12 +70,13 @@ Not yet tested on hardware. Two drivers are involved:
 1. **Console page.** Connect the console with its USB cable. The page shows what is
    attached: nothing, a console in FEL mode, stock firmware, or a running hakchi kernel with
    its version and free space.
-2. **Kernel page.** Pick the console model, put the console in FEL mode as the drawing
-   shows (hold Reset, switch Power on, release after two seconds; the screen stays black),
-   and press **Install hakchi**. The thirteen steps run in order and are resumable: if
-   anything stops, run it again and finished steps are skipped. The same page boots the
-   console from memory without writing anything, saves the stock kernel to a file, and
-   removes hakchi again (factory reset).
+2. **Install hakchi** (Console page, on a console without it). Pick the console model, put
+   the console in FEL mode as the drawing shows (hold Reset, switch Power on, release after
+   two seconds; the screen stays black), and press **Install hakchi**. The progress opens in
+   a window over the app; the thirteen steps run in order and are resumable: if anything
+   stops, run it again and finished steps are skipped. Once hakchi is installed the same
+   page manages the emulators and offers reinstall, saving the stock kernel to a file and
+   removing hakchi again (factory reset).
 3. **Library page.** Add ROMs (SNES `.sfc`, `.smc`, `.fig`, `.swc`; NES `.nes`; and, with
    their RetroArch core installed, Mega Drive / Genesis `.md`, `.gen`, `.smd`, Game Boy
    `.gb`, `.gbc`, Game Boy Advance `.gba`, N64 `.z64`, `.n64`, `.v64`; or a `.zip` of any of
@@ -83,8 +84,8 @@ Not yet tested on hardware. Two drivers are involved:
    **Sync**. Sync is
    a diff: only changed files travel, and files already on the console are kept. If the
    cable is pulled mid-way, run the sync again once the console is back.
-4. **Settings page.** Theme, the log, the Linux setup, the emulator modules, the library
-   location and the TheGamesDB key.
+4. **Settings page.** Theme, the log, the Linux setup, the library location and the
+   TheGamesDB key.
 
 ### Emulator modules
 
