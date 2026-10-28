@@ -1165,3 +1165,8 @@ Results, 2026-10-28, SNES Classic Mini EUR, kernel branch `cartload` at `1ed43a0
   lines (`Rtc time will be wrong`, `unable to read the hardware clock`), probably from the FEL
   start (compared against a NAND boot), not checked. Not tested: games, sound, controllers
   (none plugged in), USB storage, Wi-Fi.
+- Backup (`scripts/console-backup.sh`): ok, 14 min (debug build of `cartload-console`, about
+  0.5 MB/s through SSH). Every piece matched the MD5 taken on the console; no stock kernel
+  backup at block 0x68. `e2fsck -fn` on `nandc.img` reports only free-count mismatches and an
+  unreplayed journal (the memboot does not unmount); on a copy, the journal replay plus that
+  fix leaves a clean filesystem.
