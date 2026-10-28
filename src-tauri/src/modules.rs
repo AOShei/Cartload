@@ -91,13 +91,14 @@ pub fn installed_check(module: &Module) -> String {
 const RECORDS_DIR: &str = "/var/lib/hakchi/hmod";
 
 /// Prints the uninstall records (`uninstall-<name>`, one per line) that delete one of
-/// `binaries` from `bin/`. `pack_install` generates each record from the package's files
-/// (`rm -f "$rootfs/./bin/snes"`), so this finds the package that put a launcher on the
-/// console whatever it was called: Cartload's `_km_snes9x_xtreme` or hakchi2 CE's
-/// `snes9x2010`.
+/// `binaries` from `bin/`. `pack_install` generates each record from the package's files, all
+/// on one line (`rm -f "$rootfs/./uninstall" ... "$rootfs/./bin/gb" "$rootfs/./bin/gambatte"`),
+/// so this finds the package that put a launcher on the console whatever it was called:
+/// Cartload's `_km_snes9x_xtreme` or hakchi2 CE's `snes9x2010`. The closing quote ends the
+/// name (`gb` does not match `gbc`); the launcher need not be the last file on the line.
 pub fn records_check(binaries: &[&str]) -> String {
     format!(
-        r#"cd {RECORDS_DIR} 2>/dev/null && grep -lE '/bin/({})"$' uninstall-* 2>/dev/null; true"#,
+        r#"cd {RECORDS_DIR} 2>/dev/null && grep -lE '"\$rootfs/(\./)?bin/({})"' uninstall-* 2>/dev/null; true"#,
         binaries.join("|")
     )
 }
@@ -437,6 +438,8 @@ pub fn load(ids: &[String]) -> Result<Vec<ModArchive>, CommandError> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]
@@ -457,7 +460,7 @@ mod tests {
         assert_eq!(all.len(), modhub::CATALOG.len());
         assert_eq!(
             records_check(modhub::SNES9X.binaries),
-            r#"cd /var/lib/hakchi/hmod 2>/dev/null && grep -lE '/bin/(snes9x|snes)"$' uninstall-* 2>/dev/null; true"#
+            r#"cd /var/lib/hakchi/hmod 2>/dev/null && grep -lE '"\$rootfs/(\./)?bin/(snes9x|snes)"' uninstall-* 2>/dev/null; true"#
         );
         // What a SNES Classic with hakchi2 CE's RetroArch answered (2026-10-28).
         assert_eq!(
@@ -465,6 +468,53 @@ mod tests {
             ["snes9x2010", "_km_snes9x_xtreme"]
         );
         assert!(parse_records("").is_empty());
+    }
+
+    /// Runs the record search with the host's `grep -E` (POSIX ERE, like the console's BusyBox
+    /// grep) over records as a SNES Classic held them (2026-10-28).
+    #[cfg(unix)]
+    #[test]
+    fn records_check_finds_a_launcher_anywhere_on_the_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let records = [
+            (
+                "uninstall-_km_gambatte",
+                r#"rm -f "$rootfs/./uninstall" "$rootfs/./etc/libretro/core/km_gambatte_libretro.so" "$rootfs/./bin/km_gambatte" "$rootfs/./bin/gbc" "$rootfs/./bin/gb" "$rootfs/./bin/gambatte""#,
+            ),
+            (
+                "uninstall-tiny7zx",
+                r#"rm -f "$rootfs/./uninstall" "$rootfs/./bin/tiny7zx""#,
+            ),
+            (
+                "uninstall-_km_retroarch_1910_ozone",
+                r#"rm -f "$rootfs/./usr/bin/gb" "$rootfs/./bin/retroarch-clover" "$rootfs/./bin/nes""#,
+            ),
+        ];
+        for (name, line) in records {
+            std::fs::write(
+                dir.path().join(name),
+                format!("\n# auto-generated\n{line}\n"),
+            )
+            .unwrap();
+        }
+        let found = |binaries: &[&str]| {
+            let command =
+                records_check(binaries).replace(RECORDS_DIR, &dir.path().display().to_string());
+            let output = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(command)
+                .output()
+                .unwrap();
+            let mut names = parse_records(&String::from_utf8_lossy(&output.stdout));
+            names.sort();
+            names
+        };
+        // Not the last file on its line, and not matched by /usr/bin/gb or bin/gbc alone.
+        assert_eq!(found(&["gb"]), ["_km_gambatte"]);
+        assert_eq!(found(&["gb", "gbc"]), ["_km_gambatte"]);
+        assert_eq!(found(&["tiny7zx"]), ["tiny7zx"]);
+        assert_eq!(found(&["retroarch-clover"]), ["_km_retroarch_1910_ozone"]);
+        assert!(found(&["gba"]).is_empty());
     }
 
     #[test]
