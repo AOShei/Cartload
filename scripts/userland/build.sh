@@ -106,6 +106,12 @@ if [ "${1:-}" = "--inside" ]; then
   PATH="/work/shim:$PATH" make -s GCC="$cc" >/work/sntool.log 2>&1 || { tail -20 /work/sntool.log >&2; exit 1; }
   cp sntool "$out/bin/"
 
+  echo "== decodepng"
+  cd /work/src/decodepng && git clean -qfdx && stamp .
+  "$cc" -Wall -Os -std=gnu99 $pinned -I. -DBUILD_COMMIT="\"$(git rev-parse --short HEAD)\"" \
+    -DBUILD_DATE="\"$(TZ=UTC /bin/date -d "@$epoch" '+%Y-%m-%d %H:%M:%S %Z')\"" \
+    -o "$out/bin/decodepng" decodepng.c lodepng.c -lm
+
   echo "== xdelta3 3.1.1"
   cd /work/src/xdelta/xdelta3 && git -C /work/src/xdelta clean -qfdx
   autoreconf -fi >/work/xdelta.log 2>&1
@@ -150,10 +156,11 @@ while read -r kind name url pin; do
       [ -d "$d/.git" ] || git clone -q "$url" "$d"
       git -C "$d" cat-file -e "$pin^{commit}" 2>/dev/null || git -C "$d" fetch -q origin
       git -C "$d" checkout -q --force "$pin"
-      # sntool needs headers from hakchi's mkbootimg submodule.
-      if [ "$name" = hakchi ]; then
-        git -C "$d" submodule update -q --init 3rdparty/mkbootimg 3rdparty/sunxi-tools
-      fi
+      # Submodules: sntool needs hakchi's mkbootimg headers; decodepng is built with LodePNG.
+      case "$name" in
+        hakchi) git -C "$d" submodule update -q --init 3rdparty/mkbootimg 3rdparty/sunxi-tools ;;
+        decodepng) git -C "$d" submodule update -q --init ;;
+      esac
       ;;
     ''|'#'*) ;;
     *) echo "sources.txt: unknown kind $kind" >&2; exit 1 ;;

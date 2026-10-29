@@ -78,7 +78,11 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 | sntool | **not equivalent**: the public source (2018) builds a 12.5 KB tool with the boot-area commands; the shipped one (793 KB, `5833d00` 2020, unpublished) also has `sunxi-part` (`grow`, `shrink`, `tune`), `decodepng`, `ismd`, `isRecovery`, `mdui` and Mega Drive helpers. Those need a replacement of our own. |
 
 The byte-identical files show that this toolchain and Buildroot are the ones the shipped binaries
-were built with. The newer tools link the same libraries as the shipped ones, except that the
+were built with. Built programs can be run in the container with Ubuntu's `qemu-user` (`qemu-arm -L
+target/userland/buildroot-2015.11.1/output/target <program>`): BusyBox lists its 375 applets,
+llmnrd reports `v0.5 (git id v0.5-4-g4dc24d0)` like the shipped one.
+
+The newer tools link the same libraries as the shipped ones, except that the
 shipped ones also need `libgcc_s` and are 10 to 50% smaller: they were built outside Buildroot,
 probably with flags like those in hakchi's `sntool/Makefile` (`-Os -mthumb -flto`,
 `--gc-sections`). The difference is size, not behaviour.
@@ -89,7 +93,7 @@ hakchi's scripts call these, and only the shipped 2020 sntool has them:
 
 | Command | Used by | Notes |
 |---|---|---|
-| `decodepng <png> > /dev/fb0` | boot logo, splash (`init`, `b0010_functions`) | PNG to framebuffer pixels |
+| `decodepng <png> > /dev/fb0` | boot logo, splash (`init`, `b0010_functions`) | **built**: public after all, DanTheMan827's decodepng at `ac7f36a` (hakchi's submodule pin) with LodePNG `c7bb19a`; its own program here instead of part of sntool. Under QEMU it turns hakchi.png into two 1280×720 32-bit frames |
 | `sntool ismd`, `sntool mdui` | Mega Drive Mini checks | NES, SNES and Famicom answer no; Cartload refuses the Mega Drive |
 | `sntool isRecovery` | `preinit`, `b0010_functions` | meaning still to read from the console |
 | `sunxi-part` (list), `grow`, `shrink`, `tune`, `--dry-run` | Cartload's install (`grow`), hakchi's uninstall (`shrink`) and repair (`tune`), `ismdPartitioning` (list) | see below |
