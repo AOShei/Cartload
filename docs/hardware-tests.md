@@ -1298,3 +1298,23 @@ Fresh backup first (`scripts/console-backup.sh`: `~/cartload-backups/2026-10-29-
   (`d8967254...`), the menu runs through it (Nintendo's clover-mcp at nice -15), mDNS up.
   hakchi's uninstall is safe again on this console. Still to do: the play test (TV, controllers).
 
+
+## Cartload u-boot (experimental)
+
+`scripts/uboot/build.sh`'s uboot.bin, in the package assembled with it (docs/uboot.md).
+
+### 1. From RAM through FEL (nothing written)
+
+Power off, hold Reset, power on, release after two seconds (`lsusb`: 1f3a:efe8). Then
+`cargo run -q --release -p cartload-flow -- memboot --hmod target/assemble/out/cartload.hmod`.
+Check: `sntool devmem 0x47000000 4096 | md5sum` equals `head -c 4096 target/uboot/out/uboot.bin |
+md5sum` (our u-boot is the one in memory), its banner, `/proc/partitions`, `sunxi-part`.
+
+Results (SNES EUR, 2026-10-29, uboot.bin `059caf38...`): memboot finished in 50.2 s (FEL 42 s,
+SSH 7 s). In memory: our u-boot (first 4 KiB identical; banner `U-Boot 2011.09-rc1 (Oct 29 2026 -
+16:14:43)`, the pinned date; boot command replaced by FEL with `boota 47400000`). It added
+`boot_type=0 disp_para=100 fb_base=0x0 config_size=41828 partitions=` to the command line (empty
+partitions: FEL does not set up NAND in u-boot); the NAND driver found the layout itself: nand,
+nanda, nandb, nandc (370,688 KiB, grown), `sunxi-part` right, Nintendo's system decrypted.
+Back to the menu with `reboot -f`. For comparison, hakchi's u-boot on a NAND start passes
+`partitions=boot@nanda:rootfs@nandb:data@nandc`: to check with ours once installed.
