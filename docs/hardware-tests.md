@@ -1238,3 +1238,27 @@ Results (SNES EUR, our kernel, 2026-10-29, no controller or TV needed):
   Clovercon - controller1"), open only in Nintendo's `clover-mcp` and `ReedPlayer-Clover`. The
   sntool helpers have only a UDP socket on `127.0.0.1:1001` (receive queue empty); `uinput` is
   loaded (by them) with no users.
+
+## Cartload system from RAM (experimental)
+
+`scripts/userland/assemble.sh` output (docs/userland.md "Assembling the system") booted from RAM;
+nothing installed.
+
+### 1. Memboot
+
+1. Console on, at the menu. `cargo run -q --release -p cartload-flow -- memboot --hmod target/assemble/out/cartload.hmod`.
+   Expected: `memboot finished`, `console: minimal memboot shell`.
+2. `cargo run -q --release -p cartload-console -- exec 'md5sum /bin/sntool /bin/busybox; cat /proc/mounts; ps w; sntool isRecovery; echo $?; sunxi-part; e2fsck -fn /dev/nandc; echo $?'`.
+   Expected: the checksums of `target/assemble/out/ramdisk/bin/`, `/dev/mapper/root-crypt` on
+   `/newroot` (our cryptsetup opened Nintendo's system), no `/dev/nand*` mounted, `0`, the
+   layout, e2fsck passes 1-5 and exit 0.
+3. `cargo run -q --release -p cartload-console -- exec 'sync; umount -ar; reboot -f'`: back at the menu.
+
+Results (SNES EUR, 2026-10-29, `boot.img` 4,212,736 bytes, sha256 `c96edac5...`): memboot in
+13.8 s, SSH (our dropbear) after 8.7 s. Our sntool, busybox, dropbear, cryptsetup and clovershell
+running (checksums match the build); `/newroot` mounted from `root-crypt`; llmnrd, inetd, dropbear
+up; `isRecovery 0`; `sunxi-part` and `shrink --dry-run` right; our e2fsck: data clean (journal
+not replayed in a read-only check), exit 0; `hakchi hwid` right; decodepng turns hakchi.png
+into 7,372,800 bytes. Kernel log warnings only from the kernel (display script entries, audio
+PA, the boot0 scan of blocks 4-7). `hakchi eval 'echo $sftype-$sfregion'` printed `-`: to compare
+with the shipped memboot shell. Back to the menu afterwards; hakchi's own sntool still installed.
