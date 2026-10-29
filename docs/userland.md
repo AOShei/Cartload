@@ -89,27 +89,45 @@ probably with flags like those in hakchi's `sntool/Makefile` (`-Os -mthumb -flto
 
 ## sntool's unpublished commands
 
-hakchi's scripts call these, and only the shipped 2020 sntool has them:
+hakchi's scripts call these, and only the shipped 2020 sntool has them. Their behaviour was read
+by running that sntool under qemu-arm against copies of a console backup
+(`scripts/userland/fakenand/run.sh`: a preload library answers the NAND ioctls from the backup's
+boot area and logs, instead of running, the programs it starts), with a look at the
+disassembly where a trace did not say enough.
 
-| Command | Used by | Notes |
+| Command | Used by | What it does |
 |---|---|---|
 | `decodepng <png> > /dev/fb0` | boot logo, splash (`init`, `b0010_functions`) | **built**: public after all, DanTheMan827's decodepng at `ac7f36a` (hakchi's submodule pin) with LodePNG `c7bb19a`; its own program here instead of part of sntool. Under QEMU it turns hakchi.png into two 1280×720 32-bit frames |
-| `sntool ismd`, `sntool mdui` | Mega Drive Mini checks | NES, SNES and Famicom answer no; Cartload refuses the Mega Drive |
-| `sntool isRecovery` | `preinit` (loads `script/install`), `b0010_functions` (`gameover`: `shutdown` or `poweroff`) | true (exit 0) when running from hakchi's own ramdisk: observed 0 in the memboot shell (2026-10-29: `/init decrypt hakchi-shell hakchi-chainload`, `/newroot` mounted, kernel 3.4.113.29-madmonkey from RAM) and 1 in the normal system. The tool mentions `/newroot` and `cmdline`; which of them it tests is still to read from the binary |
-| `sunxi-part` (list), `grow`, `shrink`, `tune`, `--dry-run` | Cartload's install (`grow`), hakchi's uninstall (`shrink`) and repair (`tune`), `ismdPartitioning` (list) | see below |
+| `sntool isRecovery` | `preinit` (loads `script/install`), `b0010_functions` (`gameover`: `shutdown` or `poweroff`) | exit 0 if `/lib/modules-ramfs/kernel/drivers/block/nand/nand.ko` exists, a file only hakchi's boot ramdisk has; nothing else is checked. Observed on a console: 0 in the memboot shell, 1 in the normal system |
+| `sntool ismd` | Mega Drive checks (`install`, `ismdPartitioning`, sunxi-part) | exit 0 if the 32-bit word at physical `0x01c23818` (chip ID area, read through `/dev/mem`) is `0x005a7213`, else 1 |
+| `sntool mdui` | | always exit 0 |
+| `sunxi-part` and its commands | Cartload's install (`grow`), hakchi's uninstall (`shrink`) and repair (`tune`), `ismdPartitioning` (list) | below |
 
-`sunxi-part` works on two levels, read from the shipped binary's messages:
+`sunxi-part` reads the four u-boot copies (NAND blocks 0x08-0x27) with `phy_read` and the Linux
+partition table from `/dev/nand`, then:
 
-1. The Linux partition table: Allwinner's MBR at the start of `/dev/nand`
-   (`mbr: version 0x00000200, magic softw411`, several copies, checked one by one), the format
-   sunxi-tools' `sunxi-nand-part` edits.
-2. The NAND driver's own physical layout (`nandinfo0.bin`, `nandinfo1.bin`, `--nand-part`,
-   `--nand-states`): the `_boot_info` block in the NAND boot area (kernel
-   `drivers/block/nand/lib/src/phy/phy.h`: MBR, FTL partitions, storage info, factory bad
-   blocks), read and written raw through hakchi's `phy_read`/`phy_write` ioctls.
+- no command: prints the table as `mbr::32768 nanda:boot:6144 nandb:rootfs:131072
+  nandc:data:741376` (name, label, sectors).
+- `grow` and `shrink` change something only from hakchi's ramdisk (the `isRecovery` test) and
+  when the layout is not already the asked one; otherwise they print the table and exit 0.
+  `--dry-run` prints the new table and `(not) writing <grow|shrink> partition table...` (on
+  stderr) and changes nothing.
+- `shrink` (grown to factory): `hakchi umount_base`; shrinks the data filesystem to 612,352
+  sectors (1 MiB under the factory partition: `fsck.ext4 -fy`, `resize2fs -fs` (64bit off),
+  `resize2fs -f /dev/nandc 612352s`, `tune2fs -m 3`, `fsck.ext4 -fy`); rewrites the boot-info
+  block of u-boot copies 1 and 2 (blocks 0x0d and 0x14, `nand sectors written: 2`) with the
+  factory layout; `hakchi reload_nand`; `echo y | sunxi-nand-part -f a20 /dev/nand 32768 'boot 6144
+  32768' 'rootfs 131072 32768' 'data 614400 32768' 'private 2048 32768' 'UDISK 0 0'`; then what
+  `tune` does.
+- `grow` (factory to grown): `hakchi umount_base`; the boot-info block of copies 1 and 2 with
+  data = data + private + UDISK (741,376) and no private or UDISK; `hakchi reload_nand`;
+  `sunxi-nand-part` as above with `'data 741376 32768'` and nothing after it; then `tune`.
+- `tune`: `hakchi umount_base`, `fsck.ext4 -fy`, `resize2fs -fs`, `resize2fs -f` (fill the
+  partition), `tune2fs -m 3` (3% reserved), `fsck.ext4 -fy`, all on `/dev/nandc`. **It ignores
+  `--dry-run`**: never run the shipped `sunxi-part tune --dry-run` on a console expecting no
+  change.
 
-Then it reloads the NAND driver (`reload_nand`: `nand.ko`) and resizes the data filesystem
-(`resize2fs`, `tune2fs`). `grow` merges the unused `UDISK` partition into the data partition;
-`shrink` undoes it. Getting either wrong can make the data partition unreadable (the console
-itself recovers through FEL), so a replacement is developed against dumps of both levels and
-checked against the shipped tool's `--dry-run` before it writes anything.
+Copies 3 and 4 are never written, so a console keeps its factory layout there (the fixtures:
+`scripts/userland/fixtures/`). From the factory block the shipped `grow` writes exactly the
+grown block found on a console, and `shrink` then `grow` gives the boot area back byte for byte.
+The shrunk block is the factory layout but not the factory bytes (see the fixtures' README).
