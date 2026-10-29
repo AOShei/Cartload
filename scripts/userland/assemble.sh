@@ -131,11 +131,14 @@ if [ "${1:-}" = "--inside" ]; then
       [ -e "$rd/lib32/$lib" ] || { echo "ramdisk ${f#$rd/} needs $lib, which the ramdisk lacks" >&2; exit 1; }
     done
   done
-  # The archive: owners root, every time the hakchi checkout's commit time, entries in order,
+  # The archive: owners root, every time the hakchi checkout's commit time, entries by path,
   # with the kernel's archiver (cpio would record the build's inode numbers); xz with CRC32,
   # as the kernel's decompressor needs.
   find "$rd" -exec touch -h -d "@$epoch" {} +
-  sh "$src/scripts/gen_initramfs_list.sh" -u squash -g squash "$rd" >/out/ramdisk.list
+  # Sorted by path: the list comes in find's order, which depends on the file system (a
+  # build elsewhere would order the archive differently); in byte order each directory still
+  # comes before what it holds.
+  sh "$src/scripts/gen_initramfs_list.sh" -u squash -g squash "$rd" | LC_ALL=C sort -k2,2 >/out/ramdisk.list
   "$src/usr/gen_init_cpio" -t "$epoch" /out/ramdisk.list | xz --check=crc32 -9e >/out/ramdisk.cpio.xz
 
   echo "== boot.img"

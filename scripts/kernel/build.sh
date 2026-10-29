@@ -135,7 +135,8 @@ if [ "${1:-}" = "--inside" ]; then
   # The kernel's own archiver numbers inodes in order and takes a fixed time, so the archive
   # is the same on every build (cpio would record the build's inode numbers).
   find /work/overlay -exec touch -h -d "@$KERNEL_EPOCH" {} +
-  sh scripts/gen_initramfs_list.sh -u squash -g squash /work/overlay >/work/overlay.list
+  # Sorted by path: find's order depends on the file system.
+  sh scripts/gen_initramfs_list.sh -u squash -g squash /work/overlay | LC_ALL=C sort -k2,2 >/work/overlay.list
   usr/gen_init_cpio -t "$KERNEL_EPOCH" /work/overlay.list | xz --check=crc32 -9e >/work/overlay.xz
   ramdisk=/work/ramdisk
   cp "$u-ramdisk.gz" "$ramdisk"
