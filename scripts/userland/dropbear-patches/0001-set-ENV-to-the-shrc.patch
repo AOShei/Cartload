@@ -1,0 +1,11 @@
+--- a/svr-chansession.c
++++ b/svr-chansession.c
+@@ -962,6 +962,8 @@
+ 	addnewvar("HOME", ses.authstate.pw_dir);
+ 	addnewvar("SHELL", get_user_shell());
+ 	addnewvar("PATH", DEFAULT_PATH);
++	/* hakchi: the shell reads $HOME/.shrc, which has the PATH of hakchi's shell. */
++	addnewvar("ENV", "$HOME/.shrc");
+ 	if (chansess->term != NULL) {
+ 		addnewvar("TERM", chansess->term);
+ 	}

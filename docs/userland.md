@@ -168,6 +168,22 @@ behaviour, not its code, and tested two ways by `scripts/userland/sntool-test/ru
    factory layouts, dry runs, outside the recovery shell, each filesystem step failing. Same
    boot area, same Linux partition table, same output, same commands in the same order.
 
+The same test flashes u-boot and the kernel as hakchi's install and uninstall do
+(`sunxi-flash burn_boot1`, `burn_boot2`, and `echo default | sunxi-flash burn_boot1`). The public
+code differed from the shipped tool in three ways, all fixed (fork `cd99085`), found when the
+first install of our package erased copy 1's boot-info (docs/hardware-tests.md):
+
+- `burn_boot1` padded the end of u-boot's last block with 0xff: u-boot (0xba000 bytes) ends in
+  the block holding the boot-info, so flashing u-boot erased copy 1's layout. The shipped tool
+  keeps the rest of that block, and so does ours now (`burn_boot2` still pads with 0xff, as the
+  shipped tool does after a kernel).
+- `burn_boot1` wrote any input; the shipped tool writes only a u-boot image.
+- `default` (hakchi's uninstall) wrote the word into copy 1. The shipped tool puts Nintendo's
+  u-boot back in every copy, as on a console from the factory: u-boot and its script from a copy
+  hakchi never writes, joined again (u-boot padded to 64 KiB, the script to 8 KiB, header
+  lengths and checksum, 0x8c000 bytes) with the current boot-info in copies 1-2 and the factory
+  one in the others, five blocks apart, the last two blocks the start of a seventh copy.
+
 Where ours differs, on purpose (also checked by the test):
 
 - `tune` runs only from the recovery shell and `tune --dry-run` runs nothing (the shipped one
@@ -179,5 +195,7 @@ Where ours differs, on purpose (also checked by the test):
 - `shrink` takes the factory sizes from the copies hakchi never writes (copies 3 and 4) rather
   than built-in numbers, and refuses without them;
 - the shipped tool's other options (`--nand-part`, `--backup`, `--file`, `dump`...), which hakchi's
-  scripts do not use, are refused.
+  scripts do not use, are refused;
+- `burn_boot1` with a u-boot image followed by more data writes only the header's length (the
+  shipped tool writes the rest over the boot-info).
 

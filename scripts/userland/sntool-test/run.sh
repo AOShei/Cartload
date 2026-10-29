@@ -8,7 +8,8 @@
 #    shipped one, both under qemu-arm against copies of that backup (fakenand/run.sh), must
 #    write the same boot area and partition table and run the same commands for grow, shrink
 #    and tune. Needs scripts/userland/build.sh's toolchain and the shipped package unpacked
-#    in target/analysis/pkg (tar -xzf data/hakchi.hmod).
+#    in target/analysis/pkg (tar -xzf data/hakchi.hmod). The same for flashing u-boot and the
+#    kernel (sunxi-flash burn_boot1, burn_boot2, and hakchi's uninstall's "default").
 #
 # The checkout defaults to the one scripts/userland/build.sh uses (target/userland/src/hakchi).
 set -euo pipefail
@@ -93,6 +94,50 @@ for c in "${cases[@]}"; do
     echo "  $name: differs in$diffs (target/fakenand/$name-shipped and -ours)"
     fail=1
   fi
+done
+
+# Flashing u-boot and the kernel (sunxi-flash burn_boot1 / burn_boot2), as hakchi's install and
+# uninstall do: name, start, command, input. "default" (hakchi's uninstall) puts Nintendo's u-boot
+# back in the factory arrangement; the cases after it start from its result.
+printf 'default\n' >"$out/default.txt"
+uboot=$repo/target/analysis/pkg/boot/uboot.bin
+flashes=(
+  "flash-uboot||burn_boot1 8|$uboot"
+  "flash-kernel||burn_boot2 30|$repo/target/analysis/pkg/boot/boot.img"
+  "flash-not-uboot||burn_boot1 8|$repo/target/analysis/pkg/boot/boot.img"
+  "flash-default||burn_boot1|$out/default.txt"
+  "flash-default-again|flash-default|burn_boot1|$out/default.txt"
+)
+for c in "${flashes[@]}"; do
+  IFS='|' read -r name from args input <<<"$c"
+  for who in shipped ours; do
+    prog=$shipped; [ $who = ours ] && prog=$out/sntool
+    FAKENAND_FROM=${from:+$from-$who} "$fake" "$BACKUP" "$name-$who" "$prog" sunxi-flash nandsize >/dev/null 2>&1 || true
+    w=$F/$name-$who
+    cp "$input" "$w/root/tmp/input"
+    # shellcheck disable=SC2086
+    "$engine" run --rm --network none -v "$w:/w:z" -v "$repo/target/userland/buildroot-2015.11.1/output:/br:ro,z" \
+      -v "$F:/shim:ro,z" -w /w/root/tmp cartload-fakenand sh -c "qemu-arm -L /w/root -E LD_PRELOAD=/shim/fakenand.so \
+      -E FAKENAND_RAW=/w/raw.bin -E FAKENAND_LOG=/w/flash.log /w/root/bin/$(basename "$prog") sunxi-flash $args \
+      <input >/w/stdout.txt 2>/w/stderr.txt; echo \$? >/w/exit.txt" || true
+  done
+  if cmp -s "$F/$name-shipped/raw.bin" "$F/$name-ours/raw.bin" && cmp -s "$F/$name-shipped/exit.txt" "$F/$name-ours/exit.txt"; then
+    echo "  $name: same"
+  else
+    echo "  $name: differs (target/fakenand/$name-shipped and -ours)"
+    fail=1
+  fi
+done
+# sunxi-part on that factory arrangement (what hakchi's uninstall runs next).
+for c in "list-default|flash-default|" "shrink-default|flash-default|shrink --dry-run" "grow-default|flash-default|grow --dry-run"; do
+  IFS='|' read -r name from args <<<"$c"
+  for who in shipped ours; do
+    prog=$shipped; [ $who = ours ] && prog=$out/sntool
+    # shellcheck disable=SC2086
+    FAKENAND_FROM=$from-$who "$fake" "$BACKUP" "$name-$who" "$prog" sunxi-part $args >/dev/null 2>&1 || true
+  done
+  cmp -s "$F/$name-shipped/stdout.txt" "$F/$name-ours/stdout.txt" && cmp -s "$F/$name-shipped/raw.bin" "$F/$name-ours/raw.bin" \
+    && echo "  $name: same" || { echo "  $name: differs"; fail=1; }
 done
 
 # Where ours is stricter than the shipped sntool (that one runs tune's filesystem commands

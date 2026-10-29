@@ -29,6 +29,8 @@ if [ "${1:-}" = "--inside" ]; then
     rm -rf "/work/src/${t%.tar.*}"
     tar -xf "/work/dl/$t" -C /work/src
   done
+  # hakchi's change to dropbear: sessions get ENV=$HOME/.shrc (dropbear-patches).
+  for p in "$here"/dropbear-patches/*.patch; do patch -d /work/src/dropbear-2018.76 -p1 -s <"$p"; done
 
   echo "== Buildroot 2015.11.1: toolchain (GCC 4.9.3, glibc 2.22) and its packages"
   if [ ! -d "$br" ]; then
@@ -55,7 +57,9 @@ if [ "${1:-}" = "--inside" ]; then
 
   echo "== busybox"
   cd /work/src/busybox
-  git clean -qfdx
+  git clean -qfdx && git checkout -q -- .
+  # hakchi's change to ash: every shell reads ENV (busybox-patches).
+  for p in "$here"/busybox-patches/*.patch; do patch -p1 -s <"$p"; done
   cp "$here/busybox.config" .config
   KCONFIG_NOTIMESTAMP=1 make -s oldconfig </dev/null >/dev/null
   make -s silentoldconfig >/dev/null

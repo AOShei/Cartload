@@ -1,0 +1,19 @@
+diff --git a/shell/ash.c b/shell/ash.c
+index 713219b6e..149b268e0 100644
+--- a/shell/ash.c
++++ b/shell/ash.c
+@@ -14160,11 +14160,13 @@ int ash_main(int argc UNUSED_PARAM, char **argv)
+ 	}
+  state2:
+ 	state = 3;
++	/* hakchi: ENV is read by every shell, not only interactive ones, so that commands run
++	 * over SSH (sh -c) get the PATH of hakchi's shell from $HOME/.shrc. */
+ 	if (
+ #ifndef linux
+ 	 getuid() == geteuid() && getgid() == getegid() &&
+ #endif
+-	 iflag
++	 1
+ 	) {
+ 		const char *shinit = lookupvar("ENV");
+ 		if (shinit != NULL && *shinit != '\0')

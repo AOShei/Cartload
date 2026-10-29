@@ -112,6 +112,10 @@ if [ "${1:-}" = "--inside" ]; then
   build rd /out/shipped/rd "$rd" init hakchi
   cp -a /hakchi/mod/init "$rd/init"
   cp -a /hakchi/mod/hakchi "$rd/hakchi"
+  # Directories git does not keep because they are empty (etc/dropbear: dropbear's host keys).
+  (cd /out/shipped/rd && find hakchi -type d -empty) | while read -r d; do
+    [ -d "$rd/$d" ] || { mkdir -p "$rd/$d"; echo "rd $d shipped" >>"$report.tmp"; }
+  done
   echo "rd init hakchi:mod/init" >>"$report.tmp"
   (cd /hakchi/mod/hakchi && find . \( -type f -o -type l \) | sort) | while read -r path; do
     echo "rd hakchi/${path#./} hakchi:mod/hakchi/${path#./}" >>"$report.tmp"
@@ -161,7 +165,9 @@ if [ "${1:-}" = "--inside" ]; then
     sort -u "$report.tmp" | while read -r where path source; do
       f=$rd/$path
       [ "$where" = pkg ] && f=$pkg/$path
-      if [ -L "$f" ]; then
+      if [ "$source" = shipped ] && [ -d "$f" ]; then
+        echo "$where $path $source (an empty directory)"
+      elif [ -L "$f" ]; then
         echo "$where $path $source -> $(readlink "$f")"
       elif [ -d "$f" ]; then
         echo "$where $path/ $source ($(find "$f" -type f | wc -l) files)"

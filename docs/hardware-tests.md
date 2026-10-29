@@ -1264,3 +1264,27 @@ PA, the boot0 scan of blocks 4-7). `hakchi eval 'echo $sftype-$sfregion'` printe
 shipped memboot shell. tinysvcmdns was not running (the shipped one is): it exited with
 `IP_ADD_MEMBERSHIP: No such device`; fixed by tinysvcmdns-patches/, after which
 `avahi-browse -rpt _ssh._tcp` on the computer shows the same announcement as the shipped one. Back to the menu afterwards; hakchi's own sntool still installed.
+
+### 2. Install (2026-10-29, the user present)
+
+Fresh backup first (`scripts/console-backup.sh`: `~/cartload-backups/2026-10-29-0461872a...`).
+`cargo run -q --release -p cartload-flow -- install --hmod target/assemble/out/cartload.hmod`.
+
+- First try: step 11 failed before changing anything, `sh: boot: not found`. hakchi's dropbear
+  sets `ENV=$HOME/.shrc` and hakchi's BusyBox reads ENV in every shell, which gives SSH commands
+  the PATH with `/hakchi/shell`; upstream does neither. Fixed: `dropbear-patches/`,
+  `busybox-patches/`. Also an empty directory git had dropped (`hakchi/rootfs/etc/dropbear`).
+- Second try: installed in 42.6 s, verify passed, the console came back at the menu. But the
+  installer's `flashBoot1` (our sntool's `burn_boot1`, the public code) **erased the boot-info of
+  u-boot copy 1** (block 0x0d, 0x1a000-0x1ffff, now 0xff; `sunxi-part: no valid boot-info block in
+  the first u-boot copy`). The console ran on copy 2's layout. Repaired the same day with the
+  user's go-ahead: from the shipped memboot shell, `sunxi-flash phy_write d 1` of block 0x0d
+  from the morning's backup, read back identical; blocks 0x00-0x2f then equal to the backup,
+  0x30-0x50 our kernel (with this console's key file on the command line, as hakchi writes it).
+  sntool fixed (docs/userland.md, fork `cd99085`); to be installed again with the fix.
+- Normal boot of the installed system (no TV): our sntool started Nintendo's `clover-mcp` at
+  nice -15 without hakchi's gamepad helpers, `ReedPlayer-Clover` up, tinysvcmdns announcing as
+  before, llmnrd, dropbear; data partition 352.6 MB mounted. **Until the fixed sntool is
+  installed, do not run hakchi's uninstall on this console** (`burn_boot1 default` with the
+  public code writes the word over u-boot copy 1).
+
