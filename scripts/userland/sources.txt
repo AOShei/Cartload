@@ -35,7 +35,7 @@ git sunxi-tools-5c19710 https://github.com/linux-sunxi/sunxi-tools 5c1971040c6c4
 # branch cartload, sunxi-part, isRecovery, ismd and mdui, which the shipped sntool (5833d00,
 # 2020) had from unpublished changes, and the scripts and data (mod/, kernel-hmod/) as shipped
 # in v1.0.4-126 with Cartload's changes (scripts/userland/assemble.sh).
-git hakchi https://github.com/AOShei/hakchi cd990852ecdbcc0103d8b55b1d86f3a9c2028e80
+git hakchi https://github.com/AOShei/hakchi 2c20d1a0be40b3606c96072da7979d5d0d0c81bf
 # decodepng (hakchi's boot images): the commit hakchi's 3rdparty/decodepng submodule pins. The
 # shipped sntool bundles this code; here it is its own program.
 git decodepng https://github.com/DanTheMan827/decodepng ac7f36a559396b2acae2bec3302078ac49b9eb1a
