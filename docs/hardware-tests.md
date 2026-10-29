@@ -1318,3 +1318,22 @@ partitions: FEL does not set up NAND in u-boot); the NAND driver found the layou
 nanda, nandb, nandc (370,688 KiB, grown), `sunxi-part` right, Nintendo's system decrypted.
 Back to the menu with `reboot -f`. For comparison, hakchi's u-boot on a NAND start passes
 `partitions=boot@nanda:rootfs@nandb:data@nandc`: to check with ours once installed.
+
+### 2. Installed, cold start
+
+Check blocks 0x00-0x2f against the backup, then `cartload-flow install --hmod
+target/assemble/out/cartload.hmod`; afterwards copy 1 must be `target/uboot/out/uboot.bin` with
+the grown boot-info, copies 2-4 unchanged. Power off (switch), power on. Check the menu,
+`/proc/cmdline`, `/proc/partitions`, the data partition.
+
+Results (SNES EUR, 2026-10-29): installed in 42.3 s, 6 blocks written (0x08-0x0d, copy 1's
+u-boot), its check passed, copy 1 = our uboot.bin with the grown boot-info, copies 2-4 and the
+kernel unchanged. Cold start through it: SSH and the menu after about 75 s of uptime; the kernel
+from NAND (its command line carries this console's key file, which only the flashed boot.img
+has) with our u-boot's additions (`config_size=41828 partitions=`); nand, nanda-c right, data
+mounted (352.6 MB). `partitions=` is empty where hakchi's u-boot gives
+`boot@nanda:rootfs@nandb:data@nandc`: `sunxi_flash phy_read` skips u-boot's logical NAND setup
+(`skip_init`), so u-boot never reads the partition table, as with Nintendo's own boot command;
+hakchi's fills it because its `ext4load` from the data partition sets the logical NAND up first.
+Nothing on the console reads it (hakchi's scripts, Nintendo's system); the kernel's NAND driver
+takes the layout from the boot-info. Not yet: the play test (TV, controllers).

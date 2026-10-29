@@ -1,4 +1,4 @@
-# u-boot from source (in progress)
+# u-boot from source
 
 Step 3 of "Independence from unverifiable builds" (`docs/roadmap.md`): rebuild hakchi's
 `boot/uboot.bin` (u-boot and its board configuration, flashed into u-boot copy 1 by every
@@ -88,3 +88,9 @@ First result (2026-10-29): u-boot 515,916 bytes (Nintendo's 515,804, hakchi's 58
    keeps hakchi's). Then a cold start reads the kernel from NAND through `sunxi_flash phy_read`.
    If it did not start, FEL (Reset at power-on) brings it back; Cartload's way back is
    `install --hmod data/hakchi.hmod` from a FEL memboot.
+
+Done on a SNES (EUR) on 2026-10-29, both steps (docs/hardware-tests.md "Cartload u-boot"): from RAM
+through FEL, then installed in copy 1 and cold-started through it. One difference from hakchi's
+u-boot shows on the kernel command line: `partitions=` is empty, as Nintendo's u-boot leaves it
+(its `phy_read` skips the logical NAND setup); nothing reads it.
+
