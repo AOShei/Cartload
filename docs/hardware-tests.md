@@ -1219,3 +1219,19 @@ shipped tool on a backup first (`BACKUP=<dir>`). Read-only steps; the changing o
 `cargo run -q --release -p cartload-console -- exec 'ls -l /usr/bin/clover-mcp /var/lib/hakchi/rootfs/usr/bin/clover-mcp; ps w | grep -E "clover-mcp|sntool" | grep -v grep; ls -l /dev/input/by-path/'`:
 whether hakchi's `clover-mcp -> /bin/sntool` link is what the menu runs on this console
 (docs/userland.md).
+
+Results (SNES EUR, our kernel, 2026-10-29, no controller or TV needed):
+
+- §1: our `sntool` (`a3e8359`, 18,339 bytes, md5 `0377322223ccce4a4721fd74e05b3fa7`) and the
+  shipped one print the same lines and exit codes for the listing, `grow --dry-run` (already
+  grown: the listing) and `shrink --dry-run` (the factory layout, found by ours in copies 3 and
+  4). Ours: `tune --dry-run` ran nothing, `isRecovery 0`, `ismd 1`, `mdui 0`. No NAND partition
+  was mounted; nothing written.
+- §2: the menu runs through the link. `/usr/bin/clover-mcp -> /bin/sntool` (from the overlay,
+  `/var/lib/hakchi/rootfs`). Three `clover-mcp --gui snes-eur` processes: Nintendo's
+  (`/var/squashfs/usr/bin/clover-mcp`, nice -15, holding `/dev/disp`, `event2` sunxi-knob,
+  `event3` sunxi-keyboard, `tty0`, `tty1`) started by sntool, and two sntool processes (nice 10
+  and its child, nice 18) with only `/dev/null` open, sleeping in a timer (`hrtimer_nanosleep`)
+  and using a little CPU: a polling loop. No `gpio-keys` device on this console
+  (`/dev/input/by-path` has only the AXP power chip).
+
