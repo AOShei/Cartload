@@ -37,10 +37,17 @@ Later, larger projects (not scheduled):
      Buildroot 2015.11.1, the toolchain v1.0.4-126 was built with, plus `sntool` and
      `clovershell` from the hakchi fork; keep the shipped scripts in that fork as their source
      of truth, with their difference from public master documented.
-  3. **u-boot from source** (Allwinner's published u-boot plus hakchi's changes).
-  4. **Own identity.** The package gets its own version instead of "hakchi v1.0.4-126", is
-     published as a release with its source and checksums, built in CI, and becomes what the
-     app installs; the app shows that version and the kernel's.
+  3. **u-boot from source.** Done: Nintendo's r16-uboot with hakchi's patch and two of
+     Cartload's, reproducible (`scripts/uboot/build.sh`, `docs/uboot.md`), run from RAM through
+     FEL and installed on a SNES (EUR), cold-started through it.
+  4. **Own identity.** Done in code: the package is "Cartload system 0.1.0" (`cartloadVersion`
+     in `var/version`, from `scripts/userland/SYSTEM_VERSION`; `hakchiVersion` stays for its
+     scripts and hakchi2 CE), embedded in the app as the default with hakchi v1.0.4-126 as the
+     alternative (a selector on the Console page), and shown in the console's status. CI
+     (`.github/workflows/system.yml`) rebuilds it from source and fails unless it is byte for
+     byte the committed `data/cartload-system-<version>.hmod`; a `system-v<version>` tag puts it,
+     its report and checksums in a draft release. To do: the first CI run, the first release,
+     the play test of the whole system.
   5. **NES and Famicom Minis**: the same chip and kernel; needs testers with the hardware.
   Firmware blobs stay blobs (ARISC, the rtl8188fu Wi-Fi firmware, `fes1.bin`), listed with
   their origin.

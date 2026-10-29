@@ -1,0 +1,114 @@
+name: System
+
+# Rebuilds Cartload's console system from source (docs/userland.md): the kernel, the userland,
+# u-boot, then the package, and checks that it is byte for byte the one the app embeds
+# (data/cartload-system-<version>.hmod). A difference fails the run: the committed package must
+# be what its pinned sources build.
+#
+# On a system-v<version> tag (`git tag system-v0.1.0 && git push --tags`) the package, its
+# report (every file with its source and SHA-256), the pinned source lists and checksums go to
+# a draft pre-release for that tag. Publish it by hand after a look.
+#
+# A full build from scratch: Buildroot's toolchain, the kernel and Nintendo's open-source archive
+# (260 MB) each time, about an hour.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/kernel/**"
+      - "scripts/userland/**"
+      - "scripts/uboot/**"
+      - "data/cartload-system-*.hmod"
+      - "data/hakchi.hmod"
+      - ".github/workflows/system.yml"
+    tags: ["system-v*"]
+  pull_request:
+    paths:
+      - "scripts/kernel/**"
+      - "scripts/userland/**"
+      - "scripts/uboot/**"
+      - "data/cartload-system-*.hmod"
+      - ".github/workflows/system.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and compare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        run: |
+          version=$(cat scripts/userland/SYSTEM_VERSION)
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          echo "system $version"
+          if [[ "${GITHUB_REF}" == refs/tags/system-v* && "${GITHUB_REF#refs/tags/system-v}" != "$version" ]]; then
+            echo "tag ${GITHUB_REF#refs/tags/} does not match SYSTEM_VERSION $version" >&2
+            exit 1
+          fi
+          test -f "data/cartload-system-$version.hmod" \
+            || { echo "data/cartload-system-$version.hmod is missing" >&2; exit 1; }
+
+      - name: Container engine
+        run: podman --version
+
+      - name: Kernel
+        run: scripts/kernel/build.sh
+
+      - name: Userland
+        run: scripts/userland/build.sh
+
+      - name: u-boot
+        run: scripts/uboot/build.sh
+
+      - name: Package
+        run: scripts/userland/assemble.sh
+
+      - name: Compare with the committed package
+        run: |
+          built=target/assemble/out/cartload-system-${{ steps.version.outputs.version }}.hmod
+          committed=data/cartload-system-${{ steps.version.outputs.version }}.hmod
+          sha256sum "$built" "$committed"
+          if ! cmp -s "$built" "$committed"; then
+            echo "the package built from source differs from $committed" >&2
+            mkdir -p target/diff/built target/diff/committed
+            tar -xzf "$built" -C target/diff/built
+            tar -xzf "$committed" -C target/diff/committed
+            diff -rq target/diff/committed target/diff/built || true
+            exit 1
+          fi
+          echo "identical: $committed is what its sources build"
+
+      - name: Release files
+        run: |
+          v=${{ steps.version.outputs.version }}
+          mkdir -p target/release
+          cp "target/assemble/out/cartload-system-$v.hmod" target/release/
+          cp target/assemble/out/report.txt "target/release/cartload-system-$v-report.txt"
+          cp target/uboot/out/report.txt "target/release/cartload-system-$v-uboot-report.txt"
+          cp scripts/userland/sources.txt "target/release/cartload-system-$v-sources.txt"
+          (cd target/release && sha256sum -- * >SHA256SUMS && cat SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cartload-system-${{ steps.version.outputs.version }}
+          path: target/release/
+
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/system-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=${{ steps.version.outputs.version }}
+          gh release view "system-v$v" >/dev/null 2>&1 \
+            || gh release create "system-v$v" --draft --prerelease \
+                 --title "Cartload system $v" \
+                 --notes "Cartload's console system $v, built from source by this repository at ${GITHUB_SHA} (scripts/kernel, scripts/userland, scripts/uboot). The report lists every file with its source and SHA-256; the sources file pins every download and repository. The app embeds the same file (data/cartload-system-$v.hmod); this build reproduced it byte for byte."
+          gh release upload "system-v$v" target/release/* --clobber
