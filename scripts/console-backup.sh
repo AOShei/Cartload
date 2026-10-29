@@ -13,6 +13,9 @@
 #                                   hakchi and its settings)
 #   boot0.bin boot1.bin             the boot loader and u-boot (hakchi's readBoot0/readBoot1)
 #   boot2.img                       the installed kernel (readBoot2)
+#   bootarea.bin                    the NAND boot area raw (16 MiB: boot0, u-boot copies with the
+#                                   driver's boot-info blocks and partition layouts, kernels)
+#   nand-mbr.bin                    the Linux partition table (softw411 copies, /dev/nand start)
 #   backup2.img                     the stock kernel backup hakchi keeps at block 0x68, if any
 #   info.txt                        partition table, versions, command line
 #
@@ -63,6 +66,11 @@ copy() { # copy <file> <command printing the data> <command printing its md5>
 for p in nanda nandb nandc; do
   copy "$p.img" "dd if=/dev/$p bs=1M 2>/dev/null" "md5sum /dev/$p"
 done
+# The whole 16 MiB boot area raw: boot0, the four u-boot copies with the NAND driver's boot-info
+# blocks (the last two still hold the factory partition layout), the kernel and its backup.
+copy bootarea.bin 'sunxi-flash phy_read 0 80 2>/dev/null' 'sunxi-flash phy_read 0 80 2>/dev/null | md5sum'
+# The Linux partition table: four softw411 copies at the start of /dev/nand.
+copy nand-mbr.bin 'dd if=/dev/nand bs=1024 count=64 2>/dev/null' 'dd if=/dev/nand bs=1024 count=64 2>/dev/null | md5sum'
 copy boot0.bin 'hakchi readBoot0' 'hakchi readBoot0 | md5sum'
 copy boot1.bin 'hakchi readBoot1' 'hakchi readBoot1 | md5sum'
 copy boot2.img 'hakchi readBoot2' 'hakchi readBoot2 | md5sum'
