@@ -1234,4 +1234,7 @@ Results (SNES EUR, our kernel, 2026-10-29, no controller or TV needed):
   and its child, nice 18) with only `/dev/null` open, sleeping in a timer (`hrtimer_nanosleep`)
   and using a little CPU: a polling loop. No `gpio-keys` device on this console
   (`/dev/input/by-path` has only the AXP power chip).
-
+- §2 with one Nintendo controller plugged in (front port 1, no TV): it is `event4` ("Nintendo
+  Clovercon - controller1"), open only in Nintendo's `clover-mcp` and `ReedPlayer-Clover`. The
+  sntool helpers have only a UDP socket on `127.0.0.1:1001` (receive queue empty); `uinput` is
+  loaded (by them) with no users.
