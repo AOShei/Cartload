@@ -70,9 +70,11 @@ kernel and ramdisk reproduces its `boot.img`.
 ## Size
 
 hakchi's installer flashes `boot.img` with `sunxi-flash burn_boot2` from NAND block 0x30 (blocks
-of 128 KiB) and keeps the stock kernel's backup at block 0x68; `sunxi-flash` only stops at the
-end of the boot area, so a larger image would overwrite the backup. Cartload refuses packages
-whose boot image exceeds 0x36 blocks (7,077,888 bytes, two blocks left for bad blocks):
+of 128 KiB), and hakchi's u-boot loads it with `sunxi_flash phy_read 43800000 30 28`: 0x28
+blocks, 5 MiB, so a longer image is cut off at boot (from 0x38 blocks on it would also overwrite
+the stock kernel backup at 0x68, since `sunxi-flash` only stops at the end of the boot area).
+Cartload refuses packages whose boot image exceeds 0x26 blocks (4,980,736 bytes, two blocks left
+for bad blocks):
 `cartload_hmod::BOOT_IMAGE_MAX_LEN`, checked by `Package::validate`. This one is 4,712,448 bytes
 (36 blocks, like v1.0.4-126's).
 

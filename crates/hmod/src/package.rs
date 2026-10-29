@@ -18,13 +18,13 @@ pub const BOOT_IMAGE: &str = "boot/boot.img";
 /// Archive entry holding u-boot.
 pub const UBOOT: &str = "boot/uboot.bin";
 
-/// Largest `boot/boot.img` a package may carry. hakchi's installer flashes it with
-/// `sunxi-flash burn_boot2` from NAND block 0x30 (blocks of 128 KiB) and keeps the stock
-/// kernel's backup at block 0x68, and `sunxi-flash` itself only stops at the end of the boot
-/// area (block 0x80): a larger image would overwrite the backup. That leaves 0x38 blocks; two
-/// are kept free because a bad block is skipped by writing to the next one. hakchi v1.0.4-126's
-/// own image is 4,589,568 bytes (36 blocks).
-pub const BOOT_IMAGE_MAX_LEN: u64 = 0x36 * 0x2_0000;
+/// Largest `boot/boot.img` a package may carry. hakchi's installer flashes it from NAND block
+/// 0x30 (blocks of 128 KiB), and hakchi's u-boot reads it back from there with
+/// `sunxi_flash phy_read 43800000 30 28`: 0x28 blocks, 5 MiB. A longer image would be cut off at
+/// boot (and from 0x38 blocks on it would also overwrite the stock kernel backup at 0x68). Two
+/// blocks are kept free because a bad block is skipped by writing to the next one. hakchi
+/// v1.0.4-126's own image is 4,589,568 bytes (36 blocks).
+pub const BOOT_IMAGE_MAX_LEN: u64 = 0x26 * 0x2_0000;
 /// Archive entry holding the version variables, see [`Version`].
 pub const VERSION_FILE: &str = "var/version";
 

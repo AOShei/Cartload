@@ -166,7 +166,28 @@ NAND boot area, as `sunxi-flash` (`sntool`) addresses it: blocks of 0x20000 byte
 command line in hex blocks. u-boot at 0x8, the kernel at 0x30, the stock kernel backup at 0x68,
 the boot area ends at 0x80. `burn_boot2` writes from 0x30 until the image ends, skipping bad
 blocks, and only refuses at 0x80: an image longer than 0x38 blocks overwrites the backup. v1.0.4-126's
-`boot.img` takes 36 blocks. `/proc/partitions` on a SNES (EUR): `nand` 16 MiB, `nanda` 3 MiB
+`boot.img` takes 36 blocks. hakchi's u-boot boots `hakchi/boot/boot.img` from the data partition
+if there is one (`ext4load sunxi_flash 4:0`, then `2:0`), else `sunxi_flash phy_read 43800000 30
+28`: only 0x28 blocks (5 MiB) of the kernel are loaded.
+
+NAND boot area of a SNES (EUR), read raw on 2026-10-28 (`sunxi-flash phy_read 0 80`): boot0
+copies in blocks 0x00-0x07, four u-boot copies at 0x08, 0x0f, 0x16 and 0x1d (7 blocks each:
+u-boot with its `script.bin`, 0xba000 bytes, then a 32 KiB boot-info block), empty 0x28-0x2f,
+the kernel from 0x30, nothing at 0x68 on that console. The NAND is 4096 blocks of 64 pages of
+2048 bytes; the logical area (`/dev/nand*`) starts at block 128.
+
+Boot-info block (`struct _boot_info`, kernel `drivers/block/nand/lib/src/phy/phy.h`): magic
+`0xaa55a5a5`, length 0x8000, checksum (32-bit word sum over the length with the checksum field
+set to `0xAE15BC34`, `_cal_sum_physic_info` in `nand_simple_r.c`), then at 0x200 a
+`PARTITION_MBR` (CRC, count, 36-byte entries: 16-byte name, start and length in sectors, user
+type, key data, read-only) and at 0x1200 the driver's partition list (`nand_disk`: size, type,
+16-byte name). u-boot passes this block to the kernel, and the NAND driver creates `nanda`,
+`nandb`, `nandc` from that list. The first two copies hold the layout hakchi grew (data 741,376
+sectors), the last two still hold the factory one (data 614,400, private 2,048, UDISK the rest).
+
+`/dev/nand` (16 MiB) starts with Allwinner's Linux partition table: four 16 KiB copies of a
+`softw411` MBR, version 0x200, the format sunxi-tools' `sunxi-nand-part -f a20` reads. Test data
+of all three: `scripts/userland/fixtures/`. `/proc/partitions` on a SNES (EUR): `nand` 16 MiB, `nanda` 3 MiB
 (boot), `nandb` 64 MiB (Nintendo's system, encrypted squashfs), `nandc` 362 MiB (data, ext4 on
 `/var/lib`).
 

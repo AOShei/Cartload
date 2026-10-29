@@ -53,8 +53,8 @@ pub const TRANSFER_BASE: u32 = DRAM_BASE + 0x0740_0000;
 pub const SECTOR_SIZE: u32 = 0x2_0000;
 /// Largest payload the staging area at [`TRANSFER_BASE`] takes (32 MiB).
 pub const TRANSFER_MAX_SIZE: u32 = SECTOR_SIZE * 0x100;
-/// hakchi2 CE's kernel size limit for FEL flashing (4 MiB). Not the space on the console:
-/// hakchi's installer flashes larger images (v1.0.4-126's is 4.4 MiB); see
+/// hakchi2 CE's kernel size limit for FEL flashing (4 MiB). Not the limit on the console:
+/// hakchi's u-boot loads up to 5 MiB (v1.0.4-126's image is 4.4 MiB); see
 /// `cartload_hmod::BOOT_IMAGE_MAX_LEN`. Memboot images may be larger still.
 pub const KERNEL_MAX_SIZE: u32 = SECTOR_SIZE * 0x20;
 /// NAND offset of the first u-boot copy.
