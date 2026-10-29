@@ -101,7 +101,7 @@ if [ "${1:-}" = "--inside" ]; then
     cp "${t#*:}" "$out/bin/"
   done
 
-  echo "== sntool (public hakchi)"
+  echo "== sntool (public hakchi and the fork's additions)"
   cd /work/src/hakchi/sntool && git -C /work/src/hakchi clean -qfdx -- sntool && stamp /work/src/hakchi
   PATH="/work/shim:$PATH" make -s GCC="$cc" >/work/sntool.log 2>&1 || { tail -20 /work/sntool.log >&2; exit 1; }
   cp sntool "$out/bin/"

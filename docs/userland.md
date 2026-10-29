@@ -32,7 +32,7 @@ packages (2018 releases).
 | kexec | ramdisk and package | kexec-tools 2.0.15 | Buildroot | kernel.org |
 | rsync | ramdisk | 3.1.3 | Buildroot | samba.org |
 | llmnrd, tinysvcmdns | ramdisk | no version string | Buildroot | GitHub (to pin) |
-| sntool (sunxi-flash, sunxi-part, decodepng) | ramdisk and package | `5833d00 (dirty)` 2020-03-30: not in public hakchi | Buildroot | public hakchi `sntool/` (last change 2018-10) |
+| sntool (sunxi-flash, sunxi-part, decodepng) | ramdisk and package | `5833d00 (dirty)` 2020-03-30: not in public hakchi | Buildroot | public hakchi `sntool/` (last change 2018-10); ours: the fork's branch `cartload` |
 | clovershell | ramdisk `hakchi/shell/` | built 2018-03-19 | Buildroot | Cluster's (to locate) |
 | sunxi-fexc, sunxi-nand-part, sunxi-pio | ramdisk and package | sunxi-tools v1.4.2-30/-54 (`5c19710`), dirty | Linaro GCC 4.8.3 2014.02 | linux-sunxi/sunxi-tools + hakchi's `sunxi-tools.diff` |
 | fbgrab | package | (libpng 1.6.20) | Buildroot | to pin |
@@ -75,7 +75,7 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 | clovershell | Cluster's daemon at `5edb874`, the last commit before the shipped build; same strings |
 | sunxi-fexc, sunxi-pio, sunxi-nand-part | sunxi-tools at the commits they report (`1e219c0`, `5c19710`), with our toolchain instead of Linaro GCC 4.8 |
 | xdelta3 3.1.1 | jmacd's xdelta at `7508fd2` (the shipped binary, unpacked from UPX 3.94, reports 3.1.1; main had no commits from 2017-08 to 2026), without lzma like the shipped one, not UPX-packed |
-| sntool | **partly ours**: the public source (2018) has the boot-area commands (`sunxi-flash`, `check`, `kernel`, `devmem`); the shipped one (793 KB, `5833d00` 2020, unpublished) also has `sunxi-part`, `isRecovery`, `ismd`, `mdui`, `decodepng`, a `clover-mcp` mode and Mega Drive helpers. `sunxi-part`, `isRecovery`, `ismd` and `mdui` are now in the hakchi fork (branch `cartload`, `a3e8359`, not yet in `sources.txt`) and match the shipped tool on a console backup (below); `decodepng` is its own program; the `clover-mcp` mode is still to do |
+| sntool | **partly ours**: the public source (2018) has the boot-area commands (`sunxi-flash`, `check`, `kernel`, `devmem`); the shipped one (793 KB, `5833d00` 2020, unpublished) also has `sunxi-part`, `isRecovery`, `ismd`, `mdui`, `decodepng`, a `clover-mcp` mode and Mega Drive helpers. `sunxi-part`, `isRecovery`, `ismd` and `mdui` are now in the hakchi fork (branch `cartload`, `a3e8359`, pinned in `sources.txt`) and match the shipped tool on a console backup (below); `decodepng` is its own program; the `clover-mcp` mode is still to do |
 
 The byte-identical files show that this toolchain and Buildroot are the ones the shipped binaries
 were built with. Built programs can be run in the container with Ubuntu's `qemu-user` (`qemu-arm -L

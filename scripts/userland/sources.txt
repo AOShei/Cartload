@@ -31,9 +31,10 @@ git xdelta https://github.com/jmacd/xdelta 7508fd2a823443b1f0173ca361620f21d62a7
 # v1.4.2-54-g5c19710 ("dirty": hakchi's patch to fel_lib.c, which they do not use).
 git sunxi-tools-1e219c0 https://github.com/linux-sunxi/sunxi-tools 1e219c0bb9051cb6252e7fb9e52c552e4aa21a21
 git sunxi-tools-5c19710 https://github.com/linux-sunxi/sunxi-tools 5c1971040c6c44caefb98e371bfca9e18d511da9
-# sntool and its headers (the mkbootimg submodule): public hakchi. The shipped sntool
-# (5833d00, 2020) was built from unpublished changes.
-git hakchi https://github.com/AOShei/hakchi fd525ac710988d12fb9e37213b5fc75651ba47c0
+# sntool and its headers (the mkbootimg submodule): public hakchi (fd525ac) plus, on the fork's
+# branch cartload, sunxi-part, isRecovery, ismd and mdui, which the shipped sntool (5833d00,
+# 2020) had from unpublished changes.
+git hakchi https://github.com/AOShei/hakchi a3e83599ae70c4c25d516cd69df1640295a4c372
 # decodepng (hakchi's boot images): the commit hakchi's 3rdparty/decodepng submodule pins. The
 # shipped sntool bundles this code; here it is its own program.
 git decodepng https://github.com/DanTheMan827/decodepng ac7f36a559396b2acae2bec3302078ac49b9eb1a
