@@ -71,7 +71,8 @@ hakchi's 41,828 bytes exactly. The image is laid out as Nintendo's: u-boot, 0xff
 configuration, 0xff to 0xba000 (the length every copy in the NAND boot area is spaced by: it must
 not change, as the installer rewrites copy 1 only), header lengths at 0x14 and 0x18, checksum by
 sntool's `check -f`. The build date in the banner is the hakchi checkout's commit time; two
-builds give the same bytes. `scripts/userland/assemble.sh` puts it in the package as
+builds give the same bytes. So a new hakchi pin changes uboot.bin (its date and checksum): rebuild
+u-boot before assembling, or the package will not match a build from scratch (CI checks). `scripts/userland/assemble.sh` puts it in the package as
 `boot/uboot.bin`.
 
 First result (2026-10-29): u-boot 515,916 bytes (Nintendo's 515,804, hakchi's 589,824), image
