@@ -95,7 +95,7 @@ hakchi's scripts call these, and only the shipped 2020 sntool has them:
 |---|---|---|
 | `decodepng <png> > /dev/fb0` | boot logo, splash (`init`, `b0010_functions`) | **built**: public after all, DanTheMan827's decodepng at `ac7f36a` (hakchi's submodule pin) with LodePNG `c7bb19a`; its own program here instead of part of sntool. Under QEMU it turns hakchi.png into two 1280×720 32-bit frames |
 | `sntool ismd`, `sntool mdui` | Mega Drive Mini checks | NES, SNES and Famicom answer no; Cartload refuses the Mega Drive |
-| `sntool isRecovery` | `preinit`, `b0010_functions` | meaning still to read from the console |
+| `sntool isRecovery` | `preinit` (loads `script/install`), `b0010_functions` (`gameover`: `shutdown` or `poweroff`) | true (exit 0) when running from hakchi's own ramdisk: observed 0 in the memboot shell (2026-10-29: `/init decrypt hakchi-shell hakchi-chainload`, `/newroot` mounted, kernel 3.4.113.29-madmonkey from RAM) and 1 in the normal system. The tool mentions `/newroot` and `cmdline`; which of them it tests is still to read from the binary |
 | `sunxi-part` (list), `grow`, `shrink`, `tune`, `--dry-run` | Cartload's install (`grow`), hakchi's uninstall (`shrink`) and repair (`tune`), `ismdPartitioning` (list) | see below |
 
 `sunxi-part` works on two levels, read from the shipped binary's messages:
