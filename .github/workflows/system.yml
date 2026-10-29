@@ -71,6 +71,13 @@ jobs:
       - name: Package
         run: scripts/userland/assemble.sh
 
+      - name: Hashes of the parts
+        run: |
+          sha256sum target/kernel/out/zImage target/kernel/out/boot.img target/assemble/ramdisk.cpio.xz \
+            target/assemble/out/boot.img target/uboot/out/uboot.bin
+          (cd target/kernel/stage/lib/modules && find . -type f | sort | xargs sha256sum) | sha256sum
+          sha256sum target/assemble/ramdisk.list
+
       - name: Compare with the committed package
         run: |
           built=target/assemble/out/cartload-system-${{ steps.version.outputs.version }}.hmod
@@ -85,6 +92,22 @@ jobs:
             exit 1
           fi
           echo "identical: $committed is what its sources build"
+
+      - name: Diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-diagnostics
+          path: |
+            target/assemble/out/report.txt
+            target/assemble/out/boot.img
+            target/assemble/ramdisk.list
+            target/assemble/ramdisk.cpio.xz
+            target/kernel/out/zImage
+            target/kernel/out/.config
+            target/kernel/kernel.log
+            target/uboot/out/report.txt
+          if-no-files-found: ignore
 
       - name: Release files
         run: |
