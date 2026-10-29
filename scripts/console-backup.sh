@@ -26,10 +26,11 @@ set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
 cd "$repo"
-console() { cargo run -q -p cartload-console -- exec --command-timeout 0 "$@" 2>/dev/null; }
+# Release builds: the debug build's SSH runs at about 0.5 MB/s, the release one at about 4.5 MB/s.
+console() { cargo run -q --release -p cartload-console -- exec --command-timeout 0 "$@" 2>/dev/null; }
 
 echo "== console"
-cargo build -q -p cartload-console -p cartload-flow
+cargo build -q --release -p cartload-console -p cartload-flow
 hwid=$(console 'hakchi hwid' | tr -dc '0-9a-f')
 [ -n "$hwid" ] || { echo "no console answers over USB" >&2; exit 1; }
 dir=${1:-$HOME/cartload-backups/$(date +%Y-%m-%d)-$hwid}
@@ -37,7 +38,7 @@ mkdir -p "$dir"
 echo "console $hwid -> $dir"
 
 echo "== memboot shell (RAM only)"
-cargo run -q -p cartload-flow -- memboot --hmod data/hakchi.hmod | grep -E '^\[|finished'
+cargo run -q --release -p cartload-flow -- memboot --hmod data/hakchi.hmod | grep -E '^\[|finished'
 console 'grep -q "^/dev/nand" /proc/mounts' \
   && { echo "a NAND partition is mounted in the memboot shell; not copying" >&2; exit 1; }
 
@@ -73,5 +74,5 @@ fi
 (cd "$dir" && md5sum -- *.img *.bin >MD5SUMS && sha256sum -- *.img *.bin >SHA256SUMS)
 
 echo "== restart into the console's own system"
-timeout 20 cargo run -q -p cartload-console -- exec 'sync; umount -ar; reboot -f' >/dev/null 2>&1 || true
+timeout 20 cargo run -q --release -p cartload-console -- exec 'sync; umount -ar; reboot -f' >/dev/null 2>&1 || true
 echo "done: $dir"
