@@ -1260,5 +1260,7 @@ running (checksums match the build); `/newroot` mounted from `root-crypt`; llmnr
 up; `isRecovery 0`; `sunxi-part` and `shrink --dry-run` right; our e2fsck: data clean (journal
 not replayed in a read-only check), exit 0; `hakchi hwid` right; decodepng turns hakchi.png
 into 7,372,800 bytes. Kernel log warnings only from the kernel (display script entries, audio
-PA, the boot0 scan of blocks 4-7). `hakchi eval 'echo $sftype-$sfregion'` printed `-`: to compare
-with the shipped memboot shell. Back to the menu afterwards; hakchi's own sntool still installed.
+PA, the boot0 scan of blocks 4-7). `hakchi eval 'echo $sftype-$sfregion'` printed `-`, as in the
+shipped memboot shell. tinysvcmdns was not running (the shipped one is): it exited with
+`IP_ADD_MEMBERSHIP: No such device`; fixed by tinysvcmdns-patches/, after which
+`avahi-browse -rpt _ssh._tcp` on the computer shows the same announcement as the shipped one. Back to the menu afterwards; hakchi's own sntool still installed.

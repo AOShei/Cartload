@@ -87,7 +87,9 @@ if [ "${1:-}" = "--inside" ]; then
   cp llmnrd "$out/bin/"
 
   echo "== tinysvcmdns (geekman's library, Cartload's main)"
-  cd /work/src/tinysvcmdns && git clean -qfdx
+  cd /work/src/tinysvcmdns && git clean -qfdx && git checkout -q -- .
+  # The console has no default route: join the mDNS group on each interface (tinysvcmdns-patches).
+  for p in "$here"/tinysvcmdns-patches/*.patch; do patch -p1 -s <"$p"; done
   "$cc" -std=gnu99 -O2 -DNDEBUG -Wall -o "$out/bin/tinysvcmdns" mdns.c mdnsd.c "$here/main-tinysvcmdns.c" -I. -lpthread
 
   echo "== clovershell"

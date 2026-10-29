@@ -93,7 +93,7 @@ out (nothing calls it; Buildroot does not install it), `libcryptsetup`, `libpopt
 | kexec-tools 2.0.15 | same, without zlib like the shipped one; 92,276 bytes against 47,160 |
 | rsync 3.1.3 | same, with its bundled zlib and popt like the shipped one (`buildroot-patches/`); 375,568 bytes against 278,144 |
 | llmnrd | built from `4dc24d0`, the commit the shipped binary names (`git id v0.5-4-g4dc24d0`) |
-| tinysvcmdns | geekman's library; the shipped main program was never published, so `main-tinysvcmdns.c` replaces it with the same command line (`S93mdnsd`: instance, type, port, TXT records) |
+| tinysvcmdns | geekman's library; the shipped main program was never published, so `main-tinysvcmdns.c` replaces it with the same command line (`S93mdnsd`: instance, type, port, TXT records). The console has no default route, so the library's join of the mDNS group on "any interface" fails (`IP_ADD_MEMBERSHIP: No such device`; hakchi's copy of the library was modified too): `tinysvcmdns-patches/` joins on each interface instead. On a SNES it then announces what the shipped one does (`hakchi` `_ssh._tcp` on `madmonkey.local`, 169.254.13.37, port 22, the same TXT records) |
 | clovershell | Cluster's daemon at `5edb874`, the last commit before the shipped build; same strings |
 | sunxi-fexc, sunxi-pio, sunxi-nand-part | sunxi-tools at the commits they report (`1e219c0`, `5c19710`), with our toolchain instead of Linaro GCC 4.8 |
 | xdelta3 3.1.1 | jmacd's xdelta at `7508fd2` (the shipped binary, unpacked from UPX 3.94, reports 3.1.1; main had no commits from 2017-08 to 2026), without lzma like the shipped one, not UPX-packed |

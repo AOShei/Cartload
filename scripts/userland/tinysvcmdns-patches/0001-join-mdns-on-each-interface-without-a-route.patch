@@ -1,0 +1,50 @@
+diff --git a/mdnsd.c b/mdnsd.c
+index 6488a53..c1f9b1b 100644
+--- a/mdnsd.c
++++ b/mdnsd.c
+@@ -37,6 +37,8 @@
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <net/if.h>
++#include <ifaddrs.h>
++#include <errno.h>
+ #include <syslog.h>
+ #endif
+ 
+@@ -133,8 +135,36 @@ static int create_recv_sock() {
+ 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+ 	mreq.imr_multiaddr.s_addr = inet_addr(MDNS_ADDR);
+ 	if ((r = setsockopt(sd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq, sizeof(mreq))) < 0) {
++#ifndef _WIN32
++		/* Without a default route the kernel cannot choose an interface for INADDR_ANY
++		 * (ENODEV): join on each IPv4 interface that is up and multicast-capable instead,
++		 * and send from the first of them. */
++		struct ifaddrs *ifs, *i;
++		int joined = 0;
++		if (errno == ENODEV && getifaddrs(&ifs) == 0) {
++			for (i = ifs; i != NULL; i = i->ifa_next) {
++				if (i->ifa_addr == NULL || i->ifa_addr->sa_family != AF_INET ||
++				    !(i->ifa_flags & IFF_UP) || !(i->ifa_flags & IFF_MULTICAST))
++					continue;
++				mreq.imr_interface = ((struct sockaddr_in *) i->ifa_addr)->sin_addr;
++				if (setsockopt(sd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *) &mreq, sizeof(mreq)) < 0)
++					continue;
++				if (!joined && setsockopt(sd, IPPROTO_IP, IP_MULTICAST_IF,
++						(char *) &mreq.imr_interface, sizeof(mreq.imr_interface)) < 0)
++					log_message(LOG_ERR, "recv setsockopt(IP_MULTICAST_IF): %m");
++				joined++;
++			}
++			freeifaddrs(ifs);
++		}
++		if (!joined) {
++			log_message(LOG_ERR, "recv setsockopt(IP_ADD_MEMBERSHIP): %m");
++			return r;
++		}
++		r = 0;
++#else
+ 		log_message(LOG_ERR, "recv setsockopt(IP_ADD_MEMBERSHIP): %m");
+ 		return r;
++#endif
+ 	}
+ 
+ 	// enable loopback in case someone else needs the data
