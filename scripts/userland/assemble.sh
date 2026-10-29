@@ -5,8 +5,8 @@
 #
 #   scripts/userland/assemble.sh [hakchi checkout]
 #
-# Needs scripts/kernel/build.sh's and scripts/userland/build.sh's output (target/kernel,
-# target/userland). The hakchi checkout (scripts and data) defaults to the one build.sh uses.
+# Needs scripts/kernel/build.sh's, scripts/userland/build.sh's and scripts/uboot/build.sh's
+# output (target/kernel, target/userland, target/uboot). The hakchi checkout (scripts and data) defaults to the one build.sh uses.
 # Into target/assemble/out:
 #
 #   ramdisk/            the ramdisk's files
@@ -55,6 +55,7 @@ if [ "${1:-}" = "--inside" ]; then
       out:*) cp -L "/work/out/${source#out:}" "$dest" ;;
       br:*) cp -L "$br/target/${source#br:}" "$dest" ;;
       hakchi:*) cp -L "/hakchi/${source#hakchi:}" "$dest" ;;
+      uboot:*) cp -L "/uboot/${source#uboot:}" "$dest" ;;
       shipped) cp -a "/out/shipped/$where/$path" "$dest" ;;
       kernel:ramfs) mkdir -p "$dest" && cp -a "/kernel/ramfs/lib/modules/$release/." "$dest/" ;;
       kernel:modules) mkdir -p "$dest" && cp -a "/kernel/stage/lib/modules/$release" "$dest/" ;;
@@ -193,7 +194,9 @@ engine=$(command -v podman || command -v docker || true)
 [ -n "$engine" ] || { echo "needs podman or docker" >&2; exit 1; }
 [ -f "$repo/target/kernel/out/zImage" ] || { echo "no kernel: run scripts/kernel/build.sh first" >&2; exit 1; }
 [ -x "$repo/target/userland/out/bin/sntool" ] || { echo "no userland: run scripts/userland/build.sh first" >&2; exit 1; }
+[ -f "$repo/target/uboot/out/uboot.bin" ] || { echo "no u-boot: run scripts/uboot/build.sh first" >&2; exit 1; }
 mkdir -p "$repo/target/assemble"
 "$engine" run --rm -e TZ=UTC -v "$repo:/repo:ro,z" -v "$repo/target/userland:/work:ro,z" \
   -v "$repo/target/kernel:/kernel:ro,z" -v "$hakchi:/hakchi:ro,z" -v "$repo/target/assemble:/out:z" \
+  -v "$repo/target/uboot/out:/uboot:ro,z" \
   cartload-userland-build /repo/scripts/userland/assemble.sh --inside

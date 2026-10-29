@@ -6,6 +6,7 @@
 #   out:<path>      scripts/userland/build.sh's own builds (target/userland/out)
 #   br:<path>       built by Buildroot (its target tree)
 #   hakchi:<path>   the hakchi fork's checkout (scripts and data, text)
+#   uboot:<path>    scripts/uboot/build.sh's output (target/uboot/out)
 #   kernel:<what>   scripts/kernel/build.sh's output: zImage, modules (the package's
 #                   lib/modules/<release>), ramfs (the ramdisk's modules-ramfs)
 #   boot.img        made by assemble.sh from kernel:zImage and the ramdisk
@@ -87,7 +88,7 @@ pkg etc/preinit.d/b0010_functions hakchi:kernel-hmod/etc/preinit.d/b0010_functio
 pkg etc/preinit.d/b0050_boot      hakchi:kernel-hmod/etc/preinit.d/b0050_boot
 # A shell script (hakchi's memboot functions, standalone); text, as shipped.
 pkg bin/detached-fallback shipped
-# hakchi's u-boot: step 3 of the plan.
-pkg boot/uboot.bin      shipped
+# u-boot and its board configuration, from Nintendo's source (scripts/uboot, docs/uboot.md).
+pkg boot/uboot.bin      uboot:uboot.bin
 # Realtek's firmware for the RTL8188FU Wi-Fi chip, a binary blob (Realtek publishes no source).
 pkg lib/firmware/rtlwifi/rtl8188fufw.bin shipped

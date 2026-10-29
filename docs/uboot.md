@@ -46,12 +46,45 @@ u-boot 0x90000, its board configuration (`script.bin`) at 0x90000, the boot-info
   gzip/bzip2, GPT/EFI partitions, `fel_gpio`, `check_update_key_gpio`; and it lacks Nintendo's
   fastboot and recovery key handling (`fastboot_key`, `boot-recovery`, `misc partition`).
 
-## Plan
+## Building
 
-1. A reproducible build (`scripts/uboot/`): the pinned archive, hakchi's patch, our Buildroot
-   toolchain, Cartload's patches for what hakchi's build adds (the boot command, FAT and bootm
-   options, the ext4 backport from upstream u-boot), the board configuration from fex text,
-   joined and checksummed as sntool's `join`/`check -f` do.
-2. Compare it with hakchi's: commands, strings, sizes, the boot command, the configuration.
-3. On the console: first from RAM through FEL (u-boot loaded over USB, nothing written), then
-   flashed to copy 1 only, with the user present and FEL as the way back.
+```sh
+scripts/uboot/build.sh   # into target/uboot/out: uboot.bin, u-boot.map, report.txt
+```
+
+Nintendo's source (archive and tarball checked by SHA-256), hakchi's `r16-uboot.diff` from the
+hakchi fork at the userland's pin, then Cartload's patches (`scripts/uboot/patches/`):
+
+1. `0001-build-with-gcc-4.9`: `-Wno-maybe-uninitialized`, so the tree builds with the userland's
+   toolchain (Buildroot 2015.11.1 GCC 4.9.3, the one hakchi's u-boot was built with).
+2. `0002-boot-command`: `sunxi_flash phy_read 43800000 30 28;boota 43800000;efex`. The kernel
+   from NAND block 0x30, 0x28 blocks (5 MiB, as hakchi's u-boot reads; Nintendo's read 0x20, too
+   little for a 4.2 MB boot.img), then FEL (`efex`) if it does not boot. hakchi's u-boot first
+   tries `hakchi/boot/boot.img` on the data partition through ext4, which only the Mega Drive
+   Mini uses (hakchi's install creates that directory only there; on a SNES it does not exist),
+   so the unpublished ext4 backport is left out, with hakchi's FAT, bootm and GPT additions.
+
+Only u-boot is built: boot0 and fes1 link Allwinner's DRAM setup, a binary (the build stops if
+`u-boot.map` shows a prebuilt library). The board configuration is `scripts/uboot/sys_config.fex`,
+decoded from hakchi's image (Nintendo's with `dcdc2_vol = 1140`); sunxi-fexc compiles it back to
+hakchi's 41,828 bytes exactly. The image is laid out as Nintendo's: u-boot, 0xff to 0x80000, the
+configuration, 0xff to 0xba000 (the length every copy in the NAND boot area is spaced by: it must
+not change, as the installer rewrites copy 1 only), header lengths at 0x14 and 0x18, checksum by
+sntool's `check -f`. The build date in the banner is the hakchi checkout's commit time; two
+builds give the same bytes. `scripts/userland/assemble.sh` puts it in the package as
+`boot/uboot.bin`.
+
+First result (2026-10-29): u-boot 515,916 bytes (Nintendo's 515,804, hakchi's 589,824), image
+`059caf38...`; same header fields and configuration as hakchi's.
+
+## Testing on a console
+
+1. From RAM through FEL (nothing written): power off, hold Reset, power on, release after two
+   seconds; `cargo run -q --release -p cartload-flow -- memboot --hmod target/assemble/out/cartload.hmod`.
+   FEL loads fes1 (hakchi2 CE's, Cartload's `data/fes1.bin`), then this u-boot with its boot
+   command replaced by `boota 47400000`, and the package's boot.img. It shows that the u-boot
+   runs (display, USB, boota); not the NAND path.
+2. Installed (`cartload-flow install`): hakchi's installer writes it to u-boot copy 1 (copy 2
+   keeps hakchi's). Then a cold start reads the kernel from NAND through `sunxi_flash phy_read`.
+   If it did not start, FEL (Reset at power-on) brings it back; Cartload's way back is
+   `install --hmod data/hakchi.hmod` from a FEL memboot.

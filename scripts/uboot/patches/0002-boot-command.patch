@@ -1,0 +1,14 @@
+--- a/include/configs/clover.h
++++ b/include/configs/clover.h
+@@ -301,7 +301,10 @@
+ #ifdef CONFIG_FINAL
+ #define CONFIG_NAND_BOOT_PART_START_BLOCK 48 // ~6MiB reserved for boot0 + uboot
+ #define CONFIG_NAND_BOOT_PART_BLOCK_COUNT 32 // ~4MiB reserved for boot partition
+-#define CONFIG_BOOTCOMMAND "sunxi_flash phy_read 43800000 30 20;boota 43800000        "
++/* Cartload: the kernel at NAND block 0x30, 0x28 blocks (5 MiB, as hakchi's u-boot reads, for
++ * kernels with a larger ramdisk), and FEL if it does not boot. hakchi's u-boot first tries
++ * hakchi/boot/boot.img on the data partition (ext4), which only the Mega Drive Mini uses. */
++#define CONFIG_BOOTCOMMAND "sunxi_flash phy_read 43800000 30 28;boota 43800000;efex"
+ #else
+ #define CONFIG_NAND_BOOT_PART_START_BLOCK 48 // ~6MiB reserved for boot0 + uboot
+ #define CONFIG_NAND_BOOT_PART_BLOCK_COUNT 64 // ~8MiB reserved for boot partition

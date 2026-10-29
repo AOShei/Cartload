@@ -1,0 +1,12 @@
+--- a/config.mk
++++ b/config.mk
+@@ -218,6 +218,9 @@
+ # but they don't make much sense in the u-boot world, so disable them.
+ CFLAGS += $(call cc-option,-Wno-format-nonliteral)
+ CFLAGS += $(call cc-option,-Wno-format-security)
++# Cartload: GCC 4.9 (Buildroot 2015.11.1, the toolchain of hakchi's own u-boot build) warns of
++# maybe-uninitialized variables in board/sunxi, which -Werror makes fatal.
++CFLAGS += $(call cc-option,-Wno-maybe-uninitialized)
+ 
+ # $(CPPFLAGS) sets -g, which causes gcc to pass a suitable -g<format>
+ # option to the assembler.
