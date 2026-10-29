@@ -214,18 +214,22 @@ pub enum Error {
         path: PathBuf,
     },
 
-    /// A package file is not the one Cartload installs ([`crate::pinned`]).
+    /// A package file is not the one Cartload expected ([`crate::pinned`]).
     #[error(
-        "{} is not the hakchi {} kernel package (expected {} bytes, SHA-256 {}; found {len} bytes{})",
+        "{} is not the {expected} kernel package (expected {expected_len} bytes, SHA-256 \
+         {expected_sha256}; found {len} bytes{})",
         path.display(),
-        crate::pinned::PINNED_VERSION,
-        crate::pinned::PINNED_LEN,
-        crate::pinned::PINNED_SHA256,
         if sha256.is_empty() { String::new() } else { format!(", SHA-256 {sha256}") }
     )]
     NotPinned {
         /// The file checked.
         path: PathBuf,
+        /// The package it should be ([`crate::pinned::PinnedPackage::label`]).
+        expected: &'static str,
+        /// That package's size.
+        expected_len: u64,
+        /// That package's SHA-256.
+        expected_sha256: &'static str,
         /// Its size.
         len: u64,
         /// Its SHA-256, empty when the size already ruled it out.

@@ -2,6 +2,7 @@ import { packageInfo, packageUpdate } from "../api/commands";
 import { AppError, inTauri, on } from "../api/tauri";
 import type { DownloadProgress, PackageStatus } from "../api/types";
 import { previewPackage } from "../dev/preview";
+import { preferences } from "./preferences.svelte";
 import { toasts } from "./toasts.svelte";
 
 /** `9.3 MB`, `761 KB`, `14 B` (binary units, decimal labels, as in status.rs). */
@@ -50,13 +51,30 @@ class PackageStore {
     }
     this.loading = true;
     try {
-      this.status = await packageInfo();
+      this.status = await packageInfo(preferences.kernelPackage);
     } catch (error: unknown) {
       const e = AppError.from(error);
       toasts.error(`Could not read the kernel package: ${e.message}`, e.detail);
     } finally {
       this.loading = false;
     }
+  }
+
+  /** Chooses the package to install (by id) and reads its status. */
+  async choose(id: string): Promise<void> {
+    preferences.setKernelPackage(id);
+    if (inTauri) {
+      await this.load();
+    }
+  }
+
+  /** What the user sees for a package: `Cartload system 0.1.0` or `hakchi v1.0.4-126`. */
+  label(): string {
+    const pkg = this.status?.package;
+    if (!pkg) {
+      return "";
+    }
+    return pkg.system ? `Cartload system ${pkg.system}` : `hakchi ${pkg.version}`;
   }
 
   /** Downloads the pinned package into the cache (fallback for the built-in copy). */
@@ -72,9 +90,8 @@ class PackageStore {
     this.progress = { done: 0, total: null };
     this.error = null;
     try {
-      this.status = await packageUpdate();
-      const version = this.status.package?.version ?? "unknown";
-      toasts.success(`Kernel package ${version} is ready.`);
+      this.status = await packageUpdate(preferences.kernelPackage);
+      toasts.success(`Kernel package ${this.label() || "unknown"} is ready.`);
     } catch (error: unknown) {
       const e = AppError.from(error);
       this.error = e.message;

@@ -74,9 +74,9 @@ export function consoleExec(command: string): Promise<ExecResult> {
   return call<ExecResult>("console_exec", { command });
 }
 
-/** Starts a flow; progress follows as `flow-progress` events. */
-export function flowStart(kind: FlowKind): Promise<FlowSnapshot> {
-  return call<FlowSnapshot>("flow_start", { kind });
+/** Starts a flow with the kernel package `pkg` (its id); progress follows as `flow-progress` events. */
+export function flowStart(kind: FlowKind, pkg?: string): Promise<FlowSnapshot> {
+  return call<FlowSnapshot>("flow_start", { kind, package: pkg ?? null });
 }
 
 /** Asks the running flow to stop (after the current step when it writes to flash). */
@@ -94,14 +94,14 @@ export function flowSteps(kind: FlowKind): Promise<StepSnapshot[]> {
   return call<StepSnapshot[]>("flow_steps", { kind });
 }
 
-/** The kernel package that would be installed. */
-export function packageInfo(): Promise<PackageStatus> {
-  return call<PackageStatus>("package_info");
+/** The kernel package `pkg` (its id; Cartload's system without one) as it would be installed. */
+export function packageInfo(pkg?: string): Promise<PackageStatus> {
+  return call<PackageStatus>("package_info", { package: pkg ?? null });
 }
 
-/** Downloads the pinned kernel package (the fallback when the built-in copy cannot be written); progress follows as `package-download` events. */
-export function packageUpdate(): Promise<PackageStatus> {
-  return call<PackageStatus>("package_update");
+/** Downloads a pinned kernel package (the fallback when the built-in copy cannot be written; hakchi's only); progress follows as `package-download` events. */
+export function packageUpdate(pkg?: string): Promise<PackageStatus> {
+  return call<PackageStatus>("package_update", { package: pkg ?? null });
 }
 
 /** The emulator modules Cartload can install, with cache and console state. */

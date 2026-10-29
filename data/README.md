@@ -126,3 +126,22 @@ NAND) with `hakchi-shell` on the command line, stops the UI, unmounts everything
 License: part of hakchi (madmonkey1907/hakchi) as shipped in hakchi2 CE, GNU General Public
 License v3.0. Cartload redistributes it unchanged on the same terms as the rest of this
 repository (GPL-3.0-or-later). Do not modify it.
+
+## cartload-system-0.1.0.hmod
+
+| | |
+| --- | --- |
+| Origin | Built by this repository: `scripts/kernel/build.sh`, `scripts/userland/build.sh`, `scripts/uboot/build.sh`, then `scripts/userland/assemble.sh` (docs/userland.md, docs/uboot.md); every file's source is in the build's `report.txt` |
+| Size | 8 641 616 bytes |
+| SHA-256 | `8689f26402da1831366435c347d3bdae1915f8917dbd0dd0396ec01f52f02cdd` |
+| Embedded by | `crates/hmod` with the `bundled` feature, as `cartload_hmod::pinned::CARTLOAD` (the package the app installs by default) |
+
+Cartload's own console system, version 0.1.0 (`cartloadVersion` in its `var/version`): our
+kernel, u-boot from Nintendo's source, and the ramdisk and package programs built from source,
+laid out like hakchi v1.0.4-126 with its scripts (from the hakchi fork). The builds are
+reproducible; CI rebuilds this file from the pinned sources and fails if the bytes differ.
+
+License: the parts' own (GPL-2.0 for the kernel and u-boot, GPL-3.0 for hakchi's scripts and
+sntool, and the licenses of BusyBox, glibc and the other programs listed in docs/userland.md),
+with Realtek's RTL8188FU firmware from linux-firmware under its redistribution license.
+

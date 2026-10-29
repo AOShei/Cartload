@@ -2,6 +2,7 @@
   import { consoleStore, flowStore, formatBytes, packageStore } from "../../state";
   import Icon from "../Icon.svelte";
   import FelInstructions from "./FelInstructions.svelte";
+  import PackageChoice from "./PackageChoice.svelte";
   import { consoleWatch } from "./watch";
 
   /* Installing hakchi on a console that does not have it, in one card: how to put the
@@ -51,10 +52,17 @@
         </span>
       {:else if pkg}
         <span class="ok"><Icon name="check" size={16} /></span>
-        <span>Kernel package <strong class="num">{pkg.version}</strong> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}</span></span>
+        <span>Kernel package <PackageChoice disabled={busy} /> <span class="muted num">· {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}</span></span>
+      {:else if !packageStore.status?.sources.length}
+        <div class="missing">
+          <span>Kernel package <PackageChoice disabled={busy} />: the built-in copy could not be written to the cache.</span>
+          {#if packageStore.status?.problem}
+            <span class="problem">{packageStore.status.problem}</span>
+          {/if}
+        </div>
       {:else}
         <div class="missing">
-          <span>The kernel package is missing. Download it (9 MB).</span>
+          <span>Kernel package <PackageChoice disabled={busy} /> is missing. Download it (9 MB).</span>
           {#if packageStore.status?.problem}
             <span class="problem">The copy on disk cannot be used: {packageStore.status.problem}</span>
           {/if}

@@ -4,6 +4,7 @@
   import { consoleStore, flowStore, formatBytes, packageStore, toasts } from "../../state";
   import Dialog from "../Dialog.svelte";
   import Icon from "../Icon.svelte";
+  import PackageChoice from "./PackageChoice.svelte";
   import { consoleWatch } from "./watch";
 
   /* The kernel tasks besides the first install. With hakchi installed: reinstall or update
@@ -56,14 +57,14 @@
     <div class="package">
       <span class="muted small">
         {#if pkg}
-          Package <span class="num">{pkg.version}</span>, {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}
+          Package <PackageChoice disabled={busy} />, {formatBytes(pkg.len)}{pkg.source === "override" ? " (CARTLOAD_HMOD)" : ""}
         {:else if packageStore.updating}
           Downloading the package…
         {:else}
           The kernel package is missing.
         {/if}
       </span>
-      {#if !pkg}
+      {#if !pkg && packageStore.status?.sources.length}
         <button type="button" class="btn btn-quiet btn-sm" onclick={() => void packageStore.update()} disabled={busy || packageStore.updating}>
           {#if packageStore.updating}<span class="spinner" aria-hidden="true"></span>{:else}<Icon name="download" size={14} />{/if}
           Download
@@ -77,7 +78,7 @@
       <li>
         <div class="tool-text">
           <strong>Reinstall or repair</strong>
-          <span class="muted">Writes the package's hakchi again. Games and emulators stay.</span>
+          <span class="muted">Writes the chosen package again. Games and emulators stay.</span>
         </div>
         <button type="button" class="btn btn-sm" disabled={!canStart} onclick={() => void flowStore.begin({ kind: "install" })}>
           <Icon name="refresh" size={14} />

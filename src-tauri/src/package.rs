@@ -1,12 +1,14 @@
-//! The kernel package (`hakchi.hmod`) the Console page installs: where it is, which version it
-//! is, and downloading a fresh copy into the cache.
+//! The kernel package the Console page installs: which one, where it is, which version it is,
+//! and downloading a fresh copy into the cache.
 //!
-//! Resolution order: the `CARTLOAD_HMOD` environment variable (a development override pointing
-//! at any package file), then the cached copy (`<cache dir>/cartload/hakchi.hmod`). The app
-//! carries the one package it installs, hakchi v1.0.4-126 (`cartload_hmod::pinned`), and writes
-//! it to the cache whenever the cached file is missing or is anything else, so installing hakchi
-//! needs no network. The cached file is only used when its SHA-256 is the pinned one; the
-//! download from the locations hakchi2 CE uses remains as a fallback and is pinned too.
+//! Two packages are built into the app (`cartload_hmod::pinned`): Cartload's own system (the
+//! default) and hakchi v1.0.4-126 (hakchi2 CE's, the way back to hakchi's own system). The
+//! frontend names one by its id with each call. Resolution order: the `CARTLOAD_HMOD`
+//! environment variable (a development override pointing at any package file), then the cached
+//! copy (`<cache dir>/cartload/<the package's file>`). The app writes the built-in package to
+//! the cache whenever the cached file is missing or is anything else, so installing needs no
+//! network. The cached file is only used when its SHA-256 is the pinned one. For hakchi's
+//! package, the download from the locations hakchi2 CE uses remains as a fallback, pinned too.
 
 use std::{
     path::{Path, PathBuf},
@@ -14,7 +16,10 @@ use std::{
 };
 
 use cartload_flow::HmodPackage;
-use cartload_hmod::{DOWNLOAD_URLS, Package, Progress, fetch_from, pinned};
+use cartload_hmod::{
+    DOWNLOAD_URLS, Package, Progress, fetch_from,
+    pinned::{self, PinnedPackage},
+};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
@@ -22,8 +27,15 @@ use crate::error::CommandError;
 
 /// Environment variable naming a package file to use instead of the cache.
 pub const OVERRIDE_ENV: &str = "CARTLOAD_HMOD";
-/// File name of the cached download.
-pub const CACHE_FILE: &str = "hakchi.hmod";
+
+/// The package with this id; the default (Cartload's system) without one.
+pub fn chosen(id: Option<&str>) -> Result<&'static PinnedPackage, CommandError> {
+    match id {
+        None => Ok(pinned::PACKAGES[0]),
+        Some(id) => PinnedPackage::by_id(id)
+            .ok_or_else(|| CommandError::new(format!("There is no kernel package \"{id}\"."))),
+    }
+}
 
 /// Where a package came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +56,8 @@ pub struct PackageInfo {
     pub source: PackageSource,
     /// `hakchiVersion`, for example `v1.0.4-126`.
     pub version: String,
+    /// `cartloadVersion`, in Cartload's own system.
+    pub system: Option<String>,
     /// `bootVersion`.
     pub boot: Option<String>,
     /// `kernelVersion`.
@@ -54,14 +68,27 @@ pub struct PackageInfo {
     pub modified: Option<u64>,
 }
 
+/// A package the user can choose.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PackageChoice {
+    /// [`PinnedPackage::id`].
+    pub id: String,
+    /// [`PinnedPackage::label`].
+    pub label: String,
+}
+
 /// What the Console page shows about the package.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageStatus {
+    /// The id of the package asked for.
+    pub choice: String,
+    /// The packages there are, the default first.
+    pub choices: Vec<PackageChoice>,
     /// The package that would be installed, when one is usable.
     pub package: Option<PackageInfo>,
     /// Where a download goes.
     pub cache_path: Option<String>,
-    /// Download locations, in order.
+    /// Download locations, in order (none for a package only built in).
     pub sources: Vec<String>,
     /// A candidate file exists but cannot be used.
     pub problem: Option<String>,
@@ -85,9 +112,18 @@ impl From<Progress> for DownloadProgress {
     }
 }
 
-/// The cached download's path, when the system has a cache directory.
-pub fn cache_path() -> Option<PathBuf> {
-    dirs::cache_dir().map(|dir| dir.join("cartload").join(CACHE_FILE))
+/// The package's cached copy, when the system has a cache directory.
+pub fn cache_path(package: &PinnedPackage) -> Option<PathBuf> {
+    dirs::cache_dir().map(|dir| dir.join("cartload").join(package.cache_file))
+}
+
+/// Download locations of a package: hakchi2 CE's for hakchi's, none for Cartload's (built in).
+fn download_urls(package: &PinnedPackage) -> &'static [&'static str] {
+    if package == &pinned::HAKCHI {
+        &DOWNLOAD_URLS
+    } else {
+        &[]
+    }
 }
 
 /// The package files to try, in order.
@@ -105,22 +141,22 @@ pub fn candidates(
     candidates
 }
 
-fn default_candidates() -> Vec<(PackageSource, PathBuf)> {
+fn default_candidates(package: &PinnedPackage) -> Vec<(PackageSource, PathBuf)> {
     candidates(
         std::env::var_os(OVERRIDE_ENV).map(PathBuf::from),
-        cache_path(),
+        cache_path(package),
     )
 }
 
 /// Writes the built-in package to the cache when the cached file is missing or not the pinned
 /// one. A failure is logged and leaves the cache as it was. Blocking.
-pub fn prepare_cache(cache: Option<&Path>) {
+pub fn prepare_cache(package: &PinnedPackage, cache: Option<&Path>) {
     let Some(cache) = cache else {
         return;
     };
-    match pinned::install_bundled(cache) {
+    match package.install_bundled(cache) {
         Ok(true) => {
-            info!(path = %cache.display(), version = pinned::PINNED_VERSION, "built-in kernel package written to the cache")
+            info!(path = %cache.display(), package = package.label, "built-in kernel package written to the cache")
         }
         Ok(false) => {}
         Err(error) => {
@@ -131,17 +167,22 @@ pub fn prepare_cache(cache: Option<&Path>) {
 
 /// Opens and validates a package file; a cached file must also be the pinned package (the
 /// override may be any package). Blocking: it hashes the file and decompresses the archive.
-pub fn inspect(path: &Path, source: PackageSource) -> cartload_hmod::Result<PackageInfo> {
+pub fn inspect(
+    path: &Path,
+    source: PackageSource,
+    package: &PinnedPackage,
+) -> cartload_hmod::Result<PackageInfo> {
     if source == PackageSource::Cached {
-        pinned::check_pinned(path)?;
+        package.check(path)?;
     }
-    let package = Package::open(path)?;
-    let version = package.validate()?;
+    let opened = Package::open(path)?;
+    let version = opened.validate()?;
     let metadata = std::fs::metadata(path).ok();
     Ok(PackageInfo {
         path: path.display().to_string(),
         source,
         version: version.hakchi,
+        system: version.cartload,
         boot: version.boot,
         kernel: version.kernel,
         len: metadata.as_ref().map_or(0, std::fs::Metadata::len),
@@ -153,16 +194,20 @@ pub fn inspect(path: &Path, source: PackageSource) -> cartload_hmod::Result<Pack
 }
 
 /// The first usable candidate, with the problem of any unusable file on the way. Blocking.
-pub fn status_from(candidates: &[(PackageSource, PathBuf)], cache: Option<&Path>) -> PackageStatus {
+pub fn status_from(
+    package: &PinnedPackage,
+    candidates: &[(PackageSource, PathBuf)],
+    cache: Option<&Path>,
+) -> PackageStatus {
     let mut problem = None;
-    let mut package = None;
+    let mut found = None;
     for (source, path) in candidates {
         if !path.is_file() {
             continue;
         }
-        match inspect(path, *source) {
+        match inspect(path, *source, package) {
             Ok(info) => {
-                package = Some(info);
+                found = Some(info);
                 break;
             }
             Err(error) => {
@@ -172,23 +217,36 @@ pub fn status_from(candidates: &[(PackageSource, PathBuf)], cache: Option<&Path>
         }
     }
     PackageStatus {
-        package,
+        choice: package.id.to_string(),
+        choices: pinned::PACKAGES
+            .iter()
+            .map(|p| PackageChoice {
+                id: p.id.to_string(),
+                label: p.label.to_string(),
+            })
+            .collect(),
+        package: found,
         cache_path: cache.map(|p| p.display().to_string()),
-        sources: DOWNLOAD_URLS.iter().map(|url| (*url).to_string()).collect(),
+        sources: download_urls(package)
+            .iter()
+            .map(|url| (*url).to_string())
+            .collect(),
         problem,
     }
 }
 
-/// The current package status.
-pub async fn status() -> PackageStatus {
-    let candidates = default_candidates();
-    let cache = cache_path();
+/// The current status of a package.
+pub async fn status(package: &'static PinnedPackage) -> PackageStatus {
+    let candidates = default_candidates(package);
+    let cache = cache_path(package);
     tokio::task::spawn_blocking(move || {
-        prepare_cache(cache.as_deref());
-        status_from(&candidates, cache.as_deref())
+        prepare_cache(package, cache.as_deref());
+        status_from(package, &candidates, cache.as_deref())
     })
     .await
     .unwrap_or_else(|join| PackageStatus {
+        choice: package.id.to_string(),
+        choices: Vec::new(),
         package: None,
         cache_path: None,
         sources: Vec::new(),
@@ -196,26 +254,27 @@ pub async fn status() -> PackageStatus {
     })
 }
 
-/// Loads the first usable package for a flow. `None` when there is none; problems are logged.
-pub async fn load_for_flow() -> Option<HmodPackage> {
-    let candidates = default_candidates();
-    let cache = cache_path();
+/// Loads the first usable copy of a package for a flow. `None` when there is none; problems are
+/// logged.
+pub async fn load_for_flow(package: &'static PinnedPackage) -> Option<HmodPackage> {
+    let candidates = default_candidates(package);
+    let cache = cache_path(package);
     tokio::task::spawn_blocking(move || {
-        prepare_cache(cache.as_deref());
+        prepare_cache(package, cache.as_deref());
         for (source, path) in candidates {
             if !path.is_file() {
                 continue;
             }
             if source == PackageSource::Cached
-                && let Err(error) = pinned::check_pinned(&path)
+                && let Err(error) = package.check(&path)
             {
                 warn!(%error, "unusable kernel package");
                 continue;
             }
             match HmodPackage::load(&path) {
-                Ok(package) => {
-                    info!(path = %path.display(), ?source, version = %package.files.version, "kernel package loaded");
-                    return Some(package);
+                Ok(loaded) => {
+                    info!(path = %path.display(), ?source, version = %loaded.files.version, "kernel package loaded");
+                    return Some(loaded);
                 }
                 Err(error) => warn!(path = %path.display(), %error, "unusable kernel package"),
             }
@@ -227,21 +286,32 @@ pub async fn load_for_flow() -> Option<HmodPackage> {
     .flatten()
 }
 
-/// Downloads the pinned package into the cache, reporting progress, and returns the new
-/// status. The download is checked against the pinned SHA-256 before it replaces any earlier
-/// copy. A fallback for when the built-in copy cannot be written.
-pub async fn update(progress: impl FnMut(Progress) + Send) -> Result<PackageStatus, CommandError> {
-    let dest = cache_path().ok_or_else(|| {
+/// Downloads a package into the cache, reporting progress, and returns the new status. The
+/// download is checked against the pinned SHA-256 before it replaces any earlier copy. A
+/// fallback for when the built-in copy cannot be written; only hakchi's package has download
+/// locations.
+pub async fn update(
+    package: &'static PinnedPackage,
+    progress: impl FnMut(Progress) + Send,
+) -> Result<PackageStatus, CommandError> {
+    let urls = download_urls(package);
+    if urls.is_empty() {
+        return Err(CommandError::new(format!(
+            "{} is built into Cartload and has no download location.",
+            package.label
+        )));
+    }
+    let dest = cache_path(package).ok_or_else(|| {
         CommandError::new("This system has no cache directory to download the package into.")
     })?;
-    let fetched = fetch_from(&DOWNLOAD_URLS, &dest, Some(pinned::PINNED_SHA256), progress)
+    let fetched = fetch_from(urls, &dest, Some(package.sha256), progress)
         .await
         .map_err(|error| {
             CommandError::from_error(&error)
                 .with_message(format!("The package could not be downloaded: {error}"))
         })?;
     info!(url = fetched.url, len = fetched.len, version = %fetched.version, "kernel package updated");
-    Ok(status().await)
+    Ok(status(package).await)
 }
 
 #[cfg(test)]
@@ -299,6 +369,7 @@ mod tests {
         let missing = dir.path().join("missing.hmod");
 
         let status = status_from(
+            &pinned::HAKCHI,
             &[
                 (PackageSource::Override, missing.clone()),
                 (PackageSource::Override, broken.clone()),
@@ -319,9 +390,12 @@ mod tests {
             status.problem
         );
         assert_eq!(status.sources.len(), 2);
+        assert_eq!(status.choice, "hakchi");
+        assert_eq!(status.choices[0].id, "cartload");
         assert_eq!(status.cache_path.as_deref(), Some(good.to_str().unwrap()));
 
-        let status = status_from(&[(PackageSource::Cached, missing)], None);
+        let status = status_from(&pinned::CARTLOAD, &[(PackageSource::Cached, missing)], None);
+        assert!(status.sources.is_empty());
         assert!(status.package.is_none());
         assert!(status.problem.is_none());
     }
@@ -329,26 +403,44 @@ mod tests {
     #[test]
     fn the_cache_holds_only_the_pinned_package() {
         let dir = tempfile::tempdir().unwrap();
-        let cache = dir.path().join("cartload").join(CACHE_FILE);
+        for package in pinned::PACKAGES {
+            let cache = dir.path().join("cartload").join(package.cache_file);
 
-        // A valid package that is not the pinned one is refused from the cache...
-        std::fs::create_dir_all(cache.parent().unwrap()).unwrap();
-        std::fs::write(&cache, sample_package()).unwrap();
-        let status = status_from(&[(PackageSource::Cached, cache.clone())], Some(&cache));
-        assert!(status.package.is_none());
-        assert!(
-            status.problem.as_deref().unwrap().contains("v1.0.4-126"),
-            "{:?}",
-            status.problem
-        );
+            // A valid package that is not the pinned one is refused from the cache...
+            std::fs::create_dir_all(cache.parent().unwrap()).unwrap();
+            std::fs::write(&cache, sample_package()).unwrap();
+            let status = status_from(
+                package,
+                &[(PackageSource::Cached, cache.clone())],
+                Some(&cache),
+            );
+            assert!(status.package.is_none());
+            assert!(
+                status.problem.as_deref().unwrap().contains(package.label),
+                "{:?}",
+                status.problem
+            );
 
-        // ...and replaced by the built-in one.
-        prepare_cache(Some(&cache));
-        let status = status_from(&[(PackageSource::Cached, cache.clone())], Some(&cache));
-        let package = status.package.expect("the built-in package");
-        assert_eq!(package.version, pinned::PINNED_VERSION);
-        assert_eq!(package.len, pinned::PINNED_LEN);
-        assert!(status.problem.is_none());
+            // ...and replaced by the built-in one.
+            prepare_cache(package, Some(&cache));
+            let status = status_from(
+                package,
+                &[(PackageSource::Cached, cache.clone())],
+                Some(&cache),
+            );
+            let found = status.package.expect("the built-in package");
+            assert_eq!(found.version, package.hakchi_version);
+            assert_eq!(found.system.as_deref(), package.system_version);
+            assert_eq!(found.len, package.len);
+            assert!(status.problem.is_none());
+        }
+    }
+
+    #[test]
+    fn the_default_is_cartloads_system() {
+        assert_eq!(chosen(None).unwrap(), &pinned::CARTLOAD);
+        assert_eq!(chosen(Some("hakchi")).unwrap(), &pinned::HAKCHI);
+        assert!(chosen(Some("nothing")).is_err());
     }
 
     #[test]

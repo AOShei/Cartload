@@ -184,13 +184,14 @@ pub async fn flow_start(
     library: State<'_, Arc<LibraryState>>,
     runner: State<'_, Arc<FlowRunner>>,
     kind: FlowKind,
+    package: Option<String>,
 ) -> Result<FlowSnapshot, CommandError> {
     if runner.is_running() {
         return Err(CommandError::new(
             "A flow is already running. Wait for it to finish, or stop it first.",
         ));
     }
-    let package = package::load_for_flow().await;
+    let package = package::load_for_flow(package::chosen(package.as_deref())?).await;
     let mods = match &kind {
         FlowKind::InstallModules { ids } => crate::modules::load(ids)?,
         FlowKind::UpdateModules { ids } => {
@@ -323,10 +324,11 @@ pub fn flow_steps(kind: FlowKind) -> Vec<StepSnapshot> {
     FlowSnapshot::starting(&kind, &kind.steps(), 0).steps
 }
 
-/// The kernel package that would be installed, and where a download would go.
+/// The kernel package that would be installed (`package`: its id, Cartload's system without
+/// one), and where a download would go.
 #[tauri::command]
-pub async fn package_info() -> Result<PackageStatus, CommandError> {
-    Ok(package::status().await)
+pub async fn package_info(package: Option<String>) -> Result<PackageStatus, CommandError> {
+    Ok(package::status(package::chosen(package.as_deref())?).await)
 }
 
 /// Downloads the pinned kernel package into the cache (the fallback for the built-in copy),
@@ -335,7 +337,9 @@ pub async fn package_info() -> Result<PackageStatus, CommandError> {
 pub async fn package_update(
     app: AppHandle,
     runner: State<'_, Arc<FlowRunner>>,
+    package: Option<String>,
 ) -> Result<PackageStatus, CommandError> {
+    let chosen = package::chosen(package.as_deref())?;
     if runner.is_running() {
         return Err(CommandError::new(
             "Wait for the current flow to finish before updating the package.",
@@ -343,7 +347,7 @@ pub async fn package_update(
     }
     tracing::info!("package_update");
     let mut last_reported = 0u64;
-    package::update(move |progress| {
+    package::update(chosen, move |progress| {
         let finished = progress.total.is_some_and(|total| progress.done >= total);
         if progress.done == 0
             || finished

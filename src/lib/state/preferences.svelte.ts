@@ -10,6 +10,7 @@ interface Stored {
   showDebugLog?: boolean;
   logOpen?: boolean;
   consoleModel?: string;
+  kernelPackage?: string;
 }
 
 function isTheme(value: unknown): value is Theme {
@@ -35,6 +36,9 @@ class Preferences {
   logOpen = $state(false);
   /** The console model the Kernel page draws: chosen by hand, or the last one detected. */
   consoleModel = $state<string | null>(null);
+  /** The kernel package the Console page installs: `cartload` (Cartload's system, the
+   *  default) or `hakchi` (hakchi v1.0.4-126). */
+  kernelPackage = $state("cartload");
 
   /** Reads the stored values and applies the theme. Safe to call more than once. */
   load(): void {
@@ -53,6 +57,9 @@ class Preferences {
         }
         if (typeof stored.consoleModel === "string") {
           this.consoleModel = stored.consoleModel;
+        }
+        if (typeof stored.kernelPackage === "string") {
+          this.kernelPackage = stored.kernelPackage;
         }
       }
     } catch {
@@ -95,12 +102,20 @@ class Preferences {
     }
   }
 
+  setKernelPackage(value: string): void {
+    if (this.kernelPackage !== value) {
+      this.kernelPackage = value;
+      this.save();
+    }
+  }
+
   private save(): void {
     const stored: Stored = {
       theme: this.theme,
       showDebugLog: this.showDebugLog,
       logOpen: this.logOpen,
       consoleModel: this.consoleModel ?? undefined,
+      kernelPackage: this.kernelPackage,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));

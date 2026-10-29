@@ -3,6 +3,7 @@ import { AppError, inTauri, on } from "../api/tauri";
 import type { FlowKind, FlowSnapshot, StepSnapshot } from "../api/types";
 import { previewFlow } from "../dev/preview";
 import { navigation } from "./navigation.svelte";
+import { preferences } from "./preferences.svelte";
 import { toasts } from "./toasts.svelte";
 
 /** The guided install's stages (not the flow's steps). */
@@ -215,7 +216,7 @@ class FlowStore {
     this.starting = true;
     try {
       this.quiet = !window;
-      this.set(await flowStart(kind));
+      this.set(await flowStart(kind, preferences.kernelPackage));
       this.windowOpen = window;
       return true;
     } catch (error: unknown) {

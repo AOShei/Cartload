@@ -60,7 +60,7 @@ const fixtures: Record<string, () => StatusReport> = {
         hwid: "0461872a872802079d2818c76c118000",
         md_partitioning: false,
         minimal_memboot: false,
-        versions: { boot: "1.0.3", kernel: "3.4.113.29-madmonkey", script: "v1.0.4-126" },
+        versions: { boot: "1.0.3", kernel: "3.4.113.30-cartload", script: "v1.0.4-126", system: "0.1.0" },
         can_interact: true,
         console: "SnesEur",
         system_code: "snes-eur",
@@ -364,35 +364,65 @@ export function previewFlow(): FlowSnapshot | null {
   return make ? make() : flowFixtures["idle"]!();
 }
 
+const PACKAGE_CHOICES = [
+  { id: "cartload", label: "Cartload system 0.1.0" },
+  { id: "hakchi", label: "hakchi v1.0.4-126" },
+];
+const HAKCHI_SOURCES = [
+  "https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod",
+  "https://hakchi.net/hakchi/hmods/hakchi-latest.hmod",
+];
+
 const packageFixtures: Record<string, () => PackageStatus> = {
   cached: () => ({
+    choice: "cartload",
+    choices: PACKAGE_CHOICES,
+    package: {
+      path: "/home/user/.cache/cartload/cartload-system-0.1.0.hmod",
+      source: "cached",
+      version: "v1.0.4-126",
+      system: "0.1.0",
+      boot: "1.0.3",
+      kernel: "3.4.113.30-cartload",
+      len: 8_641_616,
+      modified: Date.now() - 3 * 86_400_000,
+    },
+    cache_path: "/home/user/.cache/cartload/cartload-system-0.1.0.hmod",
+    sources: [],
+    problem: null,
+  }),
+  hakchi: () => ({
+    choice: "hakchi",
+    choices: PACKAGE_CHOICES,
     package: {
       path: "/home/user/.cache/cartload/hakchi.hmod",
       source: "cached",
       version: "v1.0.4-126",
+      system: null,
       boot: "1.0.3",
       kernel: "3.4.113.29-madmonkey",
       len: 9_340_382,
       modified: Date.now() - 3 * 86_400_000,
     },
     cache_path: "/home/user/.cache/cartload/hakchi.hmod",
-    sources: [
-      "https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod",
-      "https://hakchi.net/hakchi/hmods/hakchi-latest.hmod",
-    ],
+    sources: HAKCHI_SOURCES,
     problem: null,
   }),
   none: () => ({
+    choice: "hakchi",
+    choices: PACKAGE_CHOICES,
     package: null,
     cache_path: "/home/user/.cache/cartload/hakchi.hmod",
-    sources: ["https://github.com/TeamShinkansen/Hakchi2-CE/releases/download/supplemental/hakchi-v1.0.4-126.Fri.03.Apr.2020.11_12_31.AM.GMT.hmod"],
+    sources: HAKCHI_SOURCES.slice(0, 1),
     problem: null,
   }),
   problem: () => ({
+    choice: "cartload",
+    choices: PACKAGE_CHOICES,
     package: null,
-    cache_path: "/home/user/.cache/cartload/hakchi.hmod",
+    cache_path: "/home/user/.cache/cartload/cartload-system-0.1.0.hmod",
     sources: [],
-    problem: "hakchi.hmod: /home/user/.cache/cartload/hakchi.hmod is not a readable gzip tar archive: invalid gzip header",
+    problem: "cartload-system-0.1.0.hmod: /home/user/.cache/cartload/cartload-system-0.1.0.hmod is not a readable gzip tar archive: invalid gzip header",
   }),
 };
 

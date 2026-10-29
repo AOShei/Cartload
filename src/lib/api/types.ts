@@ -239,14 +239,26 @@ export interface PackageInfo {
   path: string;
   source: PackageSource;
   version: string;
+  /** cartloadVersion: Cartload's own system. */
+  system: string | null;
   boot: string | null;
   kernel: string | null;
   len: number;
   modified: number | null;
 }
 
+/** A kernel package the user can choose. */
+export interface PackageChoice {
+  id: string;
+  label: string;
+}
+
 /** What the Kernel page shows in step 2 (package.rs). */
 export interface PackageStatus {
+  /** The id asked for. */
+  choice: string;
+  /** Every package, the default (Cartload's system) first. */
+  choices: PackageChoice[];
   package: PackageInfo | null;
   cache_path: string | null;
   sources: string[];
