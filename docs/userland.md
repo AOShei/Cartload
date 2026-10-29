@@ -73,8 +73,11 @@ shipped ramdisk, is 4,712,448; u-boot loads 4,980,736), ramdisk 2,235,440 bytes 
 ramdisk program runs under qemu-arm with the ramdisk as its root (libraries found). Same layout
 as the shipped ramdisk and package except: `decodepng` its own program, `e2initrd_helper` left
 out (nothing calls it; Buildroot does not install it), `libcryptsetup`, `libpopt` and
-`libdevmapper` added (hakchi's cryptsetup had them built in). Still as shipped: the
-`detached-fallback` shell script, hakchi's `uboot.bin` (step 3), Realtek's RTL8188FU firmware.
+`libdevmapper` added (hakchi's cryptsetup had them built in). Nothing is taken from the shipped package any more: `detached-fallback` (a shell script with
+hakchi's memboot functions) comes from the hakchi fork, `uboot.bin` from `scripts/uboot/`
+(docs/uboot.md), and Realtek's RTL8188FU Wi-Fi firmware, a binary Realtek publishes without
+source, from linux-firmware at the commit that added it (`9aa8db1c`, the same bytes as hakchi's
+copy).
 
 ## Status
 

@@ -39,3 +39,8 @@ git hakchi https://github.com/AOShei/hakchi 2c20d1a0be40b3606c96072da7979d5d0d0c
 # decodepng (hakchi's boot images): the commit hakchi's 3rdparty/decodepng submodule pins. The
 # shipped sntool bundles this code; here it is its own program.
 git decodepng https://github.com/DanTheMan827/decodepng ac7f36a559396b2acae2bec3302078ac49b9eb1a
+
+# Realtek's RTL8188FU Wi-Fi firmware (v4.0), which the package puts in lib/firmware/rtlwifi: a
+# binary Realtek publishes without source. From linux-firmware (kernel.org) at the commit that
+# added it; the same bytes as hakchi v1.0.4-126's copy.
+file rtl8188fufw.bin https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/rtlwifi/rtl8188fufw.bin?id=9aa8db1ccb9a83eeb3f5daf71e4206d218648c49 e6189d6d7032b83f0ed4284629c43db66262449a866f33fd329e611239f62e1f

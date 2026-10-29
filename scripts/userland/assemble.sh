@@ -56,6 +56,7 @@ if [ "${1:-}" = "--inside" ]; then
       br:*) cp -L "$br/target/${source#br:}" "$dest" ;;
       hakchi:*) cp -L "/hakchi/${source#hakchi:}" "$dest" ;;
       uboot:*) cp -L "/uboot/${source#uboot:}" "$dest" ;;
+      dl:*) cp -L "/work/dl/${source#dl:}" "$dest" ;;
       shipped) cp -a "/out/shipped/$where/$path" "$dest" ;;
       kernel:ramfs) mkdir -p "$dest" && cp -a "/kernel/ramfs/lib/modules/$release/." "$dest/" ;;
       kernel:modules) mkdir -p "$dest" && cp -a "/kernel/stage/lib/modules/$release" "$dest/" ;;

@@ -6,6 +6,7 @@
 #   out:<path>      scripts/userland/build.sh's own builds (target/userland/out)
 #   br:<path>       built by Buildroot (its target tree)
 #   hakchi:<path>   the hakchi fork's checkout (scripts and data, text)
+#   dl:<name>       a file sources.txt pins, downloaded by scripts/userland/build.sh
 #   uboot:<path>    scripts/uboot/build.sh's output (target/uboot/out)
 #   kernel:<what>   scripts/kernel/build.sh's output: zImage, modules (the package's
 #                   lib/modules/<release>), ramfs (the ramdisk's modules-ramfs)
@@ -86,9 +87,10 @@ pkg install             hakchi:kernel-hmod/install
 pkg uninstall           hakchi:kernel-hmod/uninstall
 pkg etc/preinit.d/b0010_functions hakchi:kernel-hmod/etc/preinit.d/b0010_functions
 pkg etc/preinit.d/b0050_boot      hakchi:kernel-hmod/etc/preinit.d/b0050_boot
-# A shell script (hakchi's memboot functions, standalone); text, as shipped.
-pkg bin/detached-fallback shipped
+# A shell script (hakchi's memboot functions, standalone).
+pkg bin/detached-fallback hakchi:kernel-hmod/bin/detached-fallback
 # u-boot and its board configuration, from Nintendo's source (scripts/uboot, docs/uboot.md).
 pkg boot/uboot.bin      uboot:uboot.bin
-# Realtek's firmware for the RTL8188FU Wi-Fi chip, a binary blob (Realtek publishes no source).
-pkg lib/firmware/rtlwifi/rtl8188fufw.bin shipped
+# Realtek's firmware for the RTL8188FU Wi-Fi chip, a binary blob (Realtek publishes no source),
+# from linux-firmware (sources.txt).
+pkg lib/firmware/rtlwifi/rtl8188fufw.bin dl:rtl8188fufw.bin
