@@ -172,7 +172,9 @@ if there is one (`ext4load sunxi_flash 4:0`, then `2:0`), else `sunxi_flash phy_
 
 NAND boot area of a SNES (EUR), read raw on 2026-10-28 (`sunxi-flash phy_read 0 80`): boot0
 copies in blocks 0x00-0x07, four u-boot copies at 0x08, 0x0f, 0x16 and 0x1d (7 blocks each:
-u-boot with its `script.bin`, 0xba000 bytes, then a 32 KiB boot-info block), empty 0x28-0x2f,
+u-boot with its `script.bin`, 0xba000 bytes, then a 32 KiB boot-info block; hakchi's u-boot in
+the first two, Nintendo's in the last two) and the start of a fifth at 0x24-0x27 (Nintendo's
+u-boot alone, no boot-info), empty 0x28-0x2f,
 the kernel from 0x30, nothing at 0x68 on that console. The NAND is 4096 blocks of 64 pages of
 2048 bytes; the logical area (`/dev/nand*`) starts at block 128.
 
@@ -184,6 +186,10 @@ type, key data, read-only) and at 0x1200 the driver's partition list (`nand_disk
 16-byte name). u-boot passes this block to the kernel, and the NAND driver creates `nanda`,
 `nandb`, `nandc` from that list. The first two copies hold the layout hakchi grew (data 741,376
 sectors), the last two still hold the factory one (data 614,400, private 2,048, UDISK the rest).
+The NAND driver finds the copies the same way (`uboot_info_init`: from the boot-info's
+`uboot_start_block` 0x08 to `uboot_next_block` 0x28, skipping bad blocks, as many blocks per copy
+as u-boot's length, header offset 0x14, and the boot-info need) and, on loading, rewrites the
+first half of them from a good copy when they are damaged.
 
 `/dev/nand` (16 MiB) starts with Allwinner's Linux partition table: four 16 KiB copies of a
 `softw411` MBR, version 0x200, the format sunxi-tools' `sunxi-nand-part -f a20` reads. Test data

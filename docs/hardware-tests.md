@@ -1192,3 +1192,30 @@ Results, 2026-10-28, SNES Classic Mini EUR, kernel branch `cartload` at `1ed43a0
   log has `udevd: failed to execute '/usr/bin/hdmi_trans'` (not yet compared with the stock
   kernel). Not tested: USB storage, Wi-Fi and Bluetooth dongles (no OTG hub), the return from
   this kernel.
+
+## Cartload sntool (experimental)
+
+Our `sntool` (hakchi fork, branch `cartload`: `sunxi-part`, `isRecovery`, `ismd`, `mdui`), copied
+to the console's RAM and run from there: nothing is installed. Built by
+`scripts/userland/sntool-test/run.sh` into `target/sntool-test/sntool`; compared there with the
+shipped tool on a backup first (`BACKUP=<dir>`). Read-only steps; the changing ones (`grow`,
+`shrink`, `tune`) come later and only with a fresh backup.
+
+### 1. Read-only commands in the memboot shell
+
+1. Console on, at the menu. `cargo run -q --release -p cartload-flow -- memboot --hmod data/hakchi.hmod`.
+2. `cargo run -q --release -p cartload-console -- exec --stdin 'cat > /tmp/sntool && chmod +x /tmp/sntool' < target/sntool-test/sntool`.
+3. Ours and the shipped one side by side, the listing and the dry runs:
+   `cargo run -q --release -p cartload-console -- exec 'cd /tmp; for c in "" "grow --dry-run" "shrink --dry-run"; do echo "== sunxi-part $c"; ./sntool sunxi-part $c; echo "ours exit $?"; sntool sunxi-part $c; echo "shipped exit $?"; done; ./sntool sunxi-part tune --dry-run; echo "ours tune exit $?"; ./sntool isRecovery; echo "isRecovery $?"; ./sntool ismd; echo "ismd $?"'`.
+   Expected: the same lines from both (`mbr::32768 nanda:boot:6144 nandb:rootfs:131072
+   nandc:data:741376`; for `shrink --dry-run` the factory layout and `(not) writing shrink
+   partition table...`), ours' `tune --dry-run` only `(not) resizing the data filesystem...`,
+   `isRecovery 0`, `ismd 1`. **Never run the shipped `sunxi-part tune --dry-run`**: it runs fsck
+   and resize2fs on the data partition anyway.
+4. `cargo run -q --release -p cartload-console -- exec 'sync; umount -ar; reboot -f'`.
+
+### 2. clover-mcp in the normal system (read-only)
+
+`cargo run -q --release -p cartload-console -- exec 'ls -l /usr/bin/clover-mcp /var/lib/hakchi/rootfs/usr/bin/clover-mcp; ps w | grep -E "clover-mcp|sntool" | grep -v grep; ls -l /dev/input/by-path/'`:
+whether hakchi's `clover-mcp -> /bin/sntool` link is what the menu runs on this console
+(docs/userland.md).

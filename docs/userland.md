@@ -75,7 +75,7 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 | clovershell | Cluster's daemon at `5edb874`, the last commit before the shipped build; same strings |
 | sunxi-fexc, sunxi-pio, sunxi-nand-part | sunxi-tools at the commits they report (`1e219c0`, `5c19710`), with our toolchain instead of Linaro GCC 4.8 |
 | xdelta3 3.1.1 | jmacd's xdelta at `7508fd2` (the shipped binary, unpacked from UPX 3.94, reports 3.1.1; main had no commits from 2017-08 to 2026), without lzma like the shipped one, not UPX-packed |
-| sntool | **not equivalent**: the public source (2018) builds a 12.5 KB tool with the boot-area commands; the shipped one (793 KB, `5833d00` 2020, unpublished) also has `sunxi-part` (`grow`, `shrink`, `tune`), `decodepng`, `ismd`, `isRecovery`, `mdui` and Mega Drive helpers. Those need a replacement of our own. |
+| sntool | **partly ours**: the public source (2018) has the boot-area commands (`sunxi-flash`, `check`, `kernel`, `devmem`); the shipped one (793 KB, `5833d00` 2020, unpublished) also has `sunxi-part`, `isRecovery`, `ismd`, `mdui`, `decodepng`, a `clover-mcp` mode and Mega Drive helpers. `sunxi-part`, `isRecovery`, `ismd` and `mdui` are now in the hakchi fork (branch `cartload`, `a3e8359`, not yet in `sources.txt`) and match the shipped tool on a console backup (below); `decodepng` is its own program; the `clover-mcp` mode is still to do |
 
 The byte-identical files show that this toolchain and Buildroot are the ones the shipped binaries
 were built with. Built programs can be run in the container with Ubuntu's `qemu-user` (`qemu-arm -L
@@ -101,6 +101,7 @@ disassembly where a trace did not say enough.
 | `sntool isRecovery` | `preinit` (loads `script/install`), `b0010_functions` (`gameover`: `shutdown` or `poweroff`) | exit 0 if `/lib/modules-ramfs/kernel/drivers/block/nand/nand.ko` exists, a file only hakchi's boot ramdisk has; nothing else is checked. Observed on a console: 0 in the memboot shell, 1 in the normal system |
 | `sntool ismd` | Mega Drive checks (`install`, `ismdPartitioning`, sunxi-part) | exit 0 if the 32-bit word at physical `0x01c23818` (chip ID area, read through `/dev/mem`) is `0x005a7213`, else 1 |
 | `sntool mdui` | | always exit 0 |
+| `clover-mcp` (a link to sntool) | the ramdisk's `rootfs/usr/bin/clover-mcp`, which hakchi copies into the console's overlay: Nintendo's `S81clover-mcp` (the menu) starts it | **not done**. Traced: it looks up `/dev/input/by-path/platform-gpio-keys.0-event-kbd` (the console's buttons), syncs, forks a child (which quits without that device), raises its priority to -15 and runs Nintendo's `/var/squashfs/usr/bin/clover-mcp`. The child presumably watches the buttons and USB controllers (the binary has input, HID and "suspendpoint" strings). Whether a SNES really runs it: to check on the console (`ls -l /usr/bin/clover-mcp`, `ps`) |
 | `sunxi-part` and its commands | Cartload's install (`grow`), hakchi's uninstall (`shrink`) and repair (`tune`), `ismdPartitioning` (list) | below |
 
 `sunxi-part` reads the four u-boot copies (NAND blocks 0x08-0x27) with `phy_read` and the Linux
@@ -131,3 +132,30 @@ Copies 3 and 4 are never written, so a console keeps its factory layout there (t
 `scripts/userland/fixtures/`). From the factory block the shipped `grow` writes exactly the
 grown block found on a console, and `shrink` then `grow` gives the boot area back byte for byte.
 The shrunk block is the factory layout but not the factory bytes (see the fixtures' README).
+
+### Our replacement
+
+`sntool/sunxi_part.c` in the hakchi fork (branch `cartload`). Written against the shipped tool's
+behaviour, not its code, and tested two ways by `scripts/userland/sntool-test/run.sh`:
+
+1. the layout logic, built for the host, against the fixtures: from the factory and from the
+   shrunk block `grow` writes the console's grown block byte for byte, `shrink` writes exactly
+   the shipped tool's shrunk block, damaged blocks and unknown layouts are refused;
+2. with a console backup (`BACKUP=<dir>`), ours and the shipped tool under qemu-arm
+   (`scripts/userland/fakenand/`) on 15 cases: listing, grow and shrink from the grown, shrunk and
+   factory layouts, dry runs, outside the recovery shell, each filesystem step failing. Same
+   boot area, same Linux partition table, same output, same commands in the same order.
+
+Where ours differs, on purpose (also checked by the test):
+
+- `tune` runs only from the recovery shell and `tune --dry-run` runs nothing (the shipped one
+  runs fsck and resize2fs on `/dev/nandc` in both cases);
+- each block written is read back; a failed write on the first u-boot copy stops before the
+  second, and before the driver reload and the Linux table;
+- nothing is changed while `/dev/nandc` is mounted;
+- `fsck.ext4` exit code 1 ("errors corrected") counts as success (the shipped one stops);
+- `shrink` takes the factory sizes from the copies hakchi never writes (copies 3 and 4) rather
+  than built-in numbers, and refuses without them;
+- the shipped tool's other options (`--nand-part`, `--backup`, `--file`, `dump`...), which hakchi's
+  scripts do not use, are refused.
+

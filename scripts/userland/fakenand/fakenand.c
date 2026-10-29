@@ -206,7 +206,8 @@ int execv(const char *path, char *const argv[]) {
 
 /* Commands are logged, not run, except sunxi-nand-part when $FAKENAND_NANDPART names an ARM build
  * of it: that one runs under qemu-arm in the same root, so the partition table it writes lands
- * in the fake /dev/nand. */
+ * in the fake /dev/nand. A command containing $FAKENAND_FAIL fails instead, with exit code
+ * $FAKENAND_FAIL_CODE (default 1). */
 FILE *popen(const char *cmd, const char *mode) {
 	static FILE *(*real)(const char *, const char *);
 	const char *tool = getenv("FAKENAND_NANDPART");
@@ -216,6 +217,13 @@ FILE *popen(const char *cmd, const char *mode) {
 	if (real == NULL)
 		real = dlsym(RTLD_NEXT, "popen");
 	say("popen %s: %s", mode, cmd);
+	if (getenv("FAKENAND_FAIL") != NULL && *getenv("FAKENAND_FAIL") && strstr(cmd, getenv("FAKENAND_FAIL"))) {
+		char fail[32];
+		snprintf(fail, sizeof(fail), "exit %d",
+			 getenv("FAKENAND_FAIL_CODE") ? atoi(getenv("FAKENAND_FAIL_CODE")) : 1);
+		say("  failing it: FAKENAND_FAIL (%s)", fail);
+		return real(fail, mode);
+	}
 	if (tool != NULL && root != NULL && at != NULL) {
 		snprintf(run, sizeof(run), "%.*sqemu-arm -L %s %s%s", (int)(at - cmd), cmd, root, tool,
 			 at + strlen("\"sunxi-nand-part\""));
