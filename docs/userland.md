@@ -82,3 +82,30 @@ were built with. The newer tools link the same libraries as the shipped ones, ex
 shipped ones also need `libgcc_s` and are 10 to 50% smaller: they were built outside Buildroot,
 probably with flags like those in hakchi's `sntool/Makefile` (`-Os -mthumb -flto`,
 `--gc-sections`). The difference is size, not behaviour.
+
+## sntool's unpublished commands
+
+hakchi's scripts call these, and only the shipped 2020 sntool has them:
+
+| Command | Used by | Notes |
+|---|---|---|
+| `decodepng <png> > /dev/fb0` | boot logo, splash (`init`, `b0010_functions`) | PNG to framebuffer pixels |
+| `sntool ismd`, `sntool mdui` | Mega Drive Mini checks | NES, SNES and Famicom answer no; Cartload refuses the Mega Drive |
+| `sntool isRecovery` | `preinit`, `b0010_functions` | meaning still to read from the console |
+| `sunxi-part` (list), `grow`, `shrink`, `tune`, `--dry-run` | Cartload's install (`grow`), hakchi's uninstall (`shrink`) and repair (`tune`), `ismdPartitioning` (list) | see below |
+
+`sunxi-part` works on two levels, read from the shipped binary's messages:
+
+1. The Linux partition table: Allwinner's MBR at the start of `/dev/nand`
+   (`mbr: version 0x00000200, magic softw411`, several copies, checked one by one), the format
+   sunxi-tools' `sunxi-nand-part` edits.
+2. The NAND driver's own physical layout (`nandinfo0.bin`, `nandinfo1.bin`, `--nand-part`,
+   `--nand-states`): the `_boot_info` block in the NAND boot area (kernel
+   `drivers/block/nand/lib/src/phy/phy.h`: MBR, FTL partitions, storage info, factory bad
+   blocks), read and written raw through hakchi's `phy_read`/`phy_write` ioctls.
+
+Then it reloads the NAND driver (`reload_nand`: `nand.ko`) and resizes the data filesystem
+(`resize2fs`, `tune2fs`). `grow` merges the unused `UDISK` partition into the data partition;
+`shrink` undoes it. Getting either wrong can make the data partition unreadable (the console
+itself recovers through FEL), so a replacement is developed against dumps of both levels and
+checked against the shipped tool's `--dry-run` before it writes anything.
