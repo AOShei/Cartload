@@ -193,7 +193,10 @@ FILE *fopen(const char *path, const char *mode) {
 	return real(path, mode);
 }
 
+/* Programs are logged, not started, except those whose path contains $FAKENAND_EXEC. */
 int execv(const char *path, char *const argv[]) {
+	static int (*real)(const char *, char *const[]);
+	const char *allow = getenv("FAKENAND_EXEC");
 	char line[4096];
 	size_t n = 0;
 	int i;
@@ -201,6 +204,11 @@ int execv(const char *path, char *const argv[]) {
 	for (i = 0; argv[i] != NULL && n < sizeof(line) - 2; i++)
 		n += (size_t)snprintf(line + n, sizeof(line) - n, "%s%s", i ? " " : "", argv[i]);
 	say("exec %s: %s", path, line);
+	if (allow != NULL && *allow && strstr(path, allow) != NULL) {
+		if (real == NULL)
+			real = dlsym(RTLD_NEXT, "execv");
+		return real(path, argv);
+	}
 	_exit(0);
 }
 
