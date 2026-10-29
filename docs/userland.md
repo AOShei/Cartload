@@ -54,6 +54,28 @@ toolchain is built once (about 3 minutes on 24 cores) and reused; it reports its
 `(Buildroot 2015.11.1) 4.9.3`, like the shipped binaries, and produces the same ARM attributes
 (Cortex-A7, VFPv4, NEON with fused multiply-add, hard-float calls).
 
+## Assembling the system
+
+```sh
+scripts/userland/assemble.sh [hakchi checkout]   # into target/assemble/out
+```
+
+Builds the boot ramdisk, `boot.img` (our kernel with that ramdisk) and the package
+(`cartload.hmod`) from `scripts/kernel/build.sh`'s and `scripts/userland/build.sh`'s output and
+the hakchi fork's scripts (`mod/`, `kernel-hmod/`: hakchi v1.0.4-126's as shipped, commit
+`ca39431`, then our changes). `scripts/userland/manifest.txt` names the source of every file; the
+shipped package only gives the layout (directories, links, file list), and a shipped program
+without a manifest line stops the build. `report.txt` lists every file with its source and
+SHA-256. Two runs give the same bytes.
+
+First result (2026-10-29): `boot.img` 4,212,736 bytes (our kernel's current one, with the
+shipped ramdisk, is 4,712,448; u-boot loads 4,980,736), ramdisk 2,235,440 bytes xz. Every
+ramdisk program runs under qemu-arm with the ramdisk as its root (libraries found). Same layout
+as the shipped ramdisk and package except: `decodepng` its own program, `e2initrd_helper` left
+out (nothing calls it; Buildroot does not install it), `libcryptsetup`, `libpopt` and
+`libdevmapper` added (hakchi's cryptsetup had them built in). Still as shipped: the
+`detached-fallback` shell script, hakchi's `uboot.bin` (step 3), Realtek's RTL8188FU firmware.
+
 ## Status
 
 | Program | State |

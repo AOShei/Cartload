@@ -1,0 +1,93 @@
+# Where each file of Cartload's console system comes from (scripts/userland/assemble.sh).
+#
+#   <rd|pkg> <path> <source>
+#
+# rd is the boot ramdisk, pkg the package. Sources:
+#   out:<path>      scripts/userland/build.sh's own builds (target/userland/out)
+#   br:<path>       built by Buildroot (its target tree)
+#   hakchi:<path>   the hakchi fork's checkout (scripts and data, text)
+#   kernel:<what>   scripts/kernel/build.sh's output: zImage, modules (the package's
+#                   lib/modules/<release>), ramfs (the ramdisk's modules-ramfs)
+#   boot.img        made by assemble.sh from kernel:zImage and the ramdisk
+#   version         made by assemble.sh: var/version with this kernel's release
+#   shipped         kept from hakchi v1.0.4-126 as it is (listed in the report as not yet ours)
+#   drop            not carried over (reason in the comment)
+#
+# Every program (ELF) of the shipped ramdisk and package needs a line here; assemble.sh stops
+# on one without. Symbolic links and directories follow the shipped layout; a line for a path
+# that is a link there replaces the link.
+
+# ---- ramdisk: programs
+rd bin/busybox          out:bin/busybox
+rd bin/cryptsetup       br:usr/sbin/cryptsetup
+rd bin/dropbear         br:usr/sbin/dropbear
+rd bin/e2fsck           br:usr/sbin/e2fsck
+rd bin/kexec            br:usr/sbin/kexec
+rd bin/llmnrd           out:bin/llmnrd
+rd bin/mke2fs           br:usr/sbin/mke2fs
+rd bin/resize2fs        br:usr/sbin/resize2fs
+rd bin/rsync            br:usr/bin/rsync
+rd bin/sntool           out:bin/sntool
+rd bin/sunxi-fexc       out:bin/sunxi-fexc
+rd bin/sunxi-nand-part  out:bin/sunxi-nand-part
+rd bin/tinysvcmdns      out:bin/tinysvcmdns
+rd bin/tune2fs          br:usr/sbin/tune2fs
+# decodepng was part of hakchi's sntool (a link to it); here its own program.
+rd bin/decodepng        out:bin/decodepng
+rd hakchi/shell/clovershell out:bin/clovershell
+
+# ---- ramdisk: libraries
+rd lib32/ld-2.22.so           br:lib/ld-2.22.so
+rd lib32/libc-2.22.so         br:lib/libc-2.22.so
+rd lib32/libcrypt-2.22.so     br:lib/libcrypt-2.22.so
+rd lib32/libdl-2.22.so        br:lib/libdl-2.22.so
+rd lib32/libm-2.22.so         br:lib/libm-2.22.so
+rd lib32/libnss_dns-2.22.so   br:lib/libnss_dns-2.22.so
+rd lib32/libnss_files-2.22.so br:lib/libnss_files-2.22.so
+rd lib32/libpthread-2.22.so   br:lib/libpthread-2.22.so
+rd lib32/libresolv-2.22.so    br:lib/libresolv-2.22.so
+rd lib32/librt-2.22.so        br:lib/librt-2.22.so
+rd lib32/libutil-2.22.so      br:lib/libutil-2.22.so
+rd lib32/libgcc_s.so.1        br:lib/libgcc_s.so.1
+rd lib32/libblkid.so.1.1.0    br:lib/libblkid.so.1.1.0
+rd lib32/libuuid.so.1.3.0     br:lib/libuuid.so.1.3.0
+rd lib32/libcom_err.so.2.1    br:usr/lib/libcom_err.so.2.1
+rd lib32/libe2p.so.2.3        br:usr/lib/libe2p.so.2.3
+rd lib32/libext2fs.so.2.4     br:usr/lib/libext2fs.so.2.4
+rd lib32/libss.so.2.0         br:usr/lib/libss.so.2.0
+# Linked into hakchi's cryptsetup; shared libraries in this build.
+rd lib32/libcryptsetup.so.4   br:usr/lib/libcryptsetup.so.4
+rd lib32/libpopt.so.0         br:usr/lib/libpopt.so.0
+rd lib32/libdevmapper.so.1.02 br:usr/lib/libdevmapper.so.1.02
+# e2fsprogs' initrd helper: nothing calls it, and Buildroot's recipe does not install it.
+rd lib32/e2initrd_helper      drop
+rd lib32/modules-ramfs        kernel:ramfs
+
+# ---- package: programs and libraries
+pkg bin/aplay           br:usr/bin/aplay
+pkg bin/fbgrab          br:usr/bin/fbgrab
+pkg bin/kexec           br:usr/sbin/kexec
+pkg bin/sntool          out:bin/sntool
+pkg bin/sunxi-fexc      out:bin/sunxi-fexc
+pkg bin/sunxi-pio       out:bin/sunxi-pio
+pkg bin/xdelta3         out:bin/xdelta3
+pkg lib/libcom_err.so.2.1 br:usr/lib/libcom_err.so.2.1
+pkg lib/libe2p.so.2.3   br:usr/lib/libe2p.so.2.3
+pkg lib/libext2fs.so.2.4 br:usr/lib/libext2fs.so.2.4
+pkg lib/libss.so.2.0    br:usr/lib/libss.so.2.0
+pkg lib/e2initrd_helper drop
+pkg lib/modules         kernel:modules
+
+# ---- package: the rest
+pkg boot/boot.img       boot.img
+pkg var/version         version
+pkg install             hakchi:kernel-hmod/install
+pkg uninstall           hakchi:kernel-hmod/uninstall
+pkg etc/preinit.d/b0010_functions hakchi:kernel-hmod/etc/preinit.d/b0010_functions
+pkg etc/preinit.d/b0050_boot      hakchi:kernel-hmod/etc/preinit.d/b0050_boot
+# A shell script (hakchi's memboot functions, standalone); text, as shipped.
+pkg bin/detached-fallback shipped
+# hakchi's u-boot: step 3 of the plan.
+pkg boot/uboot.bin      shipped
+# Realtek's firmware for the RTL8188FU Wi-Fi chip, a binary blob (Realtek publishes no source).
+pkg lib/firmware/rtlwifi/rtl8188fufw.bin shipped
