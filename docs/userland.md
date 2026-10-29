@@ -178,6 +178,10 @@ first install of our package erased copy 1's boot-info (docs/hardware-tests.md):
   keeps the rest of that block, and so does ours now (`burn_boot2` still pads with 0xff, as the
   shipped tool does after a kernel).
 - `burn_boot1` wrote any input; the shipped tool writes only a u-boot image.
+- `read_boot1` appended the boot-info after u-boot; the shipped tool reads u-boot alone, which
+  hakchi's `flashBoot1` compares with the uboot.bin it flashed (fork `2c20d1a`, found by the second
+  install: `flash md5 mismatch!`). `read_boot1 <n>` with a copy number (no script uses it) still
+  counts copies five blocks apart, the public code's guess, where the shipped tool finds them.
 - `default` (hakchi's uninstall) wrote the word into copy 1. The shipped tool puts Nintendo's
   u-boot back in every copy, as on a console from the factory: u-boot and its script from a copy
   hakchi never writes, joined again (u-boot padded to 64 KiB, the script to 8 KiB, header

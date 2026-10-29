@@ -128,6 +128,18 @@ for c in "${flashes[@]}"; do
     fail=1
   fi
 done
+# Reading them back, as hakchi's flashBoot checks a flash and the backup copies the boot area.
+for args in "read_boot1" "read_boot1 8" "read_boot2" "read_boot2 30"; do
+  for who in shipped ours; do
+    prog=$shipped; [ $who = ours ] && prog=$out/sntool
+    w=$F/flash-uboot-$who
+    "$engine" run --rm --network none -v "$w:/w:z" -v "$repo/target/userland/buildroot-2015.11.1/output:/br:ro,z" \
+      -v "$F:/shim:ro,z" -w /w/root/tmp cartload-fakenand sh -c "qemu-arm -L /w/root -E LD_PRELOAD=/shim/fakenand.so \
+      -E FAKENAND_RAW=/w/raw.bin -E FAKENAND_LOG=/w/read.log /w/root/bin/$(basename "$prog") sunxi-flash $args 2>/dev/null \
+      | md5sum" >"$out/read-$who.txt" || true
+  done
+  cmp -s "$out/read-shipped.txt" "$out/read-ours.txt" && echo "  ${args// /-}: same" || { echo "  ${args// /-}: differs"; fail=1; }
+done
 # sunxi-part on that factory arrangement (what hakchi's uninstall runs next).
 for c in "list-default|flash-default|" "shrink-default|flash-default|shrink --dry-run" "grow-default|flash-default|grow --dry-run"; do
   IFS='|' read -r name from args <<<"$c"

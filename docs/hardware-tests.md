@@ -1287,4 +1287,9 @@ Fresh backup first (`scripts/console-backup.sh`: `~/cartload-backups/2026-10-29-
   before, llmnrd, dropbear; data partition 352.6 MB mounted. **Until the fixed sntool is
   installed, do not run hakchi's uninstall on this console** (`burn_boot1 default` with the
   public code writes the word over u-boot copy 1).
+- Third try (fixed sntool, fork `cd99085`), after checking blocks 0x00-0x2f still equal the
+  backup: the installer's u-boot flash wrote nothing, then its check failed (`flash md5
+  mismatch!`): our `read_boot1` returned u-boot with the boot-info (794,624 bytes), hakchi's
+  returns u-boot alone (761,856). The installer went on (kernel, 19 blocks; package installed)
+  and the console came back; blocks 0x00-0x2f still equal the backup. sntool fixed again.
 
