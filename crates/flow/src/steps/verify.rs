@@ -46,6 +46,14 @@ impl Step<Context> for VerifyInstall {
                     versions.script.as_str(),
                     Some(expected.hakchi.as_str()),
                 ),
+                // Compared whenever either side has it: hakchi's package over Cartload's
+                // system leaves no cartloadVersion, and the other way round.
+                (
+                    "Cartload system",
+                    versions.system.as_deref().unwrap_or("none"),
+                    (expected.cartload.is_some() || versions.system.is_some())
+                        .then(|| expected.cartload.as_deref().unwrap_or("none")),
+                ),
                 ("boot", versions.boot.as_str(), expected.boot.as_deref()),
                 (
                     "kernel",

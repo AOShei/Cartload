@@ -41,9 +41,9 @@ pub mod commands {
     pub const HWID: &str = "hakchi hwid";
     /// Prints `yes` when `/var/version` exists.
     pub const VERSION_EXISTS: &str = r#"[ -f /var/version ] && echo "yes""#;
-    /// Boot, kernel and script versions on one line.
-    pub const VERSIONS: &str =
-        r#"source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion""#;
+    /// Boot, kernel and script versions on one line, then Cartload's system version (nothing
+    /// with hakchi's own package).
+    pub const VERSIONS: &str = r#"source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion $cartloadVersion""#;
     /// System code such as `snes-eur`.
     pub const SYSTEM_CODE: &str = r#"hakchi eval 'echo "$sftype-$sfregion"'"#;
     /// `_nand_` or the path of the custom firmware in use.
@@ -564,9 +564,11 @@ mod tests {
             ),
             ("hakchi hwid", ok("0461872a 87280207 9d2818c7 6c118000\n")),
             (r#"[ -f /var/version ] && echo "yes""#, ok("yes\n")),
+            // The trace's command plus `$cartloadVersion` (empty on hakchi's own package, as
+            // here: echo leaves a trailing space).
             (
-                r#"source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion""#,
-                ok("1.0.3 3.4.113.29-madmonkey v1.0.4-126\n"),
+                r#"source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion $cartloadVersion""#,
+                ok("1.0.3 3.4.113.29-madmonkey v1.0.4-126 \n"),
             ),
             (
                 r#"hakchi eval 'echo "$sftype-$sfregion"'"#,

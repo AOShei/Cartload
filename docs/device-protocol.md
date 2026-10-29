@@ -227,6 +227,8 @@ source /hakchi/config; [ "$cf_memboot" = "y" ]   -> exit 0 only on a minimal mem
 hakchi hwid
 [ -f /var/version ] && echo "yes"
 source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion"   -> 1.0.3 3.4.113.29-madmonkey v1.0.4-126
+                                             (Cartload adds $cartloadVersion: empty with hakchi's
+                                             package, 0.1.0... with Cartload's system)
 hakchi eval 'echo "$sftype-$sfregion"'       -> snes-eur
 hakchi currentFirmware                       -> _nand_ (or the path of a custom firmware)
 hakchi get rootfs; hakchi get squashfs       -> /var/lib/hakchi/rootfs, /var/squashfs

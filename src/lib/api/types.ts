@@ -40,6 +40,8 @@ export interface Versions {
   boot: string;
   kernel: string;
   script: string;
+  /** cartloadVersion: Cartload's own system; absent with hakchi's package. */
+  system?: string;
 }
 
 export interface StorageUsage {

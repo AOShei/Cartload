@@ -646,6 +646,7 @@ fn package_versions() -> Versions {
         boot: "1.0.3".into(),
         kernel: "3.4.113.29-madmonkey".into(),
         script: "v1.0.4-126".into(),
+        system: None,
     }
 }
 

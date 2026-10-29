@@ -595,6 +595,9 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
     }
 
     if let Some(versions) = &info.versions {
+        if let Some(system) = &versions.system {
+            details.push(Detail::new("Cartload system", system.clone()));
+        }
         details.push(Detail::new("hakchi", versions.script.clone()));
         details.push(Detail::new("Kernel", versions.kernel.clone()));
         details.push(Detail::new("Boot", versions.boot.clone()));
@@ -635,8 +638,16 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
         title.push_str(region);
     }
     if let Some(versions) = &info.versions {
-        title.push_str(", hakchi ");
-        title.push_str(&versions.script);
+        match &versions.system {
+            Some(system) => {
+                title.push_str(", Cartload system ");
+                title.push_str(system);
+            }
+            None => {
+                title.push_str(", hakchi ");
+                title.push_str(&versions.script);
+            }
+        }
     }
     if let Some(storage) = &info.storage {
         title.push_str(", ");
@@ -726,6 +737,7 @@ mod tests {
                 boot: "1.0.3".into(),
                 kernel: "3.4.113.29-madmonkey".into(),
                 script: "v1.0.4-126".into(),
+                system: None,
             }),
             can_interact: true,
             console: ConsoleType::SnesEur,
@@ -893,6 +905,7 @@ mod tests {
                 boot: "1.0.1".into(),
                 kernel: "3.4.112-00".into(),
                 script: "v1.0.2-000".into(),
+                system: None,
             }),
             can_interact: false,
             ..ConsoleInfo::default()

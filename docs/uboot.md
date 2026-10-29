@@ -80,7 +80,7 @@ First result (2026-10-29): u-boot 515,916 bytes (Nintendo's 515,804, hakchi's 58
 ## Testing on a console
 
 1. From RAM through FEL (nothing written): power off, hold Reset, power on, release after two
-   seconds; `cargo run -q --release -p cartload-flow -- memboot --hmod target/assemble/out/cartload.hmod`.
+   seconds; `cargo run -q --release -p cartload-flow -- memboot --hmod target/assemble/out/cartload-system-<version>.hmod`.
    FEL loads fes1 (hakchi2 CE's, Cartload's `data/fes1.bin`), then this u-boot with its boot
    command replaced by `boota 47400000`, and the package's boot.img. It shows that the u-boot
    runs (display, USB, boota); not the NAND path.

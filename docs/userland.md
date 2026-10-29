@@ -61,7 +61,7 @@ scripts/userland/assemble.sh [hakchi checkout]   # into target/assemble/out
 ```
 
 Builds the boot ramdisk, `boot.img` (our kernel with that ramdisk) and the package
-(`cartload.hmod`) from `scripts/kernel/build.sh`'s and `scripts/userland/build.sh`'s output and
+(`cartload-system-<version>.hmod`, the version from `SYSTEM_VERSION`) from `scripts/kernel/build.sh`'s and `scripts/userland/build.sh`'s output and
 the hakchi fork's scripts (`mod/`, `kernel-hmod/`: hakchi v1.0.4-126's as shipped, commit
 `ca39431`, then our changes). `scripts/userland/manifest.txt` names the source of every file; the
 shipped package only gives the layout (directories, links, file list), and a shipped program

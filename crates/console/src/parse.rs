@@ -202,10 +202,15 @@ pub struct Versions {
     pub kernel: String,
     /// `hakchiVersion`, the device script version (for example `v1.0.4-126`).
     pub script: String,
+    /// `cartloadVersion`, the version of Cartload's system (for example `0.1.0`); `None` with
+    /// hakchi's own package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system: Option<String>,
 }
 
 impl Versions {
-    /// Parses `source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion"`.
+    /// Parses `source /var/version && echo "$bootVersion $kernelVersion $hakchiVersion
+    /// $cartloadVersion"` (the last field is empty without Cartload's system).
     pub fn parse_echo(output: &str) -> Result<Self> {
         let mut fields = output.split_whitespace();
         match (fields.next(), fields.next(), fields.next()) {
@@ -213,6 +218,7 @@ impl Versions {
                 boot: boot.to_string(),
                 kernel: kernel.to_string(),
                 script: script.to_string(),
+                system: fields.next().map(str::to_string),
             }),
             _ => Err(Error::Parse {
                 what: "version triple",
@@ -235,6 +241,7 @@ impl Versions {
             boot: get("bootVersion")?,
             kernel: get("kernelVersion")?,
             script: get("hakchiVersion")?,
+            system: values.get("cartloadVersion").cloned(),
         })
     }
 
@@ -244,6 +251,7 @@ impl Versions {
             boot: "1.0.0".into(),
             kernel: "3.4.112-00".into(),
             script: "v1.0.0-000".into(),
+            system: None,
         }
     }
 
@@ -281,6 +289,9 @@ impl Versions {
 
 impl fmt::Display for Versions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(system) = &self.system {
+            write!(f, "Cartload system {system}, ")?;
+        }
         write!(
             f,
             "boot {}, kernel {}, script {}",
@@ -686,6 +697,22 @@ mod tests {
     const HWID: &str = "0461872a 87280207 9d2818c7 6c118000";
 
     #[test]
+    fn versions_with_cartload_system() {
+        let echo = Versions::parse_echo("1.0.3 3.4.113.30-cartload v1.0.4-126 0.1.0\n").unwrap();
+        assert_eq!(echo.system.as_deref(), Some("0.1.0"));
+        assert_eq!(
+            echo.to_string(),
+            "Cartload system 0.1.0, boot 1.0.3, kernel 3.4.113.30-cartload, script v1.0.4-126"
+        );
+        let file = Versions::parse_file(
+            "bootVersion='1.0.3'\nhakchiVersion='v1.0.4-126'\nkernelVersion='3.4.113.30-cartload'\ncartloadVersion='0.1.0'\n",
+        )
+        .unwrap();
+        assert_eq!(file, echo);
+        assert!(file.can_interact());
+    }
+
+    #[test]
     fn system_codes_round_trip() {
         for (code, console) in SYSTEM_CODES {
             assert_eq!(ConsoleType::from_system_code(code), console);
@@ -735,6 +762,7 @@ mod tests {
         assert_eq!(versions.boot, "1.0.3");
         assert_eq!(versions.kernel, "3.4.113.29-madmonkey");
         assert_eq!(versions.script, "v1.0.4-126");
+        assert_eq!(versions.system, None);
         assert_eq!(Versions::parse_file(VERSION_FILE).unwrap(), versions);
         assert_eq!(
             versions.to_string(),

@@ -8,6 +8,8 @@ pub const HAKCHI_VERSION: &str = "hakchiVersion";
 pub const BOOT_VERSION: &str = "bootVersion";
 /// Name of the variable holding the kernel version.
 pub const KERNEL_VERSION: &str = "kernelVersion";
+/// Name of the variable holding the version of Cartload's system, in Cartload's own packages.
+pub const CARTLOAD_VERSION: &str = "cartloadVersion";
 
 /// The versions declared by a kernel package in `var/version`.
 ///
@@ -26,7 +28,9 @@ pub struct Version {
     pub boot: Option<String>,
     /// `kernelVersion`, e.g. `3.4.113.29-madmonkey`.
     pub kernel: Option<String>,
-    /// Every variable in the file, including the three above.
+    /// `cartloadVersion`, e.g. `0.1.0`: present in Cartload's own system packages only.
+    pub cartload: Option<String>,
+    /// Every variable in the file, including the four above.
     pub variables: BTreeMap<String, String>,
 }
 
@@ -43,14 +47,25 @@ impl Version {
             hakchi,
             boot: variables.get(BOOT_VERSION).cloned(),
             kernel: variables.get(KERNEL_VERSION).cloned(),
+            cartload: variables.get(CARTLOAD_VERSION).cloned(),
             variables,
         })
     }
 }
 
 impl fmt::Display for Version {
-    /// `v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey)`, omitting what is unknown.
+    /// `v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey)`, omitting what is unknown;
+    /// Cartload's own packages read `Cartload system 0.1.0 (hakchi v1.0.4-126, boot ...)`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(cartload) = &self.cartload {
+            write!(f, "Cartload system {cartload} (hakchi {}", self.hakchi)?;
+            for (label, value) in [("boot", &self.boot), ("kernel", &self.kernel)] {
+                if let Some(value) = value {
+                    write!(f, ", {label} {value}")?;
+                }
+            }
+            return f.write_str(")");
+        }
         f.write_str(&self.hakchi)?;
         let details: Vec<String> = [("boot", &self.boot), ("kernel", &self.kernel)]
             .into_iter()
@@ -176,11 +191,27 @@ mod tests {
     }
 
     #[test]
+    fn cartload_system_version() {
+        let version = Version::parse(
+            "bootVersion='1.0.3'\nhakchiVersion='v1.0.4-126'\nkernelVersion='3.4.113.30-cartload'\ncartloadVersion='0.1.0'\n",
+        )
+        .unwrap();
+        assert_eq!(version.cartload.as_deref(), Some("0.1.0"));
+        assert_eq!(
+            version.to_string(),
+            "Cartload system 0.1.0 (hakchi v1.0.4-126, boot 1.0.3, kernel 3.4.113.30-cartload)"
+        );
+        let hakchi = Version::parse("hakchiVersion='v1.0.4-126'\n").unwrap();
+        assert_eq!(hakchi.cartload, None);
+    }
+
+    #[test]
     fn display_omits_unknown_parts() {
         let version = Version {
             hakchi: "v1".to_string(),
             boot: None,
             kernel: Some("3.4".to_string()),
+            cartload: None,
             variables: BTreeMap::new(),
         };
         assert_eq!(version.to_string(), "v1 (kernel 3.4)");

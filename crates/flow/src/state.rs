@@ -74,10 +74,16 @@ impl ConsoleState {
                 info.hwid
             ),
             Some(versions) => {
-                let mut text = format!(
-                    "hakchi {} (boot {}, kernel {}) installed",
-                    versions.script, versions.boot, versions.kernel
-                );
+                let mut text = match &versions.system {
+                    Some(system) => format!(
+                        "Cartload system {system} (hakchi {}, boot {}, kernel {}) installed",
+                        versions.script, versions.boot, versions.kernel
+                    ),
+                    None => format!(
+                        "hakchi {} (boot {}, kernel {}) installed",
+                        versions.script, versions.boot, versions.kernel
+                    ),
+                };
                 if info.can_interact {
                     text.push_str(&format!(" on {}", info.console));
                 } else if versions.requires_reflash() {
@@ -103,6 +109,7 @@ mod tests {
             boot: boot.into(),
             kernel: kernel.into(),
             script: script.into(),
+            system: None,
         }
     }
 

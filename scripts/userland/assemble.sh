@@ -11,7 +11,7 @@
 #
 #   ramdisk/            the ramdisk's files
 #   boot.img            our kernel with that ramdisk
-#   cartload.hmod       the package
+#   cartload-system-<version>.hmod   the package (version: SYSTEM_VERSION)
 #   report.txt          every file of the package and ramdisk, where it comes from, its SHA-256,
 #                       and the files still kept as shipped
 #
@@ -30,6 +30,7 @@ if [ "${1:-}" = "--inside" ]; then
   manifest=/repo/scripts/userland/manifest.txt
   src=/kernel/src/kernel
   release=$(cat "$src/include/config/kernel.release")
+  system=$(cat /repo/scripts/userland/SYSTEM_VERSION)
   epoch=$(git -C /hakchi log -1 --format=%ct)
   out=/out/out
   rm -rf /out/shipped "$out"
@@ -154,14 +155,19 @@ if [ "${1:-}" = "--inside" ]; then
   rm -rf "$pkg/lib/modules/"*-madmonkey
   cp "$out/boot.img" "$pkg/boot/boot.img"
   echo "pkg boot/boot.img boot.img" >>"$report.tmp"
-  sed "s/^kernelVersion=.*/kernelVersion='$release'/" /out/shipped/pkg/var/version >"$pkg/var/version"
+  # hakchi's scripts and hakchi2 CE read hakchiVersion (the scripts are v1.0.4-126's, so it
+  # stays); cartloadVersion names this build of the system (SYSTEM_VERSION).
+  {
+    sed "s/^kernelVersion=.*/kernelVersion='$release'/" /out/shipped/pkg/var/version
+    echo "cartloadVersion='$system'"
+  } >"$pkg/var/version"
   echo "pkg var/version version" >>"$report.tmp"
   (cd "$pkg" && tar --owner=0 --group=0 --numeric-owner --sort=name --mtime="@$epoch" -cf - * \
-    | gzip -n -9 >"$out/cartload.hmod")
+    | gzip -n -9 >"$out/cartload-system-$system.hmod")
 
   echo "== report"
   {
-    echo "# Cartload console system: kernel $release, hakchi checkout $(git -C /hakchi rev-parse --short HEAD)"
+    echo "# Cartload system $system: kernel $release, hakchi checkout $(git -C /hakchi rev-parse --short HEAD)"
     echo "# boot.img $size bytes (u-boot loads $BOOT_IMAGE_MAX_LEN), ramdisk $(stat -c %s /out/ramdisk.cpio.xz) bytes xz"
     echo "# <rd|pkg> <path> <source> <sha256>"
     sort -u "$report.tmp" | while read -r where path source; do
