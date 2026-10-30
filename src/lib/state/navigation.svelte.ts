@@ -12,7 +12,7 @@ export interface PageDef {
 
 /** The pages, in sidebar order. */
 export const PAGES: readonly PageDef[] = [
-  { id: "console", label: "Console", icon: "console", hint: "The console: hakchi, emulators and maintenance." },
+  { id: "console", label: "Console", icon: "console", hint: "The console: its custom system, emulators and maintenance." },
   { id: "library", label: "Library", icon: "library", hint: "Your games, folders and art." },
   { id: "settings", label: "Settings", icon: "settings", hint: "Theme and advanced options." },
 ];

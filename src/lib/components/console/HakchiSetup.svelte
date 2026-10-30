@@ -31,7 +31,7 @@
 </script>
 
 <section class="card setup" aria-labelledby="setup-heading">
-  <h2 id="setup-heading">Install hakchi</h2>
+  <h2 id="setup-heading">Install the system</h2>
 
   <div class="fel">
     <FelInstructions width={190} />
@@ -83,7 +83,7 @@
           <span class="spinner on-accent" aria-hidden="true"></span>
           Starting…
         {:else}
-          Install hakchi
+          Install
           <Icon name="arrow" size={16} />
         {/if}
       </button>

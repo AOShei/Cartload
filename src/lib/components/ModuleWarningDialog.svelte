@@ -19,7 +19,7 @@
         </div>
       </div>
     {/each}
-    <p class="muted small">It installs into hakchi's storage like the other modules. Your other games and emulators are not affected.</p>
+    <p class="muted small">It installs into the custom system's storage like the other modules. Your other games and emulators are not affected.</p>
   {/if}
   {#snippet actions()}
     <button type="button" class="btn btn-primary" onclick={() => void modulesStore.confirmPending()}>Install anyway</button>

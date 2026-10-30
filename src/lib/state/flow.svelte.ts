@@ -46,7 +46,7 @@ export function flowTitle(kind: FlowKind | null): string {
       return "Add 7z support";
     case "install":
     default:
-      return "Install hakchi";
+      return "Install the system";
   }
 }
 
@@ -65,13 +65,13 @@ export function flowOutcome(kind: FlowKind | null): { heading: string; text: str
   switch (kind?.kind) {
     case "memboot":
       return {
-        heading: "The console runs hakchi from memory.",
+        heading: "The console runs the custom system from memory.",
         text: "Nothing was written to it. Switch it off and on to return to its own system.",
       };
     case "uninstall":
       return {
         heading: "The console is back on its original system.",
-        text: "hakchi was removed and the original kernel flashed back. The console boots its own menu now.",
+        text: "The custom system was removed and the original kernel flashed back. The console boots its own menu now.",
       };
     case "dump_kernel":
       return {
@@ -101,8 +101,8 @@ export function flowOutcome(kind: FlowKind | null): { heading: string; text: str
     case "install":
     default:
       return {
-        heading: "hakchi is installed.",
-        text: "The console rebooted into its menu with hakchi running.",
+        heading: "The custom system is installed.",
+        text: "The console rebooted into its menu with the custom system running.",
       };
   }
 }

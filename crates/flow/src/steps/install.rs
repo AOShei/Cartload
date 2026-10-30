@@ -56,7 +56,7 @@ impl Step<Context> for UploadHmod {
     }
 
     fn description(&self) -> &str {
-        "Copy hakchi.hmod to the console"
+        "Copy the package to the console"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -68,7 +68,7 @@ impl Step<Context> for UploadHmod {
     async fn run(&self, ctx: &mut Context) -> Result<Outcome> {
         let hmod = ctx.hmod()?;
         ctx.reporter.info(format!(
-            "uploading {} ({} bytes, hakchi {})",
+            "uploading {} ({} bytes, {})",
             hmod.path.display(),
             hmod.bytes.len(),
             hmod.files.version

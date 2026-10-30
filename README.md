@@ -68,15 +68,18 @@ Not yet tested on hardware. Two drivers are involved:
 ## Using it
 
 1. **Console page.** Connect the console with its USB cable. The page shows what is
-   attached: nothing, a console in FEL mode, stock firmware, or a running hakchi kernel with
-   its version and free space.
-2. **Install hakchi** (Console page, on a console without it). Pick the console model, put
-   the console in FEL mode as the drawing shows (hold Reset, switch Power on, release after
-   two seconds; the screen stays black), and press **Install hakchi**. The progress opens in
-   a window over the app; the thirteen steps run in order and are resumable: if anything
-   stops, run it again and finished steps are skipped. Once hakchi is installed the same
-   page manages the emulators and offers reinstall, saving the stock kernel to a file and
-   removing hakchi again (factory reset).
+   attached: nothing, a console in FEL mode, stock firmware, or a console running a custom
+   system (Cartload's or hakchi's) with its version and free space.
+2. **Install the system** (Console page, on a console without it). Pick the console model,
+   put the console in FEL mode as the drawing shows (hold Reset, switch Power on, release
+   after two seconds; the screen stays black), and press **Install**. The kernel package is
+   **Cartload system** by default: Cartload's own console system, built from public source
+   and reproducible (see below); **hakchi v1.0.4-126**, the package hakchi2 CE installs, is
+   the alternative in the same list. The progress opens in a window over the app; the
+   steps run in order and are resumable: if anything stops, run it again and finished steps
+   are skipped. Once the system is installed the same page manages the emulators and offers
+   reinstall, saving the stock kernel to a file and removing the custom system again
+   (factory reset).
 3. **Library page.** Add ROMs (SNES `.sfc`, `.smc`, `.fig`, `.swc`; NES `.nes`; and, with
    their RetroArch core installed, Mega Drive / Genesis `.md`, `.gen`, `.smd`, Game Boy
    `.gb`, `.gbc`, Game Boy Advance `.gba`, N64 `.z64`, `.n64`, `.v64`; or a `.zip` of any of
@@ -86,6 +89,19 @@ Not yet tested on hardware. Two drivers are involved:
    cable is pulled mid-way, run the sync again once the console is back.
 4. **Settings page.** Theme, the log, the Linux setup, the library location and the
    TheGamesDB key.
+
+### The Cartload system
+
+What Cartload installs on the console by default: a kernel, u-boot and every program of the boot
+ramdisk and the package, built from public source (Nintendo's open-source archive, hakchi's
+public tree and the fork that holds its v1.0.4-126 scripts, the upstream projects), laid out like
+hakchi v1.0.4-126 and running its scripts. Every file's source is listed in the build's report;
+the builds are reproducible, and CI rebuilds the package the app embeds and fails unless it is
+byte for byte the same. The only binaries without source are Realtek's Wi-Fi firmware (from
+linux-firmware) and, outside the package, the DRAM setup in the console's boot0 and in the FEL
+loader. Releases are tagged `system-v<version>`. Details: `docs/kernel.md`, `docs/userland.md`,
+`docs/uboot.md`. Not in it yet: hakchi's USB gamepad driver (Nintendo controllers work as
+before).
 
 ### Emulator modules
 

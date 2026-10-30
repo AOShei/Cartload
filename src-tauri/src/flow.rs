@@ -89,8 +89,8 @@ impl FlowKind {
     /// What the flow does, as a progressive-tense title for the status bar.
     pub fn title(&self) -> &'static str {
         match self {
-            Self::Install => "Installing hakchi",
-            Self::Memboot => "Booting hakchi from memory",
+            Self::Install => "Installing the system",
+            Self::Memboot => "Booting the system from memory",
             Self::Uninstall { .. } => "Returning the console to its original system",
             Self::DumpKernel { .. } => "Saving the stock kernel",
             Self::InstallModules { .. } => "Installing emulator modules",
@@ -159,7 +159,7 @@ pub fn step_label(name: &str) -> &str {
         "verify-mods" => "Verify 7z support",
         "read-stock-kernel" => "Read the stock kernel backup",
         "flash-stock-kernel" => "Flash the stock kernel",
-        "remove" => "Remove hakchi",
+        "remove" => "Remove the custom system",
         "reboot" => "Reboot the console",
         "wait-offline" => "Wait for the console to leave",
         "dump-stock-kernel" => "Save the stock kernel",
@@ -654,9 +654,7 @@ impl FlowRunner {
         }
         kind.apply_options(&mut ctx.options);
         if kind.needs_package() && ctx.hmod.is_none() {
-            return Err(CommandError::new(
-                "The kernel package (hakchi.hmod) is missing.",
-            ));
+            return Err(CommandError::new("The kernel package is missing."));
         }
         if matches!(kind, FlowKind::Install | FlowKind::BaseMods) && ctx.base_mods.is_empty() {
             ctx.base_mods = basemods::BUNDLED
@@ -1178,7 +1176,11 @@ mod tests {
         let error = runner
             .start(FlowKind::Install, None, Vec::new(), Vec::new())
             .unwrap_err();
-        assert!(error.message.contains("hakchi.hmod"), "{}", error.message);
+        assert!(
+            error.message.contains("kernel package"),
+            "{}",
+            error.message
+        );
         assert_eq!(runner.snapshot().state, FlowState::Idle);
         assert!(recorder.snapshots.lock().unwrap().is_empty());
     }
@@ -1240,7 +1242,7 @@ mod tests {
         let error = runner
             .start(FlowKind::Install, None, Vec::new(), Vec::new())
             .unwrap_err();
-        assert!(error.message.contains("hakchi.hmod"));
+        assert!(error.message.contains("kernel package"));
     }
 
     #[tokio::test]

@@ -359,8 +359,8 @@ fn describe_disconnected(hint: &Hint) -> Description {
         Hint::Nothing => (
             Tone::Neutral,
             NOTHING.into(),
-            "A console with hakchi installed shows up a few seconds after power-on. To install \
-             hakchi, hold Reset while turning the console on so it starts in FEL mode."
+            "A console with a custom system installed shows up a few seconds after power-on. To \
+             install one, hold Reset while turning the console on so it starts in FEL mode."
                 .into(),
             vec![],
         ),
@@ -379,8 +379,11 @@ fn describe_disconnected(hint: &Hint) -> Description {
             refused: true,
         } => (
             Tone::Warning,
-            format!("Something answers at {address}, but it is not a hakchi kernel."),
-            "It refused the hakchi login. If this is the console, install hakchi below.".into(),
+            format!(
+                "Something answers at {address}, but it is not a console with a custom system."
+            ),
+            "It refused the console's login. If this is the console, install the system below."
+                .into(),
             vec![
                 Detail::new("Address", address.clone()),
                 Detail::new("Error", reason.clone()),
@@ -437,7 +440,8 @@ fn describe_fel(device: &UsbDevice, check: &FelCheck) -> Description {
             (
                 Tone::Ready,
                 "Console in FEL mode: ready to install the kernel.".into(),
-                "Install hakchi below, or boot it from memory without installing anything.".into(),
+                "Install the system below, or boot it from memory without installing anything."
+                    .into(),
                 details,
             )
         }
@@ -495,7 +499,7 @@ fn describe_booting(phase: BootPhase, address: Option<&str>, elapsed: u64) -> De
     match phase {
         BootPhase::Network => (
             Tone::Busy,
-            "hakchi kernel found on USB: waiting for its network link…".into(),
+            "Console found on USB: waiting for its network link…".into(),
             if elapsed < NETWORK_WAIT_WARNING {
                 "This usually takes a few seconds.".into()
             } else {
@@ -521,7 +525,7 @@ fn describe_booting(phase: BootPhase, address: Option<&str>, elapsed: u64) -> De
         ),
         BootPhase::LeavingFel => (
             Tone::Busy,
-            "Console left FEL mode: waiting for the hakchi kernel to come up…".into(),
+            "Console left FEL mode: waiting for the custom system to come up…".into(),
             "After a memboot this takes about ten seconds. If the console was switched off \
              instead, this clears shortly."
                 .into(),
@@ -586,8 +590,8 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
         details.push(Detail::new("Link", link_text));
         return (
             Tone::Ready,
-            "Console running the hakchi recovery kernel from memory.".into(),
-            "Nothing has been installed yet. Install hakchi below, or switch the console off \
+            "Console running the recovery system from memory.".into(),
+            "Nothing has been installed yet. Install the system below, or switch the console off \
              and on to return to its own system."
                 .into(),
             details,
@@ -598,7 +602,7 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
         if let Some(system) = &versions.system {
             details.push(Detail::new("Cartload system", system.clone()));
         }
-        details.push(Detail::new("hakchi", versions.script.clone()));
+        details.push(Detail::new("hakchi scripts", versions.script.clone()));
         details.push(Detail::new("Kernel", versions.kernel.clone()));
         details.push(Detail::new("Boot", versions.boot.clone()));
     }
@@ -610,21 +614,21 @@ fn describe_connected(address: &str, link: &Link, info: &ConsoleInfo) -> Descrip
         let (title, next) = match &info.versions {
             None => (
                 "Console with a very old hakchi kernel.".to_string(),
-                "Reinstall hakchi below.".to_string(),
+                "Reinstall the system below.".to_string(),
             ),
             Some(versions) if versions.requires_reflash() => (
                 format!(
                     "Console with hakchi {}: the kernel is too old to use.",
                     versions.script
                 ),
-                "Reinstall hakchi below.".to_string(),
+                "Reinstall the system below.".to_string(),
             ),
             Some(versions) => (
                 format!(
                     "Console with hakchi {}: its system files are too old.",
                     versions.script
                 ),
-                "Update hakchi below (Reinstall).".to_string(),
+                "Update the system below (Reinstall).".to_string(),
             ),
         };
         return (Tone::Warning, title, next, details);
@@ -861,7 +865,7 @@ mod tests {
                 "Model",
                 "Region",
                 "Hardware id",
-                "hakchi",
+                "hakchi scripts",
                 "Kernel",
                 "Boot",
                 "Firmware",
@@ -895,8 +899,8 @@ mod tests {
             ..ConsoleInfo::default()
         })
         .describe(0);
-        assert!(shell.title.contains("recovery kernel from memory"));
-        assert!(shell.next.contains("Install hakchi below"));
+        assert!(shell.title.contains("recovery system from memory"));
+        assert!(shell.next.contains("Install the system below"));
         assert_eq!(shell.details[0].value, "abcd");
 
         let outdated = connected(ConsoleInfo {
@@ -916,7 +920,7 @@ mod tests {
             outdated.title,
             "Console with hakchi v1.0.2-000: the kernel is too old to use."
         );
-        assert_eq!(outdated.next, "Reinstall hakchi below.");
+        assert_eq!(outdated.next, "Reinstall the system below.");
 
         let ancient = connected(ConsoleInfo {
             hwid: "abcd".into(),

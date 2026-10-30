@@ -54,9 +54,9 @@ impl Step<Context> for DetectState {
 
     fn description(&self) -> &str {
         match self.expect {
-            Expect::Any => "Identify the console and its hakchi install",
+            Expect::Any => "Identify the console and its installed system",
             Expect::MembootShell => "Check the console is in the memboot shell",
-            Expect::Installed => "Check the console runs its installed hakchi",
+            Expect::Installed => "Check the console runs its installed system",
         }
     }
 

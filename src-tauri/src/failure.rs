@@ -323,7 +323,7 @@ fn device(step: Option<&str>, text: &str) -> FlowFailure {
     if text.contains("versions differ") {
         return FlowFailure::new(
             FailureKind::Device,
-            "The console runs a different hakchi version than the package.",
+            "The console runs a different version than the package.",
             sentence(text),
             "Start the install again; if it repeats, download the package again in step 2.",
         );
@@ -401,7 +401,7 @@ fn console(error: &cartload_console::Error) -> FlowFailure {
     match error {
         cartload_console::Error::AuthFailed { .. } => FlowFailure::new(
             FailureKind::Connection,
-            "Something answered on the network, but it is not a hakchi kernel.",
+            "Something answered on the network, but it is not a console with a custom system.",
             sentence(&error.to_string()),
             "Make sure the console is the only device on the USB network, then start again.",
         ),

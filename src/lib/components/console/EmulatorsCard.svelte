@@ -88,7 +88,7 @@
               class="btn btn-sm"
               onclick={() => void modulesStore.install(modulesStore.missing(withRetroarch(module.id)))}
               disabled={downloading || flowStore.running || !ready}
-              title={ready ? "Downloads the module and reboots the console once" : "Connect a console running hakchi"}
+              title={ready ? "Downloads the module and reboots the console once" : "Connect a console running the custom system"}
             >
               {#if downloading}<span class="spinner" aria-hidden="true"></span>{/if}
               Install
@@ -101,7 +101,7 @@
     <p class="muted"><span class="spinner" aria-hidden="true"></span> Reading the modules…</p>
   {/if}
   {#if !ready}
-    <p class="muted small foot">Connect the console running hakchi to install or remove emulators.</p>
+    <p class="muted small foot">Connect the console running the custom system to install or remove emulators.</p>
   {/if}
 </section>
 

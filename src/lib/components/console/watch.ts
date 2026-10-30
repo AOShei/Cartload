@@ -48,11 +48,11 @@ export function consoleWatch(report: StatusReport | null): Watch {
         return { tone: "warning", text: report.title, ready: false, installed: false };
       }
       if (status.info.minimal_memboot) {
-        return { tone: "ready", text: "Console running hakchi from memory. Ready.", ready: true, installed: false };
+        return { tone: "ready", text: "Console running the custom system from memory. Ready.", ready: true, installed: false };
       }
       return {
         tone: "ready",
-        text: "Console connected and running hakchi. Ready, no Reset needed.",
+        text: "Console connected and running the custom system. Ready, no Reset needed.",
         ready: true,
         installed: true,
       };

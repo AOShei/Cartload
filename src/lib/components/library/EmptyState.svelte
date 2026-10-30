@@ -31,12 +31,12 @@
     <li class:done={installed}>
       <span class="mark">{#if installed}<Icon name="check" size={16} />{:else}2{/if}</span>
       <div>
-        <strong>Install hakchi</strong>
+        <strong>Install the custom system</strong>
         <p class="muted">
           {#if installed}
-            hakchi is running on the console.
+            The custom system is running on the console.
           {:else}
-            The Console page walks through it once; the console keeps hakchi afterwards.
+            The Console page walks through it once; the console keeps it afterwards.
           {/if}
         </p>
         {#if !installed}

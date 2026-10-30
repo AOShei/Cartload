@@ -11,7 +11,7 @@ const fixtures: Record<string, () => StatusReport> = {
     tone: "neutral",
     title: NOTHING,
     next:
-      "A console with hakchi installed shows up a few seconds after power-on. To install hakchi, hold Reset while turning the console on so it starts in FEL mode.",
+      "A console with a custom system installed shows up a few seconds after power-on. To install one, hold Reset while turning the console on so it starts in FEL mode.",
     details: [],
     supported: true,
     changed_at: Date.now(),
@@ -32,7 +32,7 @@ const fixtures: Record<string, () => StatusReport> = {
     },
     tone: "ready",
     title: "Console in FEL mode: ready to install the kernel.",
-    next: "Install hakchi below, or boot it from memory without installing anything.",
+    next: "Install the system below, or boot it from memory without installing anything.",
     details: [
       { label: "USB", value: "bus 1, device 9" },
       { label: "USB id", value: "1f3a:efe8" },
@@ -44,7 +44,7 @@ const fixtures: Record<string, () => StatusReport> = {
   booting: () => ({
     status: { state: "booting", phase: "network", address: null, since: Date.now() - 4000 },
     tone: "busy",
-    title: "hakchi kernel found on USB: waiting for its network link…",
+    title: "Console found on USB: waiting for its network link…",
     next: "This usually takes a few seconds.",
     details: [{ label: "Waiting for", value: "4 s" }],
     supported: true,
@@ -81,14 +81,15 @@ const fixtures: Record<string, () => StatusReport> = {
       },
     },
     tone: "ready",
-    title: "SNES Classic Mini, EUR, hakchi v1.0.4-126, 310 MB free",
+    title: "SNES Classic Mini, EUR, Cartload system 0.1.0, 310 MB free",
     next: "Ready. Open the Library page to add and sync games.",
     details: [
       { label: "Model", value: "SNES Classic Mini" },
       { label: "Region", value: "EUR" },
       { label: "Hardware id", value: "0461872a872802079d2818c76c118000" },
-      { label: "hakchi", value: "v1.0.4-126" },
-      { label: "Kernel", value: "3.4.113.29-madmonkey" },
+      { label: "Cartload system", value: "0.1.0" },
+      { label: "hakchi scripts", value: "v1.0.4-126" },
+      { label: "Kernel", value: "3.4.113.30-cartload" },
       { label: "Boot", value: "1.0.3" },
       { label: "Firmware", value: "stock NAND firmware" },
       { label: "Games storage", value: "/var/lib/hakchi/games" },
@@ -139,7 +140,7 @@ export function previewReport(): StatusReport {
 }
 
 const INSTALL_STEPS: [string, string, string][] = [
-  ["memboot", "Boot from memory", "Boot the hakchi kernel from RAM, through FEL or kexec"],
+  ["memboot", "Boot from memory", "Boot the system from RAM, through FEL or kexec"],
   ["wait-console", "Wait for the console", "Wait for the console on the USB network"],
   ["detect", "Identify the console", "Check the console is in the memboot shell"],
   ["check-md", "Compatibility check", "Check that the console is one Cartload supports"],
@@ -274,7 +275,7 @@ const flowFixtures: Record<string, () => FlowSnapshot> = {
       state: "done",
       steps,
       current: null,
-      message: "installed: hakchi v1.0.4-126 (boot 1.0.3, kernel 3.4.113.29-madmonkey) installed on SNES Classic Mini (EUR)",
+      message: "installed: Cartload system 0.1.0 (hakchi v1.0.4-126, boot 1.0.3, kernel 3.4.113.30-cartload) installed on SNES Classic Mini (EUR)",
       failure: null,
       cancel_pending: false,
       started_at: now - 300_000,

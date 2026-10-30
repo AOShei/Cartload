@@ -52,7 +52,7 @@
 
 <section class="card maintenance" class:row aria-labelledby="maintenance-heading">
   <div class="head">
-  <h2 id="maintenance-heading">hakchi</h2>
+  <h2 id="maintenance-heading">System</h2>
   {#if installed}
     <div class="package">
       <span class="muted small">
@@ -89,7 +89,7 @@
       <li>
         <div class="tool-text">
           <strong>Boot from memory</strong>
-          <span class="muted">Runs hakchi once. Nothing is written.</span>
+          <span class="muted">Runs the custom system once. Nothing is written.</span>
         </div>
         <button type="button" class="btn btn-sm" disabled={!canStart} onclick={() => void flowStore.begin({ kind: "memboot" })}>
           <Icon name="play" size={14} />
@@ -110,7 +110,7 @@
     <li>
       <div class="tool-text">
         <strong>Factory reset</strong>
-        <span class="muted">Removes hakchi and restores the console's own system.</span>
+        <span class="muted">Removes the custom system and restores the console's own.</span>
       </div>
       <button type="button" class="btn btn-sm" disabled={!canStart} onclick={() => (confirmReset = true)}>
         <Icon name="undo" size={14} />
@@ -125,12 +125,12 @@
 
 <Dialog open={confirmReset} title="Factory reset" width="520px" onclose={() => (confirmReset = false)}>
   <p>
-    This flashes the original kernel back and removes hakchi from the console, with the games and
+    This flashes the original kernel back and removes the custom system from the console, with the games and
     emulators added through it. The console's own games are untouched.
   </p>
   {#snippet actions()}
-    <button type="button" class="btn btn-danger" onclick={reset}>Remove hakchi and restore the console</button>
-    <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (confirmReset = false)}>Keep hakchi</button>
+    <button type="button" class="btn btn-danger" onclick={reset}>Remove it and restore the console</button>
+    <button type="button" class="btn btn-quiet" data-autofocus onclick={() => (confirmReset = false)}>Keep the custom system</button>
   {/snippet}
 </Dialog>
 

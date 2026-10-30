@@ -156,7 +156,7 @@ impl Step<Context> for RemoveInstall {
     }
 
     fn description(&self) -> &str {
-        "Remove hakchi's files and restore the stock u-boot"
+        "Remove the custom system's files and restore the stock u-boot"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {

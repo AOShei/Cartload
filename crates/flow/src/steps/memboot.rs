@@ -40,7 +40,7 @@ impl Step<Context> for Memboot {
     }
 
     fn description(&self) -> &str {
-        "Boot the hakchi kernel from RAM, through FEL or kexec"
+        "Boot the system from RAM, through FEL or kexec"
     }
 
     async fn already_done(&self, ctx: &mut Context) -> Result<Option<String>> {
@@ -108,10 +108,8 @@ async fn fel_memboot(ctx: &mut Context) -> Result<()> {
         tokio::time::sleep(Duration::from_millis(500).min(ctx.options.poll_interval)).await;
     }
     let hmod = ctx.hmod()?;
-    ctx.reporter.info(format!(
-        "membooting hakchi {} through FEL",
-        hmod.files.version
-    ));
+    ctx.reporter
+        .info(format!("membooting {} through FEL", hmod.files.version));
     let report = ctx
         .backend
         .fel_memboot(&hmod.files, &ctx.options.memboot, &ctx.reporter)
