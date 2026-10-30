@@ -46,11 +46,15 @@ Later, larger projects (not scheduled):
      alternative (a selector on the Console page), and shown in the console's status. CI
      (`.github/workflows/system.yml`) rebuilds it from source and fails unless it is byte for
      byte the committed `data/cartload-system-<version>.hmod`; a `system-v<version>` tag puts it,
-     its report and checksums in a draft release. To do: the first CI run, the first release,
-     the play test of the whole system.
+     its report and checksums in a draft release. Released as `system-v0.1.0` (2026-10-30, a
+     pre-release); installed from the app on a SNES (EUR) and play-tested. Not in it: hakchi's
+     USB gamepad driver (an unpublished part of its sntool; Nintendo controllers do not need
+     it), to rewrite once someone can test USB gamepads.
   5. **NES and Famicom Minis**: the same chip and kernel; needs testers with the hardware.
-  Firmware blobs stay blobs (ARISC, the rtl8188fu Wi-Fi firmware, `fes1.bin`), listed with
-  their origin.
+  Firmware blobs stay blobs (ARISC, the rtl8188fu Wi-Fi firmware, now from linux-firmware),
+  listed with their origin. Left: boot0 and the FEL loader `fes1.bin` link Allwinner's DRAM
+  setup, a binary; mainline u-boot's SPL has open DRAM code for the A33/R16 and could replace
+  `fes1.bin` (tested from RAM through FEL, nothing written), later perhaps boot0.
 - **Emulators built from official libretro source.** Today the emulator modules are
   KMFDManic's builds, mirrored and pinned. libretro publishes no RetroArch binary for 32-bit ARM
   Linux and its armhf cores stopped in 2020, so this means building RetroArch (with the
