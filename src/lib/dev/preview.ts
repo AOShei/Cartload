@@ -384,7 +384,7 @@ const packageFixtures: Record<string, () => PackageStatus> = {
       system: "0.1.0",
       boot: "1.0.3",
       kernel: "3.4.113.30-cartload",
-      len: 8_631_421,
+      len: 8_635_341,
       modified: Date.now() - 3 * 86_400_000,
     },
     cache_path: "/home/user/.cache/cartload/cartload-system-0.1.0.hmod",

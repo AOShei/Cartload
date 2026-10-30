@@ -115,6 +115,10 @@ if [ "${1:-}" = "--inside" ]; then
   build rd /out/shipped/rd "$rd" init hakchi
   cp -a /hakchi/mod/init "$rd/init"
   cp -a /hakchi/mod/hakchi "$rd/hakchi"
+  # The console writes /var/version itself at every start, from the shell variables named
+  # *Version (b0010_functions createVersionFile): defining cartloadVersion with hakchiVersion
+  # puts it there.
+  printf "cartloadVersion='%s'\n" "$system" >>"$rd/hakchi/rootfs/etc/preinit.d/b0000_defines"
   # Directories git does not keep because they are empty (etc/dropbear: dropbear's host keys).
   (cd /out/shipped/rd && find hakchi -type d -empty) | while read -r d; do
     [ -d "$rd/$d" ] || { mkdir -p "$rd/$d"; echo "rd $d shipped" >>"$report.tmp"; }
@@ -123,6 +127,7 @@ if [ "${1:-}" = "--inside" ]; then
   (cd /hakchi/mod/hakchi && find . \( -type f -o -type l \) | sort) | while read -r path; do
     echo "rd hakchi/${path#./} hakchi:mod/hakchi/${path#./}" >>"$report.tmp"
   done
+  sed -i 's|^\(rd hakchi/rootfs/etc/preinit.d/b0000_defines hakchi:.*\)$|\1+cartloadVersion|' "$report.tmp"
   place rd "$rd" hakchi/shell/clovershell "$(lookup rd hakchi/shell/clovershell)"
   # Every program finds its libraries in the ramdisk.
   find "$rd" -type f | while read -r f; do

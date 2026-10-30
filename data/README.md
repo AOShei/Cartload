@@ -132,8 +132,8 @@ repository (GPL-3.0-or-later). Do not modify it.
 | | |
 | --- | --- |
 | Origin | Built by this repository: `scripts/kernel/build.sh`, `scripts/userland/build.sh`, `scripts/uboot/build.sh`, then `scripts/userland/assemble.sh` (docs/userland.md, docs/uboot.md); every file's source is in the build's `report.txt` |
-| Size | 8 631 421 bytes |
-| SHA-256 | `5a8d8e35dd3f4f4d4b32bde4f78d358c2d608962130ee22fa48b4de36669b26f` |
+| Size | 8 635 341 bytes |
+| SHA-256 | `df267ca0a6a491f5434d0707ad5ea616d4d1d97b2df76ec86c360a38a412ed08` |
 | Embedded by | `crates/hmod` with the `bundled` feature, as `cartload_hmod::pinned::CARTLOAD` (the package the app installs by default) |
 
 Cartload's own console system, version 0.1.0 (`cartloadVersion` in its `var/version`): our

@@ -52,8 +52,8 @@ pub const CARTLOAD: PinnedPackage = PinnedPackage {
     label: "Cartload system 0.1.0",
     hakchi_version: "v1.0.4-126",
     system_version: Some("0.1.0"),
-    len: 8_631_421,
-    sha256: "5a8d8e35dd3f4f4d4b32bde4f78d358c2d608962130ee22fa48b4de36669b26f",
+    len: 8_635_341,
+    sha256: "df267ca0a6a491f5434d0707ad5ea616d4d1d97b2df76ec86c360a38a412ed08",
     cache_file: "cartload-system-0.1.0.hmod",
     #[cfg(feature = "bundled")]
     bytes: include_bytes!(concat!(
