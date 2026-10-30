@@ -11,6 +11,8 @@ released on 2026-10-23. `v0.2.0` adds the merged Console page, emulator updates 
 hakchi servers: the kernel package is built in and the emulators are mirrored, both pinned by
 SHA-256. `v0.2.1` (2026-10-28) replaces the unpublished v0.2.0 draft: it shows the 7z step in
 the sync panel and stops counting the built-in games' links as changes on every sync.
+`v0.3.0` (2026-10-30) installs Cartload's own console system by default (Cartload system
+0.1.0, built from source, see below), with hakchi v1.0.4-126 as the alternative.
 
 Next, in order:
 
