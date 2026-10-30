@@ -1,6 +1,5 @@
 <script lang="ts">
-  import Icon from "./Icon.svelte";
-  import { formatTime, logStore, preferences } from "../state";
+  import { formatTime, logStore } from "../state";
 
   interface Props {
     /** Unix milliseconds: only lines from then on are shown. */
@@ -34,20 +33,8 @@
   }
 </script>
 
+<!-- Shown inside the progress window, which covers the main window: no link to the main log. -->
 <section class="flow-log" class:grow aria-label="Log of this run">
-  <header>
-    <h3 class="caps">Log</h3>
-    <span class="spacer"></span>
-    <button
-      type="button"
-      class="btn btn-quiet btn-sm"
-      onclick={() => preferences.setLogOpen(true)}
-      title="Open the full activity log (Ctrl+L)"
-    >
-      <Icon name="log" size={14} />
-      Full log
-    </button>
-  </header>
   <ol role="log" bind:this={list} onscroll={onscroll}>
     {#each lines as line (line.seq)}
       <li class="line level-{line.level}">
@@ -69,19 +56,6 @@
     border-radius: var(--radius-m);
     background: var(--surface-raised);
     overflow: hidden;
-  }
-
-  header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    height: var(--control);
-    padding: 0 var(--space-1) 0 var(--space-3);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .spacer {
-    flex: 1;
   }
 
   .grow {

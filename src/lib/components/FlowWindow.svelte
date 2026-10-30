@@ -11,7 +11,6 @@
     modulesStore,
     navigation,
     toasts,
-    touchesKernel,
   } from "../state";
   import FelInstructions from "./console/FelInstructions.svelte";
   import Dialog from "./Dialog.svelte";
@@ -28,7 +27,6 @@
   const kind = $derived(snapshot.kind);
   const running = $derived(flowStore.running);
   const busy = $derived(running || flowStore.starting);
-  const kernel = $derived(touchesKernel(kind));
 
   /** The modules a module task works on, by name. */
   const modules = $derived.by((): string => {
@@ -159,7 +157,8 @@
     <StepList steps={snapshot.steps} now={flowStore.now} />
   </section>
 
-  <details class="log" open={kernel}>
+  <!-- Folded by default: the steps above say how far it is; the log is there for details. -->
+  <details class="log">
     <summary>Log</summary>
     <FlowLog since={snapshot.started_at} />
   </details>
